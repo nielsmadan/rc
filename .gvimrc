@@ -40,7 +40,8 @@ imap <Esc> <Nop>
 imap ` <C-c>
 
 "Shortcut to reload .gvimc
-nmap <F12> :so $HOME/.gvimrc<CR>
+nmap <S-F12> :so $HOME/.gvimrc<CR>
+nmap <F12> :e $HOME/.gvimrc<CR>
 
 map cs <Esc>:call ClearSearch()
 
