@@ -10,6 +10,9 @@ endif
 "file type
 filetype plugin indent on
 
+"show commands as you type
+set showcmd
+
 "file numbers
 set nu
 
