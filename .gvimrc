@@ -10,6 +10,11 @@ endif
 "file type
 filetype plugin indent on
 
+"emacs bindings for insert mode
+inoremap <C-f> <C-c>la
+inoremap <C-b> <C-c>i
+inoremap <C-x><C-s> <C-c>:w<CR>a
+
 "show commands as you type
 set showcmd
 
