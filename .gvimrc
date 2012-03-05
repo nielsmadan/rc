@@ -1,3 +1,5 @@
+set nocp
+
 call pathogen#infect('pathogen')
 
 "set font
