@@ -1,7 +1,5 @@
 set nocp
 
-call pathogen#infect('pathogen')
-
 "set font
 if has("gui_running")
   if has("gui_gtk2")
@@ -13,6 +11,7 @@ endif
 
 "file type
 filetype plugin indent on
+syntax on
 
 "emacs bindings for insert mode
 inoremap <C-f> <C-c>la
@@ -55,7 +54,7 @@ imap ` <C-c>
 nmap <S-F12> :so $HOME/.gvimrc<CR>
 nmap <F12> :e $HOME/.gvimrc<CR>
 
-map cs <Esc>:call ClearSearch()
+map clr <Esc>:call ClearSearch()
 
 function! ClearSearch()
 let @/ = ""
