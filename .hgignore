@@ -1,5 +1,5 @@
 syntax:glob
 *.swp
 *.swo
-*vim/bundle/vundle/*
+*vim/bundle/*
 *.netrwhist
