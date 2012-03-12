@@ -13,6 +13,12 @@ endif
 filetype plugin indent on
 syntax on
 
+"configure syntastic
+let g:syntastic_mode_map = {'mode': 'active',
+                            \ 'active_filetypes': ['python'],
+                            \ 'passive_filetypes': [] }
+let g:syntastic_check_on_open=1
+
 "emacs bindings for insert mode
 inoremap <C-f> <C-c>la
 inoremap <C-b> <C-c>i
