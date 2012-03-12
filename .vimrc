@@ -4,11 +4,12 @@ filetype off
 
 if has('win32') || has('win64')
     set rtp+=$HOME/vimfiles/bundle/vundle/
+    call vundle#rc('$HOME/vimfiles/bundle/')
 else
     set rtp+=~/.vim/bundle/vundle/
+    call vundle#rc()
 endif
 
-call vundle#rc()
 
 " let Vundle manage Vundle
 " required! 
@@ -17,7 +18,7 @@ Bundle 'gmarik/vundle'
 " My Bundles here:
 "
 " original repos on github
-"Bundle 'tpope/vim-fugitive'
+Bundle 'scrooloose/syntastic'
 "Bundle 'Lokaltog/vim-easymotion'
 "Bundle 'rstacruz/sparkup', {'rtp': 'vim/'}
 "Bundle 'tpope/vim-rails.git'
