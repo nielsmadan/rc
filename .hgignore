@@ -3,3 +3,4 @@ syntax:glob
 *.swo
 *vim/bundle/*
 *.netrwhist
+*.pyc

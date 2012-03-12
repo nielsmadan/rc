@@ -56,6 +56,10 @@ set incsearch
 imap <Esc> <Nop>
 imap ` <C-c>
 
+let g:ConqueTerm_EscKey = '<C-c>'
+let g:ConqueTerm_CWInsert = 1
+let g:ConqueTerm_ExecFileKey = '<F5>'
+
 "Shortcut to reload .gvimc
 nmap <S-F12> :so $HOME/.gvimrc<CR>
 nmap <F12> :e $HOME/.gvimrc<CR>
