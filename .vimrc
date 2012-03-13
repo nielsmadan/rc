@@ -93,6 +93,13 @@ function! ClearSearch()
 let @/ = ""
 endfunction
 
+map clx <Esc>:call FixupXml()
+
+function! FixupXml()
+%s/></>\r</g
+normal! gg=G
+endfunction
+
 " ******* .extvimrc loading *******
 
 " load .extvimrc (from same directory as .vimrc) and source all files
