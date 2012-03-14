@@ -5,6 +5,7 @@ filetype off
 if has('win32') || has('win64')
     set rtp+=$HOME/vimfiles/bundle/vundle/
     call vundle#rc('$HOME/vimfiles/bundle/')
+    set tags+=$HOME/tags/tags
 else
     set rtp+=~/.vim/bundle/vundle/
     call vundle#rc()
