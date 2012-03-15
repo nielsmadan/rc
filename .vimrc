@@ -20,6 +20,8 @@ Bundle 'gmarik/vundle'
 "
 " original repos on github
 Bundle 'scrooloose/syntastic'
+Bundle 'xolox/vim-shell'
+Bundle 'xolox/vim-easytags'
 "Bundle 'Lokaltog/vim-easymotion'
 "Bundle 'rstacruz/sparkup', {'rtp': 'vim/'}
 "Bundle 'tpope/vim-rails.git'
