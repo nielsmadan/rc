@@ -103,6 +103,21 @@ function! FixupXml()
 normal! gg=G
 endfunction
 
+map fc <Esc>:call CleanClose(1)
+map fq <Esc>:call CleanClose(0)
+
+function! CleanClose(tosave)
+if (a:tosave == 1)
+    w!
+endif
+let to_del_buf_nr = bufnr("%")
+let new_buf_nr = bufnr("#")
+if ((new_buf_nr != -1) && (new_buf_nr != to_del_buf_nr) && buflisted(new_buf_nr))
+    exe "b".new_buf_nr
+else
+    bnext
+endif
+
 " ******* .extvimrc loading *******
 
 " load .extvimrc (from same directory as .vimrc) and source all files
