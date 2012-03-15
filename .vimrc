@@ -20,12 +20,16 @@ Bundle 'gmarik/vundle'
 "
 " original repos on github
 Bundle 'scrooloose/syntastic'
-Bundle 'xolox/vim-shell'
-Bundle 'xolox/vim-easytags'
+"Bundle 'xolox/vim-shell'
+"Bundle 'xolox/vim-easytags'
 "Bundle 'Lokaltog/vim-easymotion'
 "Bundle 'rstacruz/sparkup', {'rtp': 'vim/'}
 "Bundle 'tpope/vim-rails.git'
 " vim-scripts repos
+"Bundle 'taglist.vim'
+"Bundle 'python.vim'
+"Bundle 'pydoc.vim'
+"Bundle 'Pydiction'
 "Bundle 'L9'
 "Bundle 'FuzzyFinder'
 " non github repos
@@ -87,6 +91,12 @@ let g:syntastic_check_on_open=1
 let g:ConqueTerm_EscKey = '<C-c>'
 let g:ConqueTerm_CWInsert = 1
 let g:ConqueTerm_ExecFileKey = '<F5>'
+
+if has('win32') || has('win64')
+    let g:pydiction_location = '$HOME/vimfiles/bundle/Pydiction/complete-dict'
+else
+    let g:pydiction_location = '$HOME/.vim/bundle/Pydiction/complete-dict'
+endif
 
 " ******* small function *******
 
