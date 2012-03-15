@@ -117,6 +117,7 @@ if ((new_buf_nr != -1) && (new_buf_nr != to_del_buf_nr) && buflisted(new_buf_nr)
 else
     bnext
 endif
+endfunction
 
 " ******* .extvimrc loading *******
 
