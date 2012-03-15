@@ -9,3 +9,13 @@ bb.schemes = https
 [extensions]
 fetch =
 mercurial_keyring =
+hgext.extdiff =
+
+[extdiff]
+cmd.kdiff = kdiff3
+
+cmd.diffm = sgdm
+
+cmd.p4diff = p4merge
+
+cmd.bcomp = bcomp
