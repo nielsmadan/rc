@@ -80,6 +80,10 @@ inoremap <C-x><C-s> <C-c>:w<CR>a
 nmap <S-F12> :so $HOME/.gvimrc<CR>
 nmap <F12> :e $HOME/.gvimrc<CR>
 
+"Close scratch buffer after omni complete
+autocmd CursorMovedI * if pumvisible() == 0|pclose|endif
+autocmd InsertLeave * if pumvisible() == 0|pclose|endif
+
 " ******* PLUGIN CONFIGURATION *******
 
 "configure syntastic
@@ -93,11 +97,11 @@ let g:ConqueTerm_EscKey = '<C-c>'
 let g:ConqueTerm_CWInsert = 1
 let g:ConqueTerm_ExecFileKey = '<F5>'
 
-if has('win32') || has('win64')
-    let g:pydiction_location = '$HOME/vimfiles/bundle/Pydiction/complete-dict'
-else
-    let g:pydiction_location = '$HOME/.vim/bundle/Pydiction/complete-dict'
-endif
+"if has('win32') || has('win64')
+    "let g:pydiction_location = '$HOME/vimfiles/bundle/Pydiction/complete-dict'
+"else
+    "let g:pydiction_location = '$HOME/.vim/bundle/Pydiction/complete-dict'
+"endif
 
 " ******* small function *******
 
