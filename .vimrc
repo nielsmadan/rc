@@ -78,9 +78,11 @@ inoremap <C-f> <C-c>la
 inoremap <C-b> <C-c>i
 inoremap <C-x><C-s> <C-c>:w<CR>a
 
+nnoremap <Leader>s :%s/\<<C-r><C-w>\>//gc<Left><Left><Left>
+
 "Shortcut to reload .gvimc
-nmap <S-F12> :so $HOME/.gvimrc<CR>
-nmap <F12> :e $HOME/.gvimrc<CR>
+nmap <S-F12> :so $HOME/.gvimrc<CR>:so $HOME/.vimrc
+nmap <F12> :e $HOME/.gvimrc<CR>:sp<CR>:e $HOME/.vimrc
 
 "Close scratch buffer after omni complete
 autocmd CursorMovedI * if pumvisible() == 0|pclose|endif
