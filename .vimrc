@@ -38,6 +38,8 @@ Bundle 'pythoncomplete'
 
 call pathogen#infect('pathogen')
 
+let mapleader = ","
+
 filetype plugin indent on
 syntax on
 set nu
