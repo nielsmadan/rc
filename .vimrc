@@ -81,7 +81,7 @@ inoremap <C-x><C-s> <C-c>:w<CR>a
 nnoremap <Leader>s :%s/\<<C-r><C-w>\>//gc<Left><Left><Left>
 
 "Shortcut to reload .gvimc
-nmap <S-F12> :so $HOME/.gvimrc<CR>:so $HOME/.vimrc
+nmap <S-F12> :so $HOME/.gvimrc<CR>:so $HOME/.vimrc<CR>
 nmap <F12> :e $HOME/.gvimrc<CR>:sp<CR>:e $HOME/.vimrc<CR>
 
 "Close scratch buffer after omni complete
