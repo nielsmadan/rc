@@ -108,3 +108,4 @@ fi
 
 GREP_OPTIONS="--exclude-dir=\.svn"
 export GREP_OPTIONS
+export PYLINTRC="$HOME/pylint.rc"
