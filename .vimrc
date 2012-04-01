@@ -20,6 +20,7 @@ Bundle 'gmarik/vundle'
 "
 " original repos on github
 Bundle 'scrooloose/syntastic'
+Bundle 'altercation/vim-colors-solarized'
 "Bundle 'xolox/vim-shell'
 "Bundle 'xolox/vim-easytags'
 "Bundle 'Lokaltog/vim-easymotion'
@@ -89,6 +90,9 @@ autocmd CursorMovedI * if pumvisible() == 0|pclose|endif
 autocmd InsertLeave * if pumvisible() == 0|pclose|endif
 
 " ******* PLUGIN CONFIGURATION *******
+
+set background=light
+colorscheme solarized
 
 "configure syntastic
 let g:syntastic_mode_map = {'mode': 'active',
