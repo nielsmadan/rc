@@ -22,12 +22,20 @@ Bundle 'gmarik/vundle'
 Bundle 'scrooloose/syntastic'
 Bundle 'tpope/vim-surround'
 Bundle 'tomtom/tcomment_vim'
-Bundle 'altercation/vim-colors/solarized'
 "Bundle 'xolox/vim-shell'
 "Bundle 'xolox/vim-easytags'
 "Bundle 'Lokaltog/vim-easymotion'
 "Bundle 'rstacruz/sparkup', {'rtp': 'vim/'}
 "Bundle 'tpope/vim-rails.git'
+
+"color scheme options
+Bundle 'Zenburn'
+Bundle 'fugalh/desert.vim'
+Bundle 'Wombat'
+Bundle 'molokai'
+Bundle 'moria'
+Bundle 'tpope/vim-vividchalk'
+
 " vim-scripts repos
 Bundle 'repeat.vim'
 "Bundle 'taglist.vim'
@@ -92,10 +100,18 @@ nmap <F12> :e $HOME/.gvimrc<CR>:sp<CR>:e $HOME/.vimrc<CR>
 autocmd CursorMovedI * if pumvisible() == 0|pclose|endif
 autocmd InsertLeave * if pumvisible() == 0|pclose|endif
 
-" ******* PLUGIN CONFIGURATION *******
 
-set background=light
-colorscheme solarized
+" ******* COLORSCHEME CONFIGURATION *******
+
+"colorscheme Zenburn
+"colorscheme desert
+"colorscheme Wombat
+colorscheme molokai
+"colorscheme moria
+"let moria_style = 'light' "black/dark/light/white
+"colo vividchalk
+
+" ******* PLUGIN CONFIGURATION *******
 
 "configure syntastic
 let g:syntastic_mode_map = {'mode': 'active',
