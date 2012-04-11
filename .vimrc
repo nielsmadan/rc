@@ -37,7 +37,10 @@ Bundle 'Zmrok'
 Bundle 'molokai'
 Bundle 'moria'
 Bundle 'tpope/vim-vividchalk'
-Bundle 'slimv'
+
+
+"Bundle 'slimv'
+"Bundle 'VimClojure'
 
 " vim-scripts repos
 Bundle 'repeat.vim'
