@@ -81,6 +81,12 @@ set tabstop=4
 set expandtab
 set shiftwidth=4
 
+"folding options
+set foldmethod=indent
+set foldminlines=2
+nnoremap z1 :set foldlevel=1<CR>
+nnoremap z2 :set foldlevel=2<CR>
+
 "search options
 set hlsearch
 set ignorecase
