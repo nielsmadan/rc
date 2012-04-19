@@ -84,6 +84,7 @@ set shiftwidth=4
 "folding options
 set foldmethod=indent
 set foldminlines=2
+set foldlevelstart=20
 nnoremap z1 :set foldlevel=1<CR>
 nnoremap z2 :set foldlevel=2<CR>
 
