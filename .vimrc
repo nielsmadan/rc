@@ -145,21 +145,21 @@ let g:ConqueTerm_ExecFileKey = '<F5>'
 
 " ******* small function *******
 
-map clr <Esc>:call ClearSearch()
+map <Leader>clr<CR> <Esc>:call ClearSearch()<CR>
 
 function! ClearSearch()
 let @/ = ""
 endfunction
 
-map clx <Esc>:call FixupXml()
+map <Leader>xml<CR> <Esc>:call FixupXml()
 
 function! FixupXml()
 %s/></>\r</g
 normal! gg=G
 endfunction
 
-map fc <Esc>:call CleanClose(1)
-map fq <Esc>:call CleanClose(0)
+map <Leader>wq<CR> <Esc>:call CleanClose(1)<CR>
+map <Leader>q<CR> <Esc>:call CleanClose(0)<CR>
 
 function! CleanClose(tosave)
 if (a:tosave == 1)
