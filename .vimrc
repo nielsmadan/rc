@@ -138,6 +138,11 @@ let g:ConqueTerm_EscKey = '<C-c>'
 let g:ConqueTerm_CWInsert = 1
 let g:ConqueTerm_ExecFileKey = '<F5>'
 
+"configure ctrl-p
+let g:ctrlp_map = '<c-p><c-f>'
+nmap <c-p><c-b> :CtrlPBuffer<CR>
+nmap <c-p><c-a> :CtrlPMixed<CR>
+
 "if has('win32') || has('win64')
     "let g:pydiction_location = '$HOME/vimfiles/bundle/Pydiction/complete-dict'
 "else
