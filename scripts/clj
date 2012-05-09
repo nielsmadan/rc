@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+java jline.ConsoleRunner clojure.main
+else
+java clojure.main $1
+fi
