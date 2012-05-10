@@ -6,3 +6,6 @@ if has("gui_running")
     set guifont=Consolas:h12:cANSI
   endif
 endif
+
+:set guioptions-=m  "remove menu bar
+:set guioptions-=T  "remove toolbar
