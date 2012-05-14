@@ -111,3 +111,4 @@ export GREP_OPTIONS
 export PYLINTRC="$HOME/pylint.rc"
 alias fu='curl -s http://www.commandlinefu.com/commands/browse/sort-by-votes/p... | grep -vE "^$|^#"'
 export CLASSPATH=/usr/local/lib/jars/*
+alias ..='cd ..'
