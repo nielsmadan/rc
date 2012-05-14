@@ -8,7 +8,7 @@ print "Home directory found: %s" % h_dir
 print "current directory found: %s\n" % c_dir
 
 print "Symlinking rc files into home directory"
-rc_file = ['.vimrc', '.gvimrc', '.hgrc', '.vim', '.bashrc']
+rc_file = ['.vimrc', '.gvimrc', '.hgrc', '.vim', '.bashrc', '.pylintrc']
 
 print "Remove rc files or symlinks if they exist already."
 for f in rc_file:
