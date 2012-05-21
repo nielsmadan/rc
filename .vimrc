@@ -29,17 +29,6 @@ Bundle 'kien/ctrlp.vim'
 "Bundle 'rstacruz/sparkup', {'rtp': 'vim/'}
 "Bundle 'tpope/vim-rails.git'
 
-"color scheme options
-Bundle 'Zenburn'
-Bundle 'fugalh/desert.vim'
-Bundle 'Wombat'
-Bundle 'candycode.vim'
-Bundle 'Zmrok'
-Bundle 'molokai'
-Bundle 'moria'
-Bundle 'tpope/vim-vividchalk'
-
-
 "Bundle 'slimv'
 "Bundle 'VimClojure'
 
