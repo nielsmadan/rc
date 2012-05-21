@@ -66,6 +66,31 @@ set backspace=2
 set autowrite
 set autoread
 
+"vimdiff options
+if &diff
+    "quick arrow nav, left pull, right push (regardless of side)
+    nnoremap <down> ]c
+    nnoremap <up> [c
+    nnoremap <left> do
+    nnoremap <right> dp
+
+    nnoremap <m-r> :diffupdate<CR>
+    nnoremap <m-d> ]c
+    nnoremap <m-u> [c
+
+    nnoremap <m-g>1 :diffget 1<CR>
+    nnoremap <m-g>2 :diffget 2<CR>
+    nnoremap <m-g>3 :diffget 3<CR>
+    nnoremap <m-g><m-g> :diffget<CR>
+
+    nnoremap <m-p>1 :diffput 1<CR>
+    nnoremap <m-p>2 :diffput 2<CR>
+    nnoremap <m-p>3 :diffput 3<CR>
+    nnoremap <m-p><m-p> :diffput<CR>
+
+    nnoremap <m-q> :wqall<CR>
+endif
+
 "indent options
 set tabstop=4
 set expandtab
@@ -106,12 +131,9 @@ autocmd InsertLeave * if pumvisible() == 0|pclose|endif
 
 " ******* COLORSCHEME CONFIGURATION *******
 
-"colorscheme Zenburn
-"colorscheme desert
 "colorscheme Wombat
 colorscheme molokai
 "colorscheme moria
-"let moria_style = 'light' "black/dark/light/white
 "colo vividchalk
 
 " ******* PLUGIN CONFIGURATION *******
