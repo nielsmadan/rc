@@ -30,8 +30,11 @@ for f in loc_rc_file:
     call(["touch", os.path.join(h_dir, f)])
 
 print "create bundle/vundle directory in .vim and git clone it"
-os.makedirs(os.path.join(c_dir, ".vim/bundle/vundle"))
-call(["git", "clone", "https://github.com/gmarik/vundle/", os.path.join(c_dir, ".vim/bundle/vundle")])
+try:
+    os.makedirs(os.path.join(c_dir, ".vim/bundle/vundle"))
+    call(["git", "clone", "https://github.com/gmarik/vundle/", os.path.join(c_dir, ".vim/bundle/vundle")])
+except OSError:
+    pass
 
 print "create .tmp directory"
 os.mkdir(os.path.join(h_dir, ".tmp"))
