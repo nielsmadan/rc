@@ -16,30 +16,40 @@ endif
 " required! 
 Bundle 'gmarik/vundle'
 
-" small utilities
+" GENERAL PLUGINS
 Bundle 'tpope/vim-surround'
 Bundle 'repeat.vim'
 Bundle 'tomtom/tcomment_vim'
 Bundle 'kien/ctrlp.vim'
+" this is just a mirror
+Bundle 'rson/vim-conque'
+"Bundle 'joonty/vim-sauce.git'
+Bundle 'xolox/vim-shell'
 
+" easytags does not like diff
 if ! &diff
-    Bundle 'xolox/vim-shell'
     Bundle 'xolox/vim-easytags'
 endif
 
 Bundle 'Lokaltog/vim-easymotion'
+"Bundle 'AutoTag' " remove dangling tags on closing vim (test with easytags)
 "Bundle 'DirDiff.vim'
 
-" frameworks
+" FRAMEWORKS
 Bundle 'scrooloose/syntastic'
+"Bundle 'Shougo/neocomplcache'
 
-" language specific
+" LANGUAGE SPECIFIC
 "Bundle 'slimv'
 "Bundle 'VimClojure'
+
+" latest version of built-in omnicomplete
 Bundle 'pythoncomplete'
-"Bundle 'python.vim'
+" improved syntax highlighting
+Bundle 'python.vim'
 "Bundle 'pydoc.vim'
-"Bundle 'Pydiction'
+" tab completion
+Bundle 'Pydiction'
 
 " vim-scripts repos
 "Bundle 'taglist.vim'
@@ -168,29 +178,25 @@ let g:ctrlp_map = '<c-p><c-f>'
 nmap <c-p><c-b> :CtrlPBuffer<CR>
 nmap <c-p><c-a> :CtrlPMixed<CR>
 
-"if has('win32') || has('win64')
-    "let g:pydiction_location = '$HOME/vimfiles/bundle/Pydiction/complete-dict'
-"else
-    "let g:pydiction_location = '$HOME/.vim/bundle/Pydiction/complete-dict'
-"endif
+let g:pydiction_location = '$HOME/.tmp/complete-dict'
 
 " ******* small function *******
 
-map <Leader>clr<CR> <Esc>:call ClearSearch()<CR>
+map <Leader>clr <Esc>:call ClearSearch()
 
 function! ClearSearch()
 let @/ = ""
 endfunction
 
-map <Leader>xml<CR> <Esc>:call FixupXml()
+map <Leader>xml <Esc>:call FixupXml()
 
 function! FixupXml()
 %s/></>\r</g
 normal! gg=G
 endfunction
 
-map <Leader>wq<CR> <Esc>:call CleanClose(1)<CR>
-map <Leader>q<CR> <Esc>:call CleanClose(0)<CR>
+map <Leader>wq <Esc>:call CleanClose(1)
+map <Leader>q <Esc>:call CleanClose(0)
 
 function! CleanClose(tosave)
 if (a:tosave == 1)
@@ -203,6 +209,11 @@ if ((new_buf_nr != -1) && (new_buf_nr != to_del_buf_nr) && buflisted(new_buf_nr)
 else
     bnext
 endif
+
+if (bufnr("%") == to_del_buf_nr)
+    new
+endif
+exe "bd".to_del_buf_nr
 endfunction
 
 " ******* .extvimrc loading *******
