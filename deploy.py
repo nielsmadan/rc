@@ -35,3 +35,9 @@ call(["git", "clone", "https://github.com/gmarik/vundle/", os.path.join(c_dir, "
 
 print "create .tmp directory"
 os.mkdir(os.path.join(h_dir, ".tmp"))
+
+print "Run BundleInstall"
+call(['gvim', '-f', '+BundleInstall', '+qall'])
+
+print "copy complete-dict for pydiction to .tmp directory"
+call(['cp', os.path.join(c_dir, '.vim/bundle/Pydiction/complete-dict'), os.path.join(h_dir, '.tmp')])
