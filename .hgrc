@@ -13,9 +13,9 @@ hgext.extdiff =
 
 [extdiff]
 cmd.kdiff = kdiff3
-
 cmd.diffm = sgdm
-
 cmd.p4diff = p4merge
-
 cmd.bcomp = bcomp
+
+cmd.vdiff = gvimdiff
+#opts.vdiff = -f '+next' '+execute "DirDiff" fnameescape(argv(0)) fnameescape(argv(1))'
