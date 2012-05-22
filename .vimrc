@@ -5,7 +5,7 @@ filetype off
 if has('win32') || has('win64')
     set rtp+=$HOME/vimfiles/bundle/vundle/
     call vundle#rc('$HOME/vimfiles/bundle/')
-    set tags+=$HOME/tags/tags
+    set tags+=$HOME/.tmp/
 else
     set rtp+=~/.vim/bundle/vundle/
     call vundle#rc()
@@ -16,32 +16,33 @@ endif
 " required! 
 Bundle 'gmarik/vundle'
 
-" My Bundles here:
-"
-" original repos on github
-Bundle 'scrooloose/syntastic'
+" small utilities
 Bundle 'tpope/vim-surround'
+Bundle 'repeat.vim'
 Bundle 'tomtom/tcomment_vim'
 Bundle 'kien/ctrlp.vim'
-"Bundle 'xolox/vim-shell'
-"Bundle 'xolox/vim-easytags'
-"Bundle 'Lokaltog/vim-easymotion'
-"Bundle 'rstacruz/sparkup', {'rtp': 'vim/'}
-"Bundle 'tpope/vim-rails.git'
 
+if ! &diff
+    Bundle 'xolox/vim-shell'
+    Bundle 'xolox/vim-easytags'
+endif
+
+Bundle 'Lokaltog/vim-easymotion'
+"Bundle 'DirDiff.vim'
+
+" frameworks
+Bundle 'scrooloose/syntastic'
+
+" language specific
 "Bundle 'slimv'
 "Bundle 'VimClojure'
-
-" vim-scripts repos
-Bundle 'repeat.vim'
-"Bundle 'taglist.vim'
+Bundle 'pythoncomplete'
 "Bundle 'python.vim'
 "Bundle 'pydoc.vim'
-Bundle 'pythoncomplete'
 "Bundle 'Pydiction'
-"Bundle 'L9'
-"Bundle 'FuzzyFinder'
-" non github repos
+
+" vim-scripts repos
+"Bundle 'taglist.vim'
 "Bundle 'git://git.wincent.com/command-t.git'
 
 call pathogen#infect('pathogen')
@@ -133,10 +134,23 @@ autocmd InsertLeave * if pumvisible() == 0|pclose|endif
 
 "colorscheme Wombat
 colorscheme molokai
+
+"let moria_style = 'white' " possible moria styles: dark, black, white, light
+"let moria_monochrome = 1 " monochrome status line, Pmenu, line nr 
+"let moria_fontface = 'mixed' " bold statement, type in 'black' and 'dark'
 "colorscheme moria
+
 "colo vividchalk
 
 " ******* PLUGIN CONFIGURATION *******
+
+"configure easytags
+
+if ! &diff
+    set tags=./tags
+    let g:easytags_dynamic_files = 1 " add tags to project tag file (if it already exists)
+    let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
+endif
 
 "configure syntastic
 let g:syntastic_mode_map = {'mode': 'active',
