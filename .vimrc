@@ -129,7 +129,7 @@ inoremap <C-f> <C-c>la
 inoremap <C-b> <C-c>i
 inoremap <C-x><C-s> <C-c>:w<CR>a
 
-nnoremap <Leader>s :%s/\<<C-r><C-w>\>//gc<Left><Left><Left>
+nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
 
 "Shortcut to reload .gvimc
 nmap <S-F12> :so $HOME/.gvimrc<CR>:so $HOME/.vimrc<CR>
