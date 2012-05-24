@@ -124,6 +124,12 @@ set incsearch
 imap <Esc> <Nop>
 imap ` <C-c>
 
+"copy/paste to system clipboard
+vnoremap <Leader><m-c> "+y
+nnoremap <Leader><m-c> "+y
+vnoremap <Leader><m-v> "+p
+nnoremap <Leader><m-v> "+p
+
 "emacs bindings for insert mode
 inoremap <C-f> <C-c>la
 inoremap <C-b> <C-c>i
