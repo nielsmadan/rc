@@ -37,7 +37,10 @@ except OSError:
     pass
 
 print "create .tmp directory"
-os.mkdir(os.path.join(h_dir, ".tmp"))
+try:
+    os.mkdir(os.path.join(h_dir, ".tmp"))
+except OSError:
+    pass
 
 print "Run BundleInstall"
 call(['gvim', '-f', '+BundleInstall', '+qall'])
