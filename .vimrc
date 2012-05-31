@@ -77,6 +77,12 @@ set backspace=2
 set autowrite
 set autoread
 
+"run shell in interactive mode to get aliases
+set shellcmdflag=-ic
+
+"run external nose command
+nnoremap <m-t> :!nose<CR>
+
 "vimdiff options
 if &diff
     "quick arrow nav, left pull, right push (regardless of side)
@@ -166,6 +172,7 @@ if ! &diff
     set tags=./tags
     let g:easytags_dynamic_files = 1 " add tags to project tag file (if it already exists)
     let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
+    let g:easytags_updatetime_autodisable = 1
 endif
 
 "configure syntastic
