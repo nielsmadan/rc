@@ -9,6 +9,8 @@ if has('win32') || has('win64')
 else
     set rtp+=~/.vim/bundle/vundle/
     call vundle#rc()
+    "run shell in interactive mode to get aliases
+    set shellcmdflag=-ic
 endif
 
 
@@ -77,8 +79,6 @@ set backspace=2
 set autowrite
 set autoread
 
-"run shell in interactive mode to get aliases
-set shellcmdflag=-ic
 
 "run external nose command
 nnoremap <m-t> :!nose<CR>
