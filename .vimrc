@@ -9,6 +9,7 @@ if has('win32') || has('win64')
 else
     set rtp+=~/.vim/bundle/vundle/
     call vundle#rc()
+    set tags+=~/.tmp/
 endif
 
 
@@ -190,7 +191,11 @@ let g:ctrlp_map = '<c-p><c-f>'
 nmap <c-p><c-b> :CtrlPBuffer<CR>
 nmap <c-p><c-a> :CtrlPMixed<CR>
 
-let g:pydiction_location = '$HOME/.tmp/complete-dict'
+if has('win32') || has('win64')
+    let g:pydiction_location = '$HOME/.tmp/complete-dict'
+else
+    let g:pydiction_location = '~/.tmp/complete-dict'
+endif
 
 " ******* small function *******
 
