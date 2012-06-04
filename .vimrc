@@ -127,7 +127,6 @@ set smartcase
 set incsearch
 
 "Switch mode options
-imap <Esc> <Nop>
 imap ` <C-c>
 
 "copy/paste to system clipboard
