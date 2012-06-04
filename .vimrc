@@ -191,6 +191,7 @@ let g:ctrlp_map = '<c-p><c-f>'
 nmap <c-p><c-b> :CtrlPBuffer<CR>
 nmap <c-p><c-a> :CtrlPMixed<CR>
 
+"configure pydiction
 if has('win32') || has('win64')
     let g:pydiction_location = '$HOME/.tmp/complete-dict'
 else
