@@ -106,7 +106,7 @@ if [ -f ~/.localbashrc ]; then
     source ~/.localbashrc
 fi
 
-GREP_OPTIONS="--exclude-dir=\.svn"
+GREP_OPTIONS="--exclude-dir=\.svn --exclude=tags"
 export GREP_OPTIONS
 export PYLINTRC="$HOME/pylint.rc"
 alias fu='curl -s http://www.commandlinefu.com/commands/browse/sort-by-votes/p... | grep -vE "^$|^#"'
