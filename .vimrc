@@ -170,7 +170,7 @@
 
     "configure easytags
     if ! &diff
-        set tags=./tags
+        set tags=tags,./tags
         let g:easytags_dynamic_files = 1 " add tags to project tag file (if it already exists)
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
         let g:easytags_updatetime_autodisable = 1
