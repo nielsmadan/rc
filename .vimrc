@@ -130,6 +130,10 @@
     "Search/Replace word under cursor
     nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
 
+    au FileType python setl tags+=~/.tmp/python
+    au FileType python vnoremap <m-e> :w !python<CR>
+    au FileType python nnoremap <m-e> :w !python<CR>
+
     "vimdiff options
     if &diff
         "quick arrow nav, left pull, right push (regardless of side)
@@ -170,7 +174,9 @@
 
     "configure easytags
     if ! &diff
-        set tags=tags,./tags
+        set tags+=tags
+        set tags+=./tags
+        set tags+=tags;
         let g:easytags_dynamic_files = 1 " add tags to project tag file (if it already exists)
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
         let g:easytags_updatetime_autodisable = 1
