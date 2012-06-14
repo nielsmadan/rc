@@ -121,6 +121,9 @@
     "Switch mode options
     imap ` <C-c>
 
+    "reload vimrc
+    nnoremap <F12> :so $MYVIMRC<CR>
+
     "copy/paste to system clipboard
     vnoremap <Leader><m-c> "+y
     nnoremap <Leader><m-c> "+y
@@ -131,6 +134,8 @@
     nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
 
     au FileType python setl tags+=~/.tmp/python
+
+    "Execute selection and execute file for python
     au FileType python vnoremap <m-e> :w !python<CR>
     au FileType python nnoremap <m-e> :w !python<CR>
 
