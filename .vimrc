@@ -9,6 +9,9 @@
     else
         set rtp+=~/.vim/bundle/vundle/
         call vundle#rc()
+
+        "run shell in interactive mode to get aliases
+        set shellcmdflag=-ic
     endif
 
     Bundle 'gmarik/vundle'
@@ -84,9 +87,6 @@
     "file options
     set autowrite
     set autoread
-
-    "run shell in interactive mode to get aliases
-    set shellcmdflag=-ic
 
     "indent options
     set tabstop=4
