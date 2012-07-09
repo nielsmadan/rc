@@ -112,8 +112,8 @@ export PYLINTRC="$HOME/pylint.rc"
 alias fu='curl -s http://www.commandlinefu.com/commands/browse/sort-by-votes/p... | grep -vE "^$|^#"'
 export CLASSPATH=/usr/local/lib/jars/*
 alias ..='cd ..'
-alias tag='ctags --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'
-
+alias tag='ctags -a -R --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'
+alias pytag='ctags -a -R --languages="python" --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'
 alias nose='nosetests -s'
 alias py='python2.7'
 alias py27='python2.7'
