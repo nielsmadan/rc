@@ -73,25 +73,36 @@
     filetype plugin indent on
     syntax on
 
-    "show line numbers, show command, always show status linec
+    "show line numbers, show command, show mode always show status line
     set nu
     set showcmd
+    set showmode
     set laststatus=2
+    set lazyredraw "don't redraw while executing macros
 
     "do not create backup files
     set nobackup
+    "set undofile
 
     "backspace over line breaks
-    set backspace=2
+    set backspace=indent,eol,start
 
     "file options
     set autowrite
     set autoread
 
+    "text wrapping
+    set wrap
+    set textwidth=119
+    set formatoptions=tcqn1
+    set colorcolumn=120
+    set linebreak
+
     "indent options
     set tabstop=4
     set expandtab
     set shiftwidth=4
+    set softtabstop=4
 
     "folding options
     set foldmethod=indent
@@ -103,13 +114,21 @@
     set ignorecase
     set smartcase
     set incsearch
+    set scrolloff=5 "show lines above/below search result
+
+    "command line completion
+    set wildmenu
+    set wildmode=list:longest,full
 
     "Close scratch buffer after omni complete
-    autocmd CursorMovedI * if pumvisible() == 0|pclose|endif
-    autocmd InsertLeave * if pumvisible() == 0|pclose|endif
+    "autocmd CursorMovedI * if pumvisible() == 0|pclose|endif
+    "autocmd InsertLeave * if pumvisible() == 0|pclose|endif
 
 "--->MAPPINGS
     let mapleader = ","
+
+    "Clear search highlighting
+    nnoremap <leader><space> :noh<CR>
 
     "Folding shortcuts
     nnoremap z1 :set foldlevel=1<CR>
@@ -120,6 +139,10 @@
 
     "Switch mode options
     imap ` <C-c>
+    inoremap jj <C-c>
+
+    "Switch windows
+    nnoremap <leader>w <C-w>v<C-w>l
 
     "reload vimrc
     nnoremap <F12> :so $MYVIMRC<CR>
