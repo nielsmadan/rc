@@ -43,7 +43,7 @@
 
 "------->LANGUAGE SPECIFIC
         "Bundle 'slimv'
-        "Bundle 'VimClojure'
+        Bundle 'VimClojure'
 
         " latest version of built-in omnicomplete
         Bundle 'pythoncomplete'
