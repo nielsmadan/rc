@@ -21,9 +21,10 @@
         Bundle 'repeat.vim'
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
+        Bundle 'YankRing.vim'
 
         " this is just a mirror
-        Bundle 'rson/vim-conque'
+        " Bundle 'rson/vim-conque'
         "Bundle 'joonty/vim-sauce.git'
         Bundle 'xolox/vim-shell'
 
@@ -33,7 +34,7 @@
         endif
 
         Bundle 'Lokaltog/vim-easymotion'
-        Bundle 'SuperTab'
+        Bundle 'ervandew/supertab'
         "Bundle 'AutoTag' " remove dangling tags on closing vim (test with easytags)
         "Bundle 'DirDiff.vim'
 
@@ -73,8 +74,8 @@
     filetype plugin indent on
     syntax on
 
-    "show line numbers, show command, show mode always show status line
-    set nu
+    "show line numbers, show command, show mode, always show status line
+    set number
     set showcmd
     set showmode
     set laststatus=2
@@ -82,6 +83,7 @@
 
     "do not create backup files
     set nobackup
+    set noswapfile
     "set undofile
 
     "backspace over line breaks
@@ -120,9 +122,8 @@
     set wildmenu
     set wildmode=list:longest,full
 
-    "Close scratch buffer after omni complete
-    "autocmd CursorMovedI * if pumvisible() == 0|pclose|endif
-    "autocmd InsertLeave * if pumvisible() == 0|pclose|endif
+    "show menu and preview for completion
+    set completeopt=menu,preview
 
 "--->MAPPINGS
     let mapleader = ","
@@ -158,9 +159,8 @@
 
     au FileType python setl tags+=~/.tmp/python
 
-    "Execute selection and execute file for python
-    au FileType python vnoremap <m-e> :w !python<CR>
-    au FileType python nnoremap <m-e> :w !python<CR>
+    "Execute selection or execute file for python
+    au FileType python noremap <m-e> :w !python<CR>
 
     "vimdiff options
     if &diff
@@ -196,8 +196,6 @@
     "let moria_fontface = 'mixed' " bold statement, type in 'black' and 'dark'
     "colorscheme moria
 
-    "colo vividchalk
-
 "--->PLUGIN CONFIGURATION
 
     "configure easytags
@@ -216,10 +214,15 @@
                                 \ 'active_filetypes': ['python'],
                                 \ 'passive_filetypes': ['xml'] }
 
+    "configure supertab
+    let g:SuperTabDefaultCompletionType = "context"
+    let g:SuperTabContextDefaultCompletionType = "<c-p>"
+    let g:SuperTabClosePreviewOnPopupClose = 1
+
     "configure conque
-    let g:ConqueTerm_EscKey = '<C-c>'
-    let g:ConqueTerm_CWInsert = 1
-    let g:ConqueTerm_ExecFileKey = '<F5>'
+    " let g:ConqueTerm_EscKey = '<C-c>'
+    " let g:ConqueTerm_CWInsert = 1
+    " let g:ConqueTerm_ExecFileKey = '<F5>'
 
     "configure ctrl-p
     let g:ctrlp_map = '<c-p><c-f>'
@@ -227,12 +230,6 @@
     nmap <c-p><c-a> :CtrlPMixed<CR>
 
 "--->SMALL FUNCTIONS
-    map <Leader>clr <Esc>:call ClearSearch()
-
-    function! ClearSearch()
-    let @/ = ""
-    endfunction
-
     map <Leader>xml <Esc>:call FixupXml()
 
     function! FixupXml()
