@@ -7,5 +7,11 @@ if has("gui_running")
   endif
 endif
 
-:set guioptions-=m  "remove menu bar
-:set guioptions-=T  "remove toolbar
+set lines=40
+set columns=125
+set guioptions-=m  "remove menu bar
+set guioptions-=T  "remove toolbar
+set guioptions-=l  "no scroll bars (left and right)
+set guioptions-=L
+set guioptions-=r
+set guioptions-=R
