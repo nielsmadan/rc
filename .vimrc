@@ -143,7 +143,10 @@
     inoremap jj <C-c>
 
     "Switch windows
-    nnoremap <leader>w <C-w>v<C-w>l
+    nnoremap <C-h> <C-w>h
+    nnoremap <C-j> <C-w>j
+    nnoremap <C-k> <C-w>k
+    nnoremap <C-l> <C-w>l
 
     "reload vimrc
     nnoremap <F12> :so $MYVIMRC<CR>
@@ -228,6 +231,11 @@
     let g:ctrlp_map = '<c-p><c-f>'
     nmap <c-p><c-b> :CtrlPBuffer<CR>
     nmap <c-p><c-a> :CtrlPMixed<CR>
+
+    "configure yank ring
+    nnoremap <silent> <F3> :YRShow<cr>
+    inoremap <silent> <F3> <ESC>:YRShow<cr>
+    let g:yankring_manage_numbered_reg = 1
 
 "--->SMALL FUNCTIONS
     map <Leader>xml <Esc>:call FixupXml()
