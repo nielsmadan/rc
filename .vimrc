@@ -22,6 +22,7 @@
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
         Bundle 'YankRing.vim'
+        " Bundle 'sjl/gundo.vim'
 
         " this is just a mirror
         " Bundle 'rson/vim-conque'
