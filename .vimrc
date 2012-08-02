@@ -98,7 +98,7 @@
     set wrap
     set textwidth=119
     set formatoptions=tcqn1
-    set colorcolumn=120
+    " set colorcolumn=120
     set linebreak
 
     "indent options
@@ -144,6 +144,7 @@
     inoremap jj <C-c>
 
     "Switch windows
+    nnoremap <leader>w <C-w><C-w>
     nnoremap <C-h> <C-w>h
     nnoremap <C-j> <C-w>j
     nnoremap <C-k> <C-w>k
