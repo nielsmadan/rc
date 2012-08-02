@@ -144,7 +144,6 @@
     inoremap jj <C-c>
 
     "Switch windows
-    nnoremap <leader>w <C-w><C-w>
     nnoremap <C-h> <C-w>h
     nnoremap <C-j> <C-w>j
     nnoremap <C-k> <C-w>k
@@ -254,7 +253,8 @@
     normal! gg=G
     endfunction
 
-    map <Leader>wq <Esc>:call CleanClose(1)
+    nnoremap <leader>w :w<CR>
+    map <Leader>qw <Esc>:call CleanClose(1)
     map <Leader>q <Esc>:call CleanClose(0)
 
     function! CleanClose(tosave)
