@@ -223,6 +223,7 @@
     let g:SuperTabContextDefaultCompletionType = "<c-p>"
     let g:SuperTabClosePreviewOnPopupClose = 1
 
+    "fall back to local completion if omni does not return anything
     autocmd FileType *
     \ if &omnifunc != '' |
     \   call SuperTabChain(&omnifunc, "<c-p>") |
