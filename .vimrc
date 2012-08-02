@@ -223,6 +223,12 @@
     let g:SuperTabContextDefaultCompletionType = "<c-p>"
     let g:SuperTabClosePreviewOnPopupClose = 1
 
+    autocmd FileType *
+    \ if &omnifunc != '' |
+    \   call SuperTabChain(&omnifunc, "<c-p>") |
+    \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
+    \ endif
+
     "configure conque
     " let g:ConqueTerm_EscKey = '<C-c>'
     " let g:ConqueTerm_CWInsert = 1
