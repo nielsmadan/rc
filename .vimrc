@@ -160,6 +160,7 @@
 
     "Search/Replace word under cursor
     nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
+    nnoremap <Leader><c-s> :bufdo %s/<C-r><C-w>//gc \| update<s-left><s-left><left><left><left><left>
 
     au FileType python setl tags+=~/.tmp/python
 
