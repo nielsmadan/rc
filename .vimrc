@@ -21,7 +21,8 @@
         Bundle 'repeat.vim'
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
-        Bundle 'YankRing.vim'
+        " Bundle 'YankRing.vim'
+        Bundle 'yankstack'
         " Bundle 'sjl/gundo.vim'
 
         " this is just a mirror
@@ -210,7 +211,7 @@
         set tags+=tags;
         let g:easytags_dynamic_files = 1 " add tags to project tag file (if it already exists)
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
-        let g:easytags_updatetime_autodisable = 1
+        let g:easytags_updatetime_autodisable = 1 " disable updatetime warning
     endif
 
     "configure syntastic
@@ -220,9 +221,10 @@
                                 \ 'passive_filetypes': ['xml'] }
 
     "configure supertab
-    let g:SuperTabDefaultCompletionType = "context"
-    let g:SuperTabContextDefaultCompletionType = "<c-p>"
+    " let g:SuperTabDefaultCompletionType = "context"
+    " let g:SuperTabContextDefaultCompletionType = "<c-p>"
     let g:SuperTabClosePreviewOnPopupClose = 1
+    let g:SuperTabRetainCompletionDuration = 'completion'
 
     "fall back to local completion if omni does not return anything
     autocmd FileType *
@@ -242,9 +244,10 @@
     nmap <c-p><c-a> :CtrlPMixed<CR>
 
     "configure yank ring
-    nnoremap <silent> <F3> :YRShow<cr>
-    inoremap <silent> <F3> <ESC>:YRShow<cr>
-    let g:yankring_manage_numbered_reg = 1
+    " nnoremap <silent> <F3> :YRShow<cr>
+    " inoremap <silent> <F3> <ESC>:YRShow<cr>
+    " let g:yankring_manage_numbered_reg = 1
+    " let g:yankring_zap_keys = 'f F t T / ?'
 
 "--->SMALL FUNCTIONS
     map <Leader>xml <Esc>:call FixupXml()
