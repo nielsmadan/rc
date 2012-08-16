@@ -130,6 +130,11 @@
 "--->MAPPINGS
     let mapleader = ","
 
+    "Temporary
+
+        "Get in the habit of using jj to leave insert mode
+        inoremap <C-c> <nop>
+
     "Clear search highlighting
     nnoremap <leader><space> :noh<CR>
 
@@ -141,7 +146,7 @@
     nnoremap <m-t> :!nose<CR>
 
     "Switch mode options
-    imap ` <C-c>
+    inoremap ` <C-c>
     inoremap jj <C-c>
 
     "Switch windows
@@ -165,8 +170,8 @@
 
     au FileType python setl tags+=~/.tmp/python
 
-    "Execute selection or execute file for python
-    au FileType python noremap <m-e> :w !python<CR>
+    "Execute selection or execute file for python (overwrite: suspend program)
+    au FileType python noremap <c-z> :w !python<CR>
 
     "vimdiff options
     if &diff
@@ -226,7 +231,7 @@
     let g:SuperTabClosePreviewOnPopupClose = 1
     let g:SuperTabRetainCompletionDuration = 'completion'
 
-    "fall back to local completion if omni does not return anything
+    "fall back to local completion if omni does not exist for file type
     autocmd FileType *
     \ if &omnifunc != '' |
     \   call SuperTabChain(&omnifunc, "<c-p>") |
@@ -239,9 +244,8 @@
     " let g:ConqueTerm_ExecFileKey = '<F5>'
 
     "configure ctrl-p
-    let g:ctrlp_map = '<c-p><c-f>'
-    nmap <c-p><c-b> :CtrlPBuffer<CR>
-    nmap <c-p><c-a> :CtrlPMixed<CR>
+    let g:ctrlp_map = '<c-g>' " overwrite: display current file name and position
+    let g:ctrlp_working_path_mode = '' " start file search from current root
 
     "configure yank ring
     " nnoremap <silent> <F3> :YRShow<cr>
