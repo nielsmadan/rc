@@ -16,13 +16,14 @@
 
     Bundle 'gmarik/vundle'
 
-"------->GENERAL PLUGINS
+"--->GENERAL PLUGINS
         Bundle 'tpope/vim-surround'
         Bundle 'repeat.vim'
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
         " Bundle 'YankRing.vim'
         Bundle 'yankstack'
+        Bundle 'hexHighlight.vim'
         " Bundle 'sjl/gundo.vim'
 
         " this is just a mirror
@@ -40,11 +41,11 @@
         "Bundle 'AutoTag' " remove dangling tags on closing vim (test with easytags)
         "Bundle 'DirDiff.vim'
 
-"------->FRAMEWORKS
+"--->FRAMEWORKS
         Bundle 'scrooloose/syntastic'
         "Bundle 'Shougo/neocomplcache'
 
-"------->LANGUAGE SPECIFIC
+"--->LANGUAGE SPECIFIC
         "Bundle 'slimv'
         Bundle 'VimClojure'
 
@@ -55,15 +56,6 @@
         Bundle 'python.vim'
 
         "Bundle 'pydoc.vim'
-
-        " python tab completion for built ins
-        " Bundle 'Pydiction'
-        "configure pydiction
-        " if has('win32') || has('win64')
-        "     let g:pydiction_location = '$HOME/.tmp/complete-dict'
-        " else
-        "     let g:pydiction_location = '~/.tmp/complete-dict'
-        " endif
 
         " vim-scripts repos
         "Bundle 'taglist.vim'
