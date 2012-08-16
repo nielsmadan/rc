@@ -200,7 +200,8 @@
 
 "--->COLORSCHEME
     "colorscheme Wombat
-    colorscheme molokai
+    "colorscheme molokai
+    colorscheme badwolf
 
     "let moria_style = 'white' " possible moria styles: dark, black, white, light
     "let moria_monochrome = 1 " monochrome status line, Pmenu, line nr 
@@ -282,6 +283,15 @@
     endif
     exe "bd".to_del_buf_nr
     endfunction
+
+    "Show syntax highlighting groups for word under cursor
+    nmap <C-S-P> :call <SID>SynStack()<CR>
+    function! <SID>SynStack()
+        if !exists("*synstack")
+            return
+        endif
+        echo map(synstack(line('.'), col('.')), 'synIDattr(v:val, "name")')
+    endfunc
 
 "--->LOAD .EXTVIMRC
 
