@@ -2,8 +2,8 @@
 username = Niels Madan <nielsmadan@googlemail.com>
 
 [auth]
-bb.prefix = https://bitbucket.org/nmadan
-bb.username = nmadan
+bb.prefix = https://bitbucket.org/nielsmadan
+bb.username = nielsmadan
 bb.schemes = https
 
 [extensions]
