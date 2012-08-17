@@ -239,6 +239,7 @@
     "configure ctrl-p
     let g:ctrlp_map = '<c-g>' " overwrite: display current file name and position
     let g:ctrlp_working_path_mode = '' " start file search from current root
+    let g:ctrlp_switch_buffer = 0
 
     "configure yank ring
     " nnoremap <silent> <F3> :YRShow<cr>
