@@ -4,3 +4,4 @@ syntax:glob
 *vim/bundle/*
 *.netrwhist
 *.pyc
+*.git*
