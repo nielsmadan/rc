@@ -1,0 +1,7 @@
+[user]
+	name = nielsmadan
+	email = nielsmadan@gmail.com
+[alias]
+    ci = commit
+    co = checkout
+    st = status
