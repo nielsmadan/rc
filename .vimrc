@@ -191,14 +191,7 @@
     endif
 
 "--->COLORSCHEME
-    "colorscheme Wombat
-    colorscheme molokai
-    " colorscheme badwolf
-
-    "let moria_style = 'white' " possible moria styles: dark, black, white, light
-    "let moria_monochrome = 1 " monochrome status line, Pmenu, line nr 
-    "let moria_fontface = 'mixed' " bold statement, type in 'black' and 'dark'
-    "colorscheme moria
+    colo harlequin
 
 "--->PLUGIN CONFIGURATION
 
