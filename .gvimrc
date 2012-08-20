@@ -7,8 +7,10 @@ if has("gui_running")
   endif
 endif
 
-set lines=40
-set columns=125
+winpos 0 0
+set lines=50
+set columns=999
+
 set guioptions-=m  "remove menu bar
 set guioptions-=T  "remove toolbar
 set guioptions-=l  "no scroll bars (left and right)
