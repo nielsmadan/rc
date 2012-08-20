@@ -5,3 +5,8 @@
     ci = commit
     co = checkout
     st = status
+	vdiff = difftool
+[diff]
+	tool = vimdiff
+[difftool]
+	prompt = false
