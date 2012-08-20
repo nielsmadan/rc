@@ -105,12 +105,20 @@ call s:HI('Folded',          s:midnight)
 call s:HI('MatchParen',      {'guifg': s:black, 'guibg': s:gold, 'gui': 'bold'})
 
 call s:HI('LineNr',          {'guifg': s:greys[2]})
+call s:HI('NonText',         {'guifg': s:greys[2]})
+call s:HIx('CursorColumn',   {'guibg': s:greys[4]})
+call s:HIx('CursorLine',     {'guibg': s:greys[4]})
+call s:HI('SignColumn',      {'guibg': s:greys[4]})
+call s:HI('ColorColumn',     {'guibg': s:greys[4]})
+
+call s:HI('Error',           {'guifg': s:mordant, 'guibg': s:greys[4], 'gui': 'bold'})
+call s:HI('ErrorMsg',        {'guifg': s:mordant, 'gui': 'bold'})
+call s:HI('WarningMsg',      {'guifg': s:mordant})
 
 call s:HI('Cursor',          s:cursor)
 call s:HI('vCursor',         s:cursor)
 call s:HI('iCursor',         s:cursor)
 
-" StatusLine is the status line of the currently active split, StatusLineNC of the others.
 call s:HI('StatusLine',      {'guifg': s:white, 'guibg': s:black, 'gui': 'bold'})
 call s:HI('StatusLineNC',    {'guifg': s:greys[1], 'guibg': s:greys[4], 'gui': 'bold'})
 call s:HI('VertSplit',       {'guifg': s:greys[1], 'guibg': s:greys[4], 'gui': 'bold'})
@@ -118,10 +126,10 @@ call s:HI('VertSplit',       {'guifg': s:greys[1], 'guibg': s:greys[4], 'gui': '
 call s:HI('ModeMsg',         {'guifg': s:sunny, 'gui': 'bold'})
 
 if has("spell")
-    call s:HI('SpellBad',    {'guisp': '#FF0000', 'gui': 'undercurl'})
-    call s:HI('SpellCap',    {'guisp': '#7070F0', 'gui': 'undercurl'})
-    call s:HI('SpellLocal',  {'guisp': '#70F0F0', 'gui': 'undercurl'})
-    call s:HI('SpellRare',   {'guisp': '#FFFFFF', 'gui': 'undercurl'})
+    call s:HIx('SpellBad',    {'guisp': '#FF0000', 'gui': 'undercurl'})
+    call s:HIx('SpellCap',    {'guisp': '#7070F0', 'gui': 'undercurl'})
+    call s:HIx('SpellLocal',  {'guisp': '#70F0F0', 'gui': 'undercurl'})
+    call s:HIx('SpellRare',   {'guisp': '#FFFFFF', 'gui': 'undercurl'})
 endif
 
 call s:HIx('VisualNOS',      {'guibg': s:greys[3]})
@@ -134,26 +142,24 @@ call s:HI('PmenuSel',       {'guifg': s:gold, 'guibg': s:black, 'gui': 'bold'})
 call s:HI('Pmenu',          {'guibg': s:greys[4]})
 call s:HI('Pmenu',          {'guifg': '#66D9EF'})
 
-call s:HI('DiffDelete',      {'guifg': s:black, 'guibg': s:black})
-call s:HI('DiffText',        {'guifg': s:white, 'guibg': '#13354A', 'gui': 'bold'})
-call s:HI('DiffChange',      {'guibg': '#13354A'})
-call s:HI('DiffAdd',         {'guibg': '#13354A'})
-
-call s:HI('Error',           {'guifg': s:mordant, 'guibg': s:black})
-call s:HI('ErrorMsg',        {'guifg': s:mordant, 'guibg': s:black, 'gui': 'bold'})
-call s:HI('WarningMsg',      {'guifg': s:mordant, 'guibg': s:black})
+call s:HIx('DiffDelete',      {'guifg': s:greys[3], 'guibg': s:greys[3]})
+call s:HIx('DiffText',        {'guibg': '#13354A', 'gui': 'bold'})
+call s:HIx('DiffChange',      {'guibg': s:greys[3]})
+call s:HIx('DiffAdd',         {'guibg': s:greys[3]})
 
 call s:HI('Underlined',      {'gui': 'underline'})
 
-call s:HI('Directory',       {'guifg': s:lilac})
+call s:HI('Directory',       {'guifg': s:lime})
+call s:HI('SpecialKey',      {'guifg': s:lime})
+call s:HI('Special',         {'guifg': s:lime})
 
 call s:HI('Title',           {'gui': 'underline'})
 
 call s:HI('Tag',             {'gui': 'bold'})
 
-" Look into: WildMenu, CursorLine, CursorColumn, NonText, Question, SignColumn, MoreMsg
-"            SignColumn, SpecialChar, Special, SpecialKey.
+" Look into: WildMenu, Question, MoreMsg, SpecialChar
 
 "*** PYTHON ***
+call s:HI('pythonDecorator',     {'guifg': s:cerise})
 call s:HI('pythonException',     {'guifg': s:lime, 'gui': 'bold'})
 call s:HI('pythonExceptions',    {'guifg': s:lime})
