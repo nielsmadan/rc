@@ -309,12 +309,9 @@ import vim
 
 home_dir = vim.eval("$HOME")
 
-try:
-    ext_rc_list_file = open(os.path.join(home_dir, ".extvimrc"))
-    ext_rc_list = ext_rc_list_file.readlines()
+ext_rc_list_file = open(os.path.join(home_dir, ".extvimrc"))
+ext_rc_list = ext_rc_list_file.readlines()
 
-    for line in ext_rc_list:
-            vim.command("call SourceFile(\"%s\")" % line.rstrip())
-except IOError as e:
-    pass
+for line in ext_rc_list:
+    vim.command('call SourceFile("%s")' % line.rstrip())
 endpython
