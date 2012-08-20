@@ -140,6 +140,8 @@
     "Switch mode options
     inoremap ` <C-c>
     inoremap jj <C-c>
+    inoremap Jj <C-c>
+    inoremap JJ <C-c>
 
     "Switch windows
     nnoremap <C-h> <C-w>h
