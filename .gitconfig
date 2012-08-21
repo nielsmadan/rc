@@ -10,3 +10,7 @@
 	tool = vimdiff
 [difftool]
 	prompt = false
+[core]
+	editor = gvim
+[color]
+	ui = true
