@@ -1,4 +1,4 @@
-" Color scheme based on Monokai by Tomas Restrepo and badwolf by Steve Losh.
+" Color scheme based on Molokai by Tomas Restrepo and badwolf by Steve Losh.
 "
 " Author: Niels Madan
 " URL: github.com/nielsmadan/harlequin
