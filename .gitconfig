@@ -6,11 +6,12 @@
     co = checkout
     st = status
 	vdiff = difftool
+    outgoing = log origin..master
 [diff]
 	tool = vimdiff
 [difftool]
 	prompt = false
 [core]
-	editor = gvim
+	editor = "gvim -f"
 [color]
 	ui = true
