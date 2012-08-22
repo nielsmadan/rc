@@ -37,8 +37,6 @@ let s:mordant = '#AE0C00'
 let s:auburn = '#7C0A02'
 let s:moss = '#004225'
 
-let s:midnight = {'guifg': '#465457', 'guibg': '#000000'}
-
 let s:cursor = {'guifg': s:greys[4], 'guibg': s:white}
 
 " group_name, guifg, guibg, gui, guisp, '' means use default
@@ -52,6 +50,7 @@ function! s:HI(group_name, colors_dict)
     exe 'hi ' . a:group_name . ' guifg=' . guifg . ' guibg=' . guibg . ' gui=' . gui . ' guisp=' . guisp
 endfunction
 
+" Function without defaults.
 function! s:HIx(group_name, colors_dict)
     let hi_str = 'hi ' . a:group_name . ' '
 
@@ -95,6 +94,8 @@ call s:HI('SpecialComment',  {'guifg': s:frost, 'gui': 'bold'})
 call s:HI('Todo',            {'guifg': s:frost, 'gui': 'bold'})
 
 call s:HI('String',          {'guifg': s:sunny}) 
+call s:HI('SpecialKey',      {'guifg': s:lilac, 'gui': 'bold'})
+call s:HI('Special',         {'guifg': s:lilac, 'gui': 'bold'})
 
 call s:HI('Boolean',         {'guifg': s:lilac, 'gui': 'bold'})
 call s:HI('Character',       {'guifg': s:lilac, 'gui': 'bold'})
@@ -102,8 +103,8 @@ call s:HI('Number',          {'guifg': s:lilac, 'gui': 'bold'})
 call s:HI('Constant',        {'guifg': s:lilac, 'gui': 'bold'})
 call s:HI('Float',           {'guifg': s:lilac, 'gui': 'bold'})
 
-call s:HI('FoldColumn',      s:midnight) 
-call s:HI('Folded',          s:midnight)
+call s:HI('FoldColumn',      {'guifg': s:greys[1], 'guibg': s:black}) ", 'gui': 'bold'})
+call s:HI('Folded',          {'guifg': s:greys[1], 'guibg': s:black}) ", 'gui': 'bold'})
 
 call s:HI('MatchParen',      {'guifg': s:black, 'guibg': s:gold, 'gui': 'bold'})
 
@@ -137,7 +138,7 @@ endif
 
 call s:HIx('VisualNOS',      {'guibg': s:greys[3]})
 call s:HIx('Visual',         {'guibg': s:greys[3]})
-call s:HI('Search',          {'guifg': s:black, 'guibg': s:gold})
+call s:HI('Search',          {'guifg': s:black, 'guibg': s:sunny})
 call s:HI('IncSearch',       {'guifg': s:black, 'guibg': s:gold})
 
 call s:HI('Pmenu',          {'guifg': s:black, 'guibg': s:gold})
@@ -153,14 +154,13 @@ call s:HIx('DiffAdd',         {'guibg': s:moss})
 call s:HI('Underlined',      {'gui': 'underline'})
 
 call s:HI('Directory',       {'guifg': s:lime})
-call s:HI('SpecialKey',      {'guifg': s:lime})
-call s:HI('Special',         {'guifg': s:lime})
+call s:HI('WildMenu',        {'guifg': s:black, 'guibg': s:greys[1], 'gui': 'bold'})
 
 call s:HI('Title',           {'gui': 'underline'})
 
 call s:HI('Tag',             {'gui': 'bold'})
 
-" Look into: WildMenu, Question, MoreMsg, SpecialChar
+" Look into: Question, MoreMsg, SpecialChar
 
 "*** PYTHON ***
 call s:HI('pythonDecorator',     {'guifg': s:cerise})
