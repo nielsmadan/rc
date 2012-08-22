@@ -74,6 +74,7 @@
     set showmode
     set laststatus=2
     set lazyredraw "don't redraw while executing macros
+    set more "active pager
 
     "do not create backup files
     set nobackup
@@ -90,8 +91,8 @@
     "text wrapping
     set wrap
     set textwidth=119
-    set formatoptions=tcqn1
-    " set colorcolumn=120
+    set formatoptions=cqn1
+    set colorcolumn=120
     set linebreak
 
     "indent options
