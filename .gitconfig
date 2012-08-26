@@ -15,3 +15,5 @@
 	editor = "gvim -f"
 [color]
 	ui = true
+[merge]
+    defaultToUpstream = true
