@@ -120,6 +120,14 @@
     "show menu and preview for completion
     set completeopt=menu,preview
 
+    "status line options
+    set statusline=
+    set statusline+=%n\ \|\ %f\ \|\ 
+    set statusline+=%h%m%r%w
+    set statusline+=%=
+    set statusline+=%l/%L\ 
+    set statusline+=%y
+
 "--->MAPPINGS
     let mapleader = ","
 
