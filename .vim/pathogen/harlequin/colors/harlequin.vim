@@ -141,8 +141,8 @@ endif
 
 call s:HIx('VisualNOS',      {'guibg': s:greys[4]})
 call s:HIx('Visual',         {'guibg': s:greys[4]})
-call s:HI('Search',          {'guifg': s:black, 'guibg': s:sunny})
-call s:HI('IncSearch',       {'guifg': s:black, 'guibg': s:gold})
+call s:HI('Search',          {'guifg': s:black, 'guibg': s:gold})
+call s:HI('IncSearch',       {'guifg': s:black, 'guibg': s:sunny})
 
 call s:HI('Pmenu',           {'guifg': s:black, 'guibg': s:gold})
 call s:HI('PmenuSel',        {'guifg': s:gold, 'guibg': s:black, 'gui': 'bold'})
@@ -158,14 +158,13 @@ call s:HI('Underlined',      {'gui': 'underline'})
 
 call s:HI('Directory',       {'guifg': s:lime})
 call s:HI('Question',        {'guifg': s:lime})
+call s:HI('MoreMsg',         {'guifg': s:lime})
   
 call s:HI('WildMenu',        {'guifg': s:black, 'guibg': s:lilac, 'gui': 'bold'})
 
 call s:HI('Title',           {'gui': 'underline'})
 
 call s:HIx('Tag',            {'gui': 'bold'})
-
-" Look into: MoreMsg
 
 "*** PYTHON ***
 call s:HI('pythonDecorator',     {'guifg': s:cerise})
