@@ -21,6 +21,7 @@
         Bundle 'repeat.vim'
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
+        Bundle 'fholgado/minibufexpl.vim'
         " Bundle 'YankRing.vim'
         Bundle 'yankstack'
         Bundle 'hexHighlight.vim'
@@ -122,7 +123,7 @@
 
     "status line options
     set statusline=
-    set statusline+=%n\ \|\ %f\ \|\ 
+    set statusline+=\|\ %f\ \|\ 
     set statusline+=%h%m%r%w
     set statusline+=%=
     set statusline+=%l/%L\ 
@@ -215,6 +216,13 @@
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
         let g:easytags_updatetime_autodisable = 1 " disable updatetime warning
     endif
+
+    "configure minibufexplorer
+    let g:miniBufExplorerMoreThanOne=1
+    let g:miniBufExplMapWindowNavArrows=1
+    let g:miniBufExplMapCTabSwitchWindows = 1
+    let g:miniBufExplUseSingleClick = 1
+    nnoremap <leader>e :TMiniBufExplorer<CR>
 
     "configure syntastic
     let g:syntastic_check_on_open = 1
