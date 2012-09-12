@@ -218,7 +218,6 @@
     endif
 
     "configure minibufexplorer
-    let g:miniBufExplorerMoreThanOne=1
     let g:miniBufExplMapWindowNavArrows=1
     let g:miniBufExplMapCTabSwitchWindows = 1
     let g:miniBufExplUseSingleClick = 1
