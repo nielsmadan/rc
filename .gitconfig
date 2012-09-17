@@ -1,19 +1,24 @@
-[user]
-	name = nielsmadan
-	email = nielsmadan@gmail.com
 [alias]
+    ca = commit -am
     ci = commit
     co = checkout
     st = status
+
+    po = push origin
+    pom = push origin master
+
 	vdiff = difftool
     outgoing = log origin..master
+[color]
+	ui = true
+[core]
+	editor = "gvim -f"
 [diff]
 	tool = vimdiff
 [difftool]
 	prompt = false
-[core]
-	editor = "gvim -f"
-[color]
-	ui = true
 [merge]
     defaultToUpstream = true
+[user]
+	name = nielsmadan
+	email = nielsmadan@gmail.com
