@@ -108,16 +108,34 @@ fi
 
 GREP_OPTIONS="--exclude-dir=\.svn --exclude=tags"
 export GREP_OPTIONS
-export PYLINTRC="$HOME/pylint.rc"
+alias pygrep='grep --include="*.py"'
+alias xmlgrep='grep --include="*.xml"'
+
 alias fu='curl -s http://www.commandlinefu.com/commands/browse/sort-by-votes/p... | grep -vE "^$|^#"'
+
 export CLASSPATH=/usr/local/lib/jars/*
-alias ..='cd ..'
+
 alias tag='ctags -a -R --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'
 alias pytag='ctags -a -R --languages="python" --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'
+
+export PYLINTRC="$HOME/pylint.rc"
 alias nose='nosetests -s'
+
 alias py='python2.7'
 alias py27='python2.7'
 alias py26='python2.6'
-alias pygrep='grep --include="*.py"'
-alias xmlgrep='grep --include="*.xml"'
+
 alias clearcache='/sbin/sysctl -w vm.drop_caches=3'
+
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+alias ~='cd ~'
+alias -- -='cd -'
+
+alias d="cd ~/Documents/Dropbox"
+
+alias g="git"
+alias h="hg"
+alias v="gvim"
