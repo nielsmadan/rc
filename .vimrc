@@ -112,7 +112,14 @@
     set ignorecase
     set smartcase
     set incsearch
-    set scrolloff=5 "show lines above/below search result
+
+    "scrolloffs
+    set scrolloff=5
+    set sidescrolloff=7
+
+    "don't blink cursor in normal mode
+    " set guicursor=n-v-c:block-Cursor
+    " set guicursor+=n-v-c:blinkon0
 
     "command line completion
     set wildmenu
@@ -153,6 +160,10 @@
     inoremap Jj <C-c>
     inoremap JJ <C-c>
 
+    "move through wrapped lines
+    nnoremap j gj
+    nnoremap k gk
+
     "Switch windows
     nnoremap <C-h> <C-w>h
     nnoremap <C-j> <C-w>j
@@ -162,11 +173,10 @@
     "reload vimrc
     nnoremap <F12> :so $MYVIMRC<CR>
 
-    "copy/paste to system clipboard
-    vnoremap <Leader><m-c> "+y
-    nnoremap <Leader><m-c> "+y
-    vnoremap <Leader><m-v> "+p
-    nnoremap <Leader><m-v> "+p
+    "copy/paste to system clipboard (same as bash)
+    vnoremap <C-S-c> "+y
+    vnoremap <C-S-v> "+p
+    nnoremap <C-S-v> "+p
 
     "Search/Replace word under cursor
     nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
