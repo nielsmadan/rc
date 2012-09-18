@@ -7,14 +7,14 @@
     po = push origin
     pom = push origin master
 
-	vdiff = difftool
+	d = difftool
     outgoing = log origin..master
 [color]
 	ui = true
 [core]
 	editor = "gvim -f"
 [diff]
-	tool = vimdiff
+	tool = gvimdiff
 [difftool]
 	prompt = false
 [merge]
