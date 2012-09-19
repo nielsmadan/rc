@@ -20,6 +20,9 @@
 	prompt = false
 [merge]
     defaultToUpstream = true
+	tool = gvimdiff
 [user]
 	name = nielsmadan
 	email = nielsmadan@gmail.com
+[push]
+	default = simple
