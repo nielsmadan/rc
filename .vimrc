@@ -171,17 +171,6 @@
     nnoremap <C-l> <C-w>l
     nnoremap <C-=> <C-w>=
 
-    "Switch buffers
-    nnoremap <M-1> :b1
-    nnoremap <M-2> :b2
-    nnoremap <M-3> :b3
-    nnoremap <M-4> :b4
-    nnoremap <M-5> :b5
-    nnoremap <M-6> :b6
-    nnoremap <M-7> :b7
-    nnoremap <M-8> :b8
-    nnoremap <M-9> :b9
-
     "reload vimrc
     nnoremap <F12> :so $MYVIMRC<CR>
 
@@ -211,10 +200,10 @@
         nnoremap <m-d> ]c
         nnoremap <m-u> [c
 
-        nnoremap <m-g>1 :diffget 1<CR>
-        nnoremap <m-g>2 :diffget 2<CR>
-        nnoremap <m-g>3 :diffget 3<CR>
-        nnoremap <m-g><m-g> :diffget<CR>
+        nnoremap <m-1> :diffget 1<CR>
+        nnoremap <m-2> :diffget 2<CR>
+        nnoremap <m-3> :diffget 3<CR>
+        nnoremap <m-g> :diffget<CR>
 
         nnoremap <m-p>1 :diffput 1<CR>
         nnoremap <m-p>2 :diffput 2<CR>
@@ -222,6 +211,17 @@
         nnoremap <m-p><m-p> :diffput<CR>
 
         nnoremap <m-q> :wqall<CR>
+    else
+        "Switch buffers
+        nnoremap <M-1> :b1
+        nnoremap <M-2> :b2
+        nnoremap <M-3> :b3
+        nnoremap <M-4> :b4
+        nnoremap <M-5> :b5
+        nnoremap <M-6> :b6
+        nnoremap <M-7> :b7
+        nnoremap <M-8> :b8
+        nnoremap <M-9> :b9
     endif
 
 "--->COLORSCHEME
