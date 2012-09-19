@@ -172,12 +172,15 @@
     nnoremap <C-=> <C-w>=
 
     "Switch buffers
-    nnoremap <M-1> :b1<CR>
-    nnoremap <M-2> :b2<CR>
-    nnoremap <M-3> :b3<CR>
-    nnoremap <M-4> :b4<CR>
-    nnoremap <M-5> :b5<CR>
-    nnoremap <M-6> :b6<CR>
+    nnoremap <M-1> :b1
+    nnoremap <M-2> :b2
+    nnoremap <M-3> :b3
+    nnoremap <M-4> :b4
+    nnoremap <M-5> :b5
+    nnoremap <M-6> :b6
+    nnoremap <M-7> :b7
+    nnoremap <M-8> :b8
+    nnoremap <M-9> :b9
 
     "reload vimrc
     nnoremap <F12> :so $MYVIMRC<CR>
