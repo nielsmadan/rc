@@ -13,6 +13,7 @@
 	ui = true
 [core]
 	editor = "gvim -f"
+    excludesfile = ~/.global_gitignore
 [diff]
 	tool = gvimdiff
 [difftool]
