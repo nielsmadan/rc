@@ -93,7 +93,6 @@
     set wrap
     set textwidth=119
     set formatoptions=cqn1
-    set colorcolumn=120
     set linebreak
 
     "indent options
