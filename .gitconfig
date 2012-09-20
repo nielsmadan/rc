@@ -1,5 +1,6 @@
 [alias]
     ca = commit -am
+    cm = commit -m
     ci = commit
     co = checkout
     st = status
