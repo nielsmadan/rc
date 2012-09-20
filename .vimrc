@@ -133,7 +133,8 @@
     set statusline+=\|\ %f\ \|\ 
     set statusline+=%h%m%r%w
     set statusline+=%=
-    set statusline+=%l/%L\ 
+    set statusline+=C:%c/%{col(\"$\")-1}\ 
+    set statusline+=L:%l/%L\ 
     set statusline+=%y
 
 "--->MAPPINGS
