@@ -50,6 +50,8 @@
         "Bundle 'slimv'
         Bundle 'VimClojure'
 
+        Bundle 'derekwyatt/vim-scala'
+
         " latest version of built-in omnicomplete
         Bundle 'pythoncomplete'
 
