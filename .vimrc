@@ -18,6 +18,7 @@
 
 "--->GENERAL PLUGINS
         Bundle 'tpope/vim-surround'
+        Bundle 'matchit.zip'
         Bundle 'repeat.vim'
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
@@ -188,6 +189,7 @@
     au FileType python setl tags+=~/.tmp/python
 
     "Execute selection or execute file for python (overwrite: suspend program)
+    "we are writing to a 'file' here, where the file is the python interpreter
     au FileType python noremap <c-z> :w !python<CR>
 
     "vimdiff options
