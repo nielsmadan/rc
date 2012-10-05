@@ -20,10 +20,11 @@
         Bundle 'tpope/vim-surround'
         Bundle 'matchit.zip'
         Bundle 'repeat.vim'
+
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
         Bundle 'fholgado/minibufexpl.vim'
-        " Bundle 'YankRing.vim'
+
         Bundle 'yankstack'
         Bundle 'hexHighlight.vim'
         " Bundle 'sjl/gundo.vim'
@@ -278,6 +279,13 @@
     let g:ctrlp_working_path_mode = '' " start file search from current root
     let g:ctrlp_switch_buffer = 0
 
+    let g:ctrlp_prompt_mappings = {
+    \ 'ToggleType(1)':        ['<c-h>'],
+    \ 'ToggleType(-1)':       ['<c-l>'],
+    \ 'PrtCurLeft()':         ['<left>', '<c-^>'],
+    \ 'PrtCurRight()':        ['<right>'],
+    \ }
+    
     "configure yank ring
     " nnoremap <silent> <F3> :YRShow<cr>
     " inoremap <silent> <F3> <ESC>:YRShow<cr>
