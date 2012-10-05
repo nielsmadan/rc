@@ -18,7 +18,6 @@
 
 "--->GENERAL PLUGINS
         Bundle 'tpope/vim-surround'
-        Bundle 'matchit.zip'
         Bundle 'repeat.vim'
 
         Bundle 'tomtom/tcomment_vim'
@@ -54,17 +53,14 @@
 
         Bundle 'derekwyatt/vim-scala'
 
+        Bundle 'tpope/vim-ragtag'
+        Bundle 'matchit.zip'
+
         " latest version of built-in omnicomplete
         Bundle 'pythoncomplete'
-
         " improved syntax highlighting
         Bundle 'python.vim'
-
         "Bundle 'pydoc.vim'
-
-        " vim-scripts repos
-        "Bundle 'taglist.vim'
-        "Bundle 'git://git.wincent.com/command-t.git'
 
 "--->PATHOGEN
     call pathogen#infect('pathogen')
@@ -323,7 +319,7 @@
     endfunction
 
     "Show syntax highlighting groups for word under cursor
-    nmap <C-S-P> :call <SID>SynStack()<CR>
+    nnoremap <leader><c-p> :call <SID>SynStack()<CR>
     function! <SID>SynStack()
         if !exists("*synstack")
             return
