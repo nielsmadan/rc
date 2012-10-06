@@ -184,10 +184,12 @@
     nnoremap <Leader><c-s> :bufdo %s/<C-r><C-w>//gc \| update<s-left><s-left><left><left><left><left>
 
     au FileType python setl tags+=~/.tmp/python
+    au FileType ruby setl tags+=~/.tmp/ruby
 
     "Execute selection or execute file for python (overwrite: suspend program)
     "we are writing to a 'file' here, where the file is the python interpreter
     au FileType python noremap <c-z> :w !python<CR>
+    au FileType ruby noremap <c-z> :w !ruby<CR>
 
     "vimdiff options
     if &diff
