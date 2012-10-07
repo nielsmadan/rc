@@ -139,3 +139,6 @@ alias d="cd ~/Documents/Dropbox"
 alias g="git"
 alias h="hg"
 alias v="gvim"
+
+# stop global warning message on Ubuntu
+alias gvim='UBUNTU_MENUPROXY= gvim'
