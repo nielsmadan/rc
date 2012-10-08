@@ -95,6 +95,13 @@
     set formatoptions=cqn1
     set linebreak
 
+    "override any ftplugin that thinks it's a good idea to redefine
+    "the formatoptions that were explicitly set in .vimrc. >:|
+    augroup reset_fo
+        au!
+        au FileType * setlocal formatoptions-=o
+    augroup end
+
     "indent options
     set tabstop=4
     set expandtab
