@@ -162,7 +162,6 @@
     nnoremap <m-t> :!nose<CR>
 
     "Switch mode options
-    inoremap ` <C-c>
     inoremap jj <C-c>
     inoremap Jj <C-c>
     inoremap JJ <C-c>
@@ -220,7 +219,8 @@
         nnoremap <m-p>3 :diffput 3<CR>
         nnoremap <m-p><m-p> :diffput<CR>
 
-        nnoremap <m-q> :wqall<CR>
+        "when using gvimdiff as git difftool, it will only both sides in readonly mode, which is why we need the !
+        nnoremap <m-q> :wqall!<CR>
     else
         "Switch buffers
         nnoremap <M-1> :b1
