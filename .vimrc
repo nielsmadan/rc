@@ -181,9 +181,10 @@
     nnoremap <F12> :so $MYVIMRC<CR>
 
     "copy/paste to system clipboard (same as bash)
-    vnoremap <C-S-c> "+y
-    vnoremap <C-S-v> "+p
-    nnoremap <C-S-v> "+p
+    vnoremap <leader>c "+y
+    nnoremap <leader>c "+y
+    vnoremap <leader>v "+p
+    nnoremap <leader>v "+p
 
     "Search/Replace word under cursor
     nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
