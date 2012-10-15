@@ -106,6 +106,8 @@ if [ -f ~/.localbashrc ]; then
     source ~/.localbashrc
 fi
 
+export FIGNORE=%FIGNORE:.pyc
+
 GREP_OPTIONS="--exclude-dir=\.svn --exclude=tags"
 export GREP_OPTIONS
 alias pygrep='grep --include="*.py"'
