@@ -127,7 +127,7 @@ alias py='python2.7'
 alias py27='python2.7'
 alias py26='python2.6'
 
-alias clearcache='sudo /sbin/sysctl -w vm.drop_caches=3'
+alias clearcache='/sbin/sysctl -w vm.drop_caches=3'
 
 alias ..='cd ..'
 alias ...='cd ../..'
