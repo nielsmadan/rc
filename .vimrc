@@ -1,6 +1,4 @@
 "--->VUNDLE
-    set nocompatible
-
     filetype off
     
     if has('win32') || has('win64')
