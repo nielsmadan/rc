@@ -1,0 +1,11 @@
+#!/usr/bin/python
+
+import subprocess as sp
+
+output = sp.check_output(["hg", "status"])
+
+stats = [line.split(' ') for line in output.split('\n') if line != '']
+
+for stat in stats:
+    if stat[0] != '?':
+        sp.call(["hg", "d", stat[1]])

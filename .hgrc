@@ -13,3 +13,4 @@ hgext.extdiff =
 
 [extdiff]
 cmd.d = gvimdiff
+opts.d = --nofork
