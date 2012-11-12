@@ -10,6 +10,8 @@ bb.schemes = https, http
 fetch =
 mercurial_keyring =
 hgext.extdiff =
+hggit = 
+hgext.bookmarks =
 
 [extdiff]
 cmd.d = gvimdiff
