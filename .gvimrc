@@ -1,11 +1,34 @@
 "set font
 if has("gui_running")
   if has("gui_gtk2")
-    set guifont=Inconsolata\ 10
+    let s:FontSize = 10
+    exe "set guifont=Inconsolata\\ " . s:FontSize
   elseif has("gui_win32")
-    set guifont=Consolas:h12:cANSI
+    let s:FontSize = 12
+    exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
   endif
 endif
+
+map <leader>fu :call IncreaseFontSize()<CR>
+map <leader>fd :call DecreaseFontSize()<CR>
+
+function! IncreaseFontSize()
+    let s:FontSize = s:FontSize + 1
+    if has("gui_gtk2")
+        exe "set guifont=Inconsolata\\ " . s:FontSize
+    elseif has("gui_win32")
+        exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
+    endif
+endfunction
+
+function! DecreaseFontSize()
+    let s:FontSize = s:FontSize - 1
+    if has("gui_gtk2")
+        exe "set guifont=Inconsolata\\ " . s:FontSize
+    elseif has("gui_win32")
+        exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
+    endif
+endfunction
 
 winpos 0 0
 set lines=50
