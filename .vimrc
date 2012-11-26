@@ -78,7 +78,8 @@
     "do not create backup files
     set nobackup
     set noswapfile
-    "set undofile
+    set undodir=~/.tmp/undofiles
+    set undofile
 
     "backspace over line breaks
     set backspace=indent,eol,start
@@ -179,6 +180,9 @@
     "Search/Replace word under cursor
     nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
     nnoremap <Leader><c-s> :bufdo %s/<C-r><C-w>//gc \| update<s-left><s-left><left><left><left><left>
+
+    "Set spell checking for commit logs
+    au filetype svn,*commit* setlocal spell
 
     "Execute selection or execute file for python (overwrite: suspend program)
     "we are writing to a 'file' here, where the file is the python interpreter
