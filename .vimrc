@@ -316,7 +316,9 @@
         if !exists("*synstack")
             return
         endif
-        echo map(synstack(line('.'), col('.')), 'synIDattr(v:val, "name")')
+        let sgroup_list = map(synstack(line('.'), col('.')), 'synIDattr(v:val, "name")')
+        echo sgroup_list
+        let @s = join(sgroup_list, ' ')
     endfunc
 
 "--->LOAD .EXTVIMRC
