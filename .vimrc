@@ -71,9 +71,11 @@
     set number
     set showcmd
     set showmode
+    set mousehide "hide mouse while typing
     set laststatus=2
     set lazyredraw "don't redraw while executing macros
     set more "active pager
+    set shortmess+=I "no intro
 
     "do not create backup files
     set nobackup
@@ -83,6 +85,9 @@
 
     "backspace over line breaks
     set backspace=indent,eol,start
+
+    "easily toggle paste
+    set pastetoggle=<f10>
 
     "file options
     set autowrite
@@ -171,10 +176,14 @@
     nnoremap <C-l> <C-w>l
     nnoremap <C-=> <C-w>=
 
+    "scroll faster with c-e and c-y
+    nnoremap <C-e> 3<c-e>
+    nnoremap <C-y> 3<c-y>
+
     "reload vimrc
     nnoremap <F12> :so $MYVIMRC<CR>
 
-    "copy/paste to system clipboard (same as bash)
+    "copy/paste to system clipboard
     vnoremap <leader>y "+y
     nnoremap <leader>y "+y
     vnoremap <leader>p "+p
