@@ -161,6 +161,9 @@
     nnoremap j gj
     nnoremap k gk
 
+    "make Y work the same way as C and D (yank to the end of the line)
+    nnoremap Y y$
+
     "Switch windows
     nnoremap <C-h> <C-w>h
     nnoremap <C-j> <C-w>j
