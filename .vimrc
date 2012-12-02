@@ -60,6 +60,8 @@
         Bundle 'python.vim'
         "Bundle 'pydoc.vim'
 
+        Bundle 'Jinja'
+
 "--->PATHOGEN
     call pathogen#infect('pathogen')
 
