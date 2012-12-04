@@ -60,6 +60,11 @@
         Bundle 'python.vim'
         "Bundle 'pydoc.vim'
 
+"--->MINE can't do it with git+ssh. :(
+        " Bundle 'git+ssh://git@github.com/nielsmadan/harlequin'
+        " Bundle 'git+ssh://git@github.com/nielsmadan/venom'
+        " Bundle 'git+ssh://git@github.com/nielsmadan/mercury'
+
 "--->PATHOGEN
     call pathogen#infect('pathogen')
 
