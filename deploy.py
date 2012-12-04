@@ -4,18 +4,26 @@ import platform
 
 c_dir = os.path.dirname(os.path.abspath(__file__))
 h_dir = os.getenv("HOME")
+script_destination_dir = '/usr/local/bin/'
 
 def remove_symlinks_or_file(name):
     print "\tRemoving file: %s" % os.path.join(h_dir, name)
     call(["rm", os.path.join(h_dir, name)])
 
+
 def symlink_file(name):
     print "\tSymlinking file into home: %s" % os.path.join(c_dir, name)
     call(["ln", "-s", os.path.join(c_dir, name), h_dir])
 
+
+def copy_script(sname, dest_dir):
+    print "\tCopying script '%s' into %s" % (sname, dest_dir)
+    call(['cp', os.path.join(c_dir, 'scripts/' + sname), dest_dir])
+
 def create_file(name):
     print "\tCreating file: %s" % os.path.join(h_dir, name)
     call(["touch", os.path.join(h_dir, name)])
+
 
 def create_dir(name):
     try:
@@ -70,6 +78,11 @@ if __name__ == '__main__':
     _print_section("Creating directories (if they don't exist already).")
     for dname in dirs:
         create_dir(dname)
+
+    script_names = ['clj', 'hgdiff']
+    _print_section("Copying scripts into %s" % script_destination_dir)
+    for sname in script_names:
+        copy_script(sname, script_destination_dir)
 
     https_t_dir_repos = [
         ['.vim/bundle/vundle/', 'gmarik/vundle/'],
