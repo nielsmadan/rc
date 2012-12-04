@@ -60,6 +60,8 @@
         Bundle 'python.vim'
         "Bundle 'pydoc.vim'
 
+        Bundle 'Jinja'
+
 "--->MINE can't do it with git+ssh. :(
         " Bundle 'git+ssh://git@github.com/nielsmadan/harlequin'
         " Bundle 'git+ssh://git@github.com/nielsmadan/venom'
