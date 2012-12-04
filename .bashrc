@@ -137,6 +137,9 @@ alias ~='cd ~'
 alias -- -='cd -'
 
 alias d="cd ~/Documents/Dropbox"
+alias venom="cd ~/rc/.vim/pathogen/venom"
+alias merc="cd ~/rc/.vim/pathogen/mercury"
+alias harl="cde ~/rc/.vim/pathogen/harlequin"
 
 alias g="git"
 alias h="hg"
