@@ -44,7 +44,7 @@ def clone_git_repo(prefix_prot, target_dir, repo):
             raise
         return
 
-    call(["git", "clone", "https://github.com/" + repo, os.path.join(c_dir, target_dir)])
+    call(["git", "clone", prefix_prot + repo, os.path.join(c_dir, target_dir)])
 
 
 def setup_vim():
