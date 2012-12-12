@@ -259,6 +259,8 @@
     let g:miniBufExplMapWindowNavArrows=1 " ctrl + arrow = windows movement
     let g:miniBufExplMapCTabSwitchWindows = 1 " ctrl( + shift) + tab = window movement
     let g:miniBufExplUseSingleClick = 1 " click to go to buffer
+    let g:miniBufExplorerMoreThanOne = 999
+    let g:miniBufExplCheckDupeBufs = 0
     nnoremap <leader>e :TMiniBufExplorer<CR>
 
     "configure syntastic
