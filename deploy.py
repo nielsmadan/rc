@@ -94,6 +94,7 @@ if __name__ == '__main__':
 
     ssh_t_dir_repos = [
         ['.vim/pathogen/harlequin', 'nielsmadan/harlequin'],
+        ['.vim/pathogen/geisha', 'nielsmadan/geisha'],
         ['.vim/pathogen/venom', 'nielsmadan/venom'],
         ['.vim/pathogen/mercury', 'nielsmadan/mercury'],
     ]
