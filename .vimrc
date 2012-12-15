@@ -201,7 +201,7 @@
     nnoremap <Leader><c-s> :bufdo %s/<C-r><C-w>//gc \| update<s-left><s-left><left><left><left><left>
 
     "Set spell checking for commit logs
-    au filetype svn,*commit* setlocal spell
+    au filetype svn,*commit*,rst setlocal spell
 
     "Execute selection or execute file for python (overwrite: suspend program)
     "we are writing to a 'file' here, where the file is the python interpreter
