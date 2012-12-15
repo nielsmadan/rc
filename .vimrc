@@ -83,6 +83,7 @@
     set lazyredraw "don't redraw while executing macros
     set more "active pager
     set shortmess+=I "no intro
+    set display='lastline' "show as much of last line as possible if it doesn't fit.
 
     "do not create backup files
     set nobackup
