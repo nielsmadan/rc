@@ -83,7 +83,7 @@
     set lazyredraw "don't redraw while executing macros
     set more "active pager
     set shortmess+=I "no intro
-    set display='lastline' "show as much of last line as possible if it doesn't fit.
+    set display=lastline "show as much of last line as possible if it doesn't fit.
     set helpheight=0 "no min window height for help window.
 
     "do not create backup files
