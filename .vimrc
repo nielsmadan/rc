@@ -238,6 +238,7 @@
     endif
 
 "--->COLORSCHEME
+    let &t_Co = 256
     colo harlequin
 
 "--->PLUGIN CONFIGURATION
