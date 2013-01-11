@@ -9,12 +9,21 @@
 # ... or force ignoredups and ignorespace
 HISTCONTROL=ignoredups:ignorespace
 
+# don't add some commands to history (anything that's less than 4 letters)
+export HISTIGNORE="?:??:???:exit:clear:reset"
+
 # append to the history file, don't overwrite it
 shopt -s histappend
 
+# case insensitive globbing
+shopt -s nocaseglob
+
+# autocorrect for tab completion in cd
+shopt -s cdspell
+
 # for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
-HISTSIZE=1000
-HISTFILESIZE=2000
+HISTSIZE=32768
+HISTFILESIZE=32768
 
 # check the window size after each command and, if necessary,
 # update the values of LINES and COLUMNS.
@@ -107,6 +116,7 @@ if [ -f ~/.localbashrc ]; then
 fi
 
 export FIGNORE=%FIGNORE:.pyc
+export MANPAGER="less -X"
 
 GREP_OPTIONS="--exclude-dir=\.svn --exclude=tags"
 export GREP_OPTIONS
@@ -115,12 +125,9 @@ alias xmlgrep='grep --include="*.xml"'
 
 alias fu='curl -s http://www.commandlinefu.com/commands/browse/sort-by-votes/p... | grep -vE "^$|^#"'
 
-export CLASSPATH=/usr/local/lib/jars/*
-
 alias tag='ctags -a -R --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'
 alias pytag='ctags -a -R --languages="python" --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'
 
-export PYLINTRC="$HOME/pylint.rc"
 alias nose='nosetests -s'
 
 alias py='python2.7'
@@ -144,6 +151,8 @@ alias harl="cde ~/rc/.vim/pathogen/harlequin"
 alias g="git"
 alias h="hg"
 alias v="gvim"
+
+alias upgrade='sudo apt-get update; sudo apt-get upgrade; sudo apt-get dist-upgrade;'
 
 # stop global warning message on Ubuntu
 alias gvim='UBUNTU_MENUPROXY= gvim'
