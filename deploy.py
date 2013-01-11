@@ -16,9 +16,9 @@ def symlink_file(name):
     call(["ln", "-s", os.path.join(c_dir, name), h_dir])
 
 
-def copy_script(sname, dest_dir):
+def symlink_script(sname, dest_dir):
     print "\tCopying script '%s' into %s" % (sname, dest_dir)
-    call(['cp', os.path.join(c_dir, 'scripts/' + sname), dest_dir])
+    call(['sudo', 'ln', '-s', os.path.join(c_dir, 'scripts/' + sname), dest_dir])
 
 def create_file(name):
     print "\tCreating file: %s" % os.path.join(h_dir, name)
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     print "Home directory found: %s" % h_dir
     print "Current directory found: %s" % c_dir
 
-    rc_file = ['.vimrc', '.gitconfig', '.gvimrc', '.hgrc', '.vim', '.bashrc', '.pylintrc', '.tmux.conf']
+    rc_file = ['.vimrc', '.gitconfig', '.gvimrc', '.hgrc', '.vim', '.bashrc', '.bash_profile', '.pylintrc', '.tmux.conf']
 
     _print_section("Remove rc files or symlinks if they exist already.")
     for fname in rc_file:
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     script_names = ['clj', 'hgdiff']
     _print_section("Copying scripts into %s" % script_destination_dir)
     for sname in script_names:
-        copy_script(sname, script_destination_dir)
+        symlink_script(sname, script_destination_dir)
 
     https_t_dir_repos = [
         ['.vim/bundle/vundle/', 'gmarik/vundle/'],
