@@ -1,10 +1,10 @@
 from subprocess import call
 import os
-import platform
 
 c_dir = os.path.dirname(os.path.abspath(__file__))
 h_dir = os.getenv("HOME")
 script_destination_dir = '/usr/local/bin/'
+
 
 def remove_symlinks_or_file(name):
     print "\tRemoving file: %s" % os.path.join(h_dir, name)
@@ -19,6 +19,7 @@ def symlink_file(name):
 def symlink_script(sname, dest_dir):
     print "\tCopying script '%s' into %s" % (sname, dest_dir)
     call(['sudo', 'ln', '-s', os.path.join(c_dir, 'scripts/' + sname), dest_dir])
+
 
 def create_file(name):
     print "\tCreating file: %s" % os.path.join(h_dir, name)
@@ -59,7 +60,8 @@ if __name__ == '__main__':
     print "Home directory found: %s" % h_dir
     print "Current directory found: %s" % c_dir
 
-    rc_file = ['.vimrc', '.gitconfig', '.gvimrc', '.hgrc', '.vim', '.bashrc', '.bash_profile', '.pylintrc', '.tmux.conf']
+    rc_file = ['.vimrc', '.gitconfig', '.gvimrc', '.hgrc', '.vim', '.pep8',
+               '.bashrc', '.bash_profile', '.pylintrc', '.tmux.conf']
 
     _print_section("Remove rc files or symlinks if they exist already.")
     for fname in rc_file:
