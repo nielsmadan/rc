@@ -272,6 +272,7 @@
     let g:syntastic_mode_map = {'mode': 'active',
                                 \ 'active_filetypes': ['python'],
                                 \ 'passive_filetypes': ['xml', 'rst'] }
+    let g:syntastic_python_checker="flake8"
 
     "configure supertab
     " let g:SuperTabDefaultCompletionType = "context"
