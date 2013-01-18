@@ -62,6 +62,7 @@
         "Bundle 'pydoc.vim'
 
         Bundle 'Jinja'
+        Bundle 'peterhoeg/vim-qml'
 
 "--->MINE can't do it with git+ssh. :(
         " Bundle 'git+ssh://git@github.com/nielsmadan/harlequin'
