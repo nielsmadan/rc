@@ -1,4 +1,4 @@
-export CLASSPATH=/usr/local/lib/jars/*
+export CLASSPATH=.:/usr/local/lib/jars/*
 export PYLINTRC="$HOME/pylint.rc"
 
 if [ -s "$HOME/.rvm/scripts/rvm" ]; then
