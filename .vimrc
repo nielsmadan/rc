@@ -156,6 +156,7 @@
 
 "--->MAPPINGS
     let mapleader = ","
+    cnoreabbrev <expr> W ((getcmdtype() is# ':' && getcmdline() is# 'W')?('w'):('W'))
 
     "Clear search highlighting
     nnoremap <leader><space> :noh<CR>
