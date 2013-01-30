@@ -123,6 +123,8 @@ export GREP_OPTIONS
 alias pygrep='grep --include="*.py"'
 alias xmlgrep='grep --include="*.xml"'
 
+alias ack='ack-grep'
+
 alias fu='curl -s http://www.commandlinefu.com/commands/browse/sort-by-votes/p... | grep -vE "^$|^#"'
 
 alias tag='ctags -a -R --fields=+l --c-kinds=+p --c++-kinds=+p -ftags'

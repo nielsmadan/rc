@@ -61,7 +61,8 @@ if __name__ == '__main__':
     print "Current directory found: %s" % c_dir
 
     rc_file = ['.vimrc', '.gitconfig', '.gvimrc', '.hgrc', '.vim', '.pep8',
-               '.bashrc', '.bash_profile', '.pylintrc', '.tmux.conf']
+               '.bashrc', '.bash_profile', '.pylintrc', '.tmux.conf', '.global_gitignore',
+               '.ackrc']
 
     _print_section("Remove rc files or symlinks if they exist already.")
     for fname in rc_file:
