@@ -24,7 +24,6 @@
         Bundle 'fholgado/minibufexpl.vim'
         Bundle 'mileszs/ack.vim'
 
-        Bundle 'yankstack'
         Bundle 'hexHighlight.vim'
         " Bundle 'sjl/gundo.vim'
 
@@ -49,7 +48,8 @@
 
 "--->LANGUAGE SPECIFIC
         "Bundle 'slimv'
-        Bundle 'VimClojure'
+        Bundle 'guns/vim-clojure-static'
+        Bundle 'tpope/vim-foreplay'
 
         Bundle 'derekwyatt/vim-scala'
 
@@ -115,6 +115,7 @@
     "the formatoptions that were explicitly set in .vimrc. >:|
     augroup reset_fo
         au!
+        au FileType * setlocal formatoptions-=r
         au FileType * setlocal formatoptions-=o
     augroup end
 
