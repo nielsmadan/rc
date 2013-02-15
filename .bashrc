@@ -154,7 +154,7 @@ alias g="git"
 alias h="hg"
 alias v="gvim"
 
-alias upgrade='sudo apt-get update; sudo apt-get upgrade; sudo apt-get dist-upgrade;'
+alias upgrade='sudo apt-get -y update && sudo apt-get -y upgrade && sudo apt-get -y dist-upgrade && sudo apt-get -y autoclean && sudo apt-get -y autoremove'
 
 # stop global warning message on Ubuntu
 alias gvim='UBUNTU_MENUPROXY= gvim'

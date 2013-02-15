@@ -1,0 +1,3 @@
+.hg
+.vim/bundle/*
+.vim/pathogen/*

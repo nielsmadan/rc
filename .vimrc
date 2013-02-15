@@ -281,6 +281,9 @@
                                 \ 'passive_filetypes': ['xml', 'rst'] }
     let g:syntastic_python_checker="flake8"
 
+    nnoremap <leader>rr :MercuryBM<CR>
+    vnoremap <leader>rr :MercurySM<CR>
+
     "configure supertab
     " let g:SuperTabDefaultCompletionType = "context"
     " let g:SuperTabContextDefaultCompletionType = "<c-p>"
