@@ -9,8 +9,8 @@
 # ... or force ignoredups and ignorespace
 HISTCONTROL=ignoredups:ignorespace
 
-# don't add some commands to history (anything that's less than 4 letters)
-export HISTIGNORE="?:??:???:exit:clear:reset"
+# don't add some commands to history (anything that's less than 3 letters)
+export HISTIGNORE="?:??:exit:clear:reset"
 
 # append to the history file, don't overwrite it
 shopt -s histappend
@@ -78,8 +78,6 @@ esac
 if [ -x /usr/bin/dircolors ]; then
     test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
     alias ls='ls --color=always'
-    #alias dir='dir --color=auto'
-    #alias vdir='vdir --color=auto'
 
     alias grep='grep --color=always'
     alias fgrep='fgrep --color=always'
@@ -87,9 +85,10 @@ if [ -x /usr/bin/dircolors ]; then
 fi
 
 # some more ls aliases
+alias l='ls'
 alias ll='ls -alF'
 alias la='ls -A'
-alias l='ls -Cw $COLUMNS | less -r'
+alias lspage='ls -Cw $COLUMNS | less -r'
 
 # Add an "alert" alias for long running commands.  Use like so:
 #   sleep 10; alert
