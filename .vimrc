@@ -272,7 +272,7 @@
     nnoremap <leader>e :TMiniBufExplorer<CR>
 
     "configure ack.vim
-    nnoremap <c-a> :Ack 
+    nnoremap <leader>a :Ack 
 
     "configure syntastic
     let g:syntastic_check_on_open = 1
