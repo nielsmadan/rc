@@ -31,7 +31,7 @@ function! DecreaseFontSize()
 endfunction
 
 winpos 0 0
-set lines=50
+set lines=999
 set columns=999
 
 set guioptions-=m  "remove menu bar
