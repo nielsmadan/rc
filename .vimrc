@@ -150,7 +150,8 @@
 
     "status line options
     set statusline=
-    set statusline+=\|\ %f\ \|\ 
+    set statusline+=\|\ %f\ \|
+    set statusline+=\ %{fugitive#statusline()}\ \|\ 
     set statusline+=%h%m%r%w
     set statusline+=%=
     set statusline+=C:%c/%{col(\"$\")-1}\ 
