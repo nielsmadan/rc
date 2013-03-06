@@ -17,6 +17,7 @@
 "--->GENERAL PLUGINS
         Bundle 'tpope/vim-surround'
         Bundle 'tpope/vim-rsi'
+        Bundle 'tpope/vim-fugitive'
         Bundle 'repeat.vim'
 
         Bundle 'tomtom/tcomment_vim'
