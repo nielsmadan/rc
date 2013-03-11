@@ -176,7 +176,6 @@
     inoremap jj <C-c>
     inoremap Jj <C-c>
     inoremap JJ <C-c>
-    inoremap <C-j> <C-c>
 
     "move through wrapped lines
     nnoremap j gj
@@ -204,6 +203,12 @@
     nnoremap <leader>y "+y
     vnoremap <leader>p "+p
     nnoremap <leader>p "+p
+
+    " Ctrl-j/k deletes blank line below/above, and Alt-j/k inserts.
+    " nnoremap <silent><C-j> m`:silent +g/\m^\s*$/d<CR>``:noh<CR>
+    " nnoremap <silent><C-k> m`:silent -g/\m^\s*$/d<CR>``:noh<CR>
+    nnoremap <silent><a-j> :set paste<CR>m`o<Esc>``:set nopaste<CR>
+    nnoremap <silent><a-k> :set paste<CR>m`O<Esc>``:set nopaste<CR>
 
     "Search/Replace word under cursor
     nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
