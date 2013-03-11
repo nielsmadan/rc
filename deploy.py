@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     rc_file = ['.vimrc', '.gitconfig', '.gvimrc', '.hgrc', '.vim', '.pep8',
                '.bashrc', '.bash_profile', '.pylintrc', '.tmux.conf', '.global_gitignore',
-               '.ackrc']
+               '.ackrc', '.ctags']
 
     _print_section("Remove rc files or symlinks if they exist already.")
     for fname in rc_file:
