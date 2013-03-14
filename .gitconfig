@@ -1,5 +1,6 @@
 [alias]
     ca = commit -am
+    caa = commit -a --amend
     cm = commit -m
     ci = commit
     co = checkout
