@@ -5,6 +5,7 @@
     ci = commit
     co = checkout
     st = status
+    l = log --pretty=oneline --abbrev-commit
     gl = log --graph --pretty=oneline --abbrev-commit
 
     po = push origin
