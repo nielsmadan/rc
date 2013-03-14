@@ -21,3 +21,5 @@ if [ -f ~/.local_bash_profile ]; then
 fi
 
 [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc"
+
+complete -o default -o nospace -F _git g
