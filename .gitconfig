@@ -4,9 +4,15 @@
     cm = commit -m
     ci = commit
     co = checkout
-    st = status
+    s = status
     l = log --pretty=oneline --abbrev-commit
     gl = log --graph --pretty=oneline --abbrev-commit
+
+    r = rebase
+    ri = rebase --interactive
+
+    st = stash
+    sp = stash pop
 
     po = push origin
     pom = push origin master
