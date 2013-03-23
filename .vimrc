@@ -323,6 +323,10 @@
     \ 'PrtCurLeft()':         ['<left>', '<c-^>'],
     \ 'PrtCurRight()':        ['<right>'],
     \ }
+
+    let g:ctrlp_custom_ignore = {
+    \ 'file': '\v\.(pyc|exe|so|dll)$',
+    \ }
     
     "configure yank ring
     " nnoremap <silent> <F3> :YRShow<cr>
