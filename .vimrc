@@ -148,6 +148,9 @@
     "show menu and preview for completion
     set completeopt=menu,preview
 
+    "allow increment for characters
+    set nrformats=octal,hex,alpha
+
     "status line options
     set statusline=
     set statusline+=\|\ %f\ \|
