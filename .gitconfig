@@ -11,6 +11,8 @@
     r = rebase
     ri = rebase --interactive
 
+    pr = pull --rebase
+
     st = stash
     sp = stash pop
 
