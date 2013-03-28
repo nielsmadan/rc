@@ -293,6 +293,9 @@
 
     nnoremap <leader>rr :MercuryBM<CR>
     vnoremap <leader>rr :MercurySM<CR>
+    " let g:mercury_leader_seq="<leader>t"
+    " let g:mercury_no_defaults=1
+    " let g:mercury_default_register="a"
 
     "configure supertab
     " let g:SuperTabDefaultCompletionType = "context"
