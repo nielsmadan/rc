@@ -124,6 +124,7 @@ GREP_OPTIONS="--exclude-dir=\.svn --exclude=tags"
 export GREP_OPTIONS
 alias pygrep='grep --include="*.py"'
 alias xmlgrep='grep --include="*.xml"'
+alias qmlgrep='grep --include="*.qml"'
 
 alias ack='ack-grep'
 
