@@ -3,8 +3,12 @@
     caa = commit -a --amend --no-edit
     cm = commit -m
     ci = commit
+
     co = checkout
+    com = checkout master
+
     s = status
+
     l = log --pretty=oneline --abbrev-commit
     gl = log --graph --pretty=oneline --abbrev-commit
 
