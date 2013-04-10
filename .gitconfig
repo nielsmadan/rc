@@ -14,6 +14,8 @@
     l = log --pretty=oneline --abbrev-commit
     gl = log --graph --pretty=oneline --abbrev-commit
 
+    ; cl = "!f() { git clone $* ; case $* in *your.host.com*) git config user.name \"Your Name\" && git config user.email \"your.email@company.com\" ;; esac }; f"
+
     r = rebase
     ri = rebase --interactive
 
