@@ -46,3 +46,5 @@
 	email = nielsmadan@gmail.com
 [push]
 	default = simple
+[include]
+    path = "/home/nielsm/.local_gitconfig"
