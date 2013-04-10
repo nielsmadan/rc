@@ -9,6 +9,8 @@
 
     s = status
 
+    sm = submodule
+
     l = log --pretty=oneline --abbrev-commit
     gl = log --graph --pretty=oneline --abbrev-commit
 
