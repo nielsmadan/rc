@@ -19,7 +19,7 @@
 
     r = rebase
     ri = rebase --interactive
-    rm = rebase master
+    rbm = rebase master
 
     pr = pull --rebase
 
