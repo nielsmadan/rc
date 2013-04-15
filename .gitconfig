@@ -6,6 +6,7 @@
 
     co = checkout
     com = checkout master
+    cob = checkout -b
 
     s = status
 
@@ -18,6 +19,7 @@
 
     r = rebase
     ri = rebase --interactive
+    rm = rebase master
 
     pr = pull --rebase
 
