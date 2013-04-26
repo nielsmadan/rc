@@ -50,7 +50,7 @@
 "--->LANGUAGE SPECIFIC
         "Bundle 'slimv'
         Bundle 'guns/vim-clojure-static'
-        Bundle 'tpope/vim-foreplay'
+        Bundle 'tpope/vim-fireplace'
 
         Bundle 'derekwyatt/vim-scala'
 
