@@ -291,6 +291,12 @@
                                 \ 'passive_filetypes': ['xml', 'rst'] }
     let g:syntastic_python_checker="flake8"
 
+    "configure vim-fireplace
+    nnoremap <leader>zz :Require<CR>:Eval<CR>
+    vnoremap <leader>zz :Eval<CR>
+    nnoremap <leader>za :Require<CR>
+
+    "configure mercury
     nnoremap <leader>rr :MercuryBM<CR>
     vnoremap <leader>rr :MercurySM<CR>
     " let g:mercury_leader_seq="<leader>t"
