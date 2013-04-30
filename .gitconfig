@@ -30,6 +30,7 @@
     pom = push origin master
 
 	d = difftool
+    dns = diff --name-status
     outgoing = log origin..master
 [color]
 	ui = true
