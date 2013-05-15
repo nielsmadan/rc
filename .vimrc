@@ -32,6 +32,7 @@
         " Bundle 'rson/vim-conque'
         "Bundle 'joonty/vim-sauce.git'
         Bundle 'xolox/vim-shell'
+        Bundle 'xolox/vim-notes'
 
         " easytags does not like diff
         if ! &diff
@@ -280,6 +281,14 @@
     let g:miniBufExplorerMoreThanOne = 999
     let g:miniBufExplCheckDupeBufs = 0
     nnoremap <leader>e :TMiniBufExplorer<CR>
+
+    "configure vim-notes
+    nnoremap <leader>nn :Note
+    nnoremap <leader>nd :DeleteNote
+    nnoremap <leader>ns :SearchNotes
+
+    let g:notes_suffix = '.txt'
+    let g:notes_smart_quotes = 0
 
     "configure ack.vim
     nnoremap <leader>a :Ack 
