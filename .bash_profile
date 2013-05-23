@@ -23,3 +23,4 @@ fi
 [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc"
 
 complete -o default -o nospace -F _git g
+complete -F _command launch
