@@ -153,11 +153,12 @@ alias venom="cd ~/rc/.vim/pathogen/venom"
 alias merc="cd ~/rc/.vim/pathogen/mercury"
 alias harl="cde ~/rc/.vim/pathogen/harlequin"
 
+# stop global warning message on Ubuntu
+alias gvim='UBUNTU_MENUPROXY= gvim'
+alias gvimdiff='UBUNTU_MENUPROXY= gvimdiff'
+
 alias g="git"
 alias h="hg"
 alias v="gvim"
 
 alias upgrade='sudo apt-get -y update && sudo apt-get -y upgrade && sudo apt-get -y dist-upgrade && sudo apt-get -y autoclean && sudo apt-get -y autoremove'
-
-# stop global warning message on Ubuntu
-alias gvim='UBUNTU_MENUPROXY= gvim'
