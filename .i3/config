@@ -27,13 +27,16 @@ bindsym $mod+d exec dmenu_run
 # bindsym $mod+d exec --no-startup-id i3-dmenu-desktop
 
 # kill focused window
-bindsym $mod+Shift+q kill
+bindsym $mod+y kill
 
 # change focus
 bindsym $mod+h focus left
 bindsym $mod+j focus down
 bindsym $mod+k focus up
 bindsym $mod+l focus right
+
+# toggle focus between outputs
+bindsym $mod+space workspace back_and_forth
 
 # move focused window
 bindsym $mod+Shift+h move left
@@ -53,7 +56,7 @@ bindsym $mod+e layout toggle split
 bindsym $mod+Shift+space floating toggle
 
 # change focus between tiling / floating windows
-bindsym $mod+space focus mode_toggle
+# bindsym $mod+space focus mode_toggle
 
 # focus the parent container
 # bindsym $mod+a focus parent
@@ -122,5 +125,5 @@ bar {
 for_window [title="Drive"] floating enable
 assign [title="Drive"] 2
 
-for_window [title="qmlscene"] floating enable
+for_window [title="qmlscene"] floating enable; workspace 2; focus floating
 assign [title="qmlscene"] 2
