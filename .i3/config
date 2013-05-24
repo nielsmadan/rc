@@ -1,3 +1,6 @@
+#fix for gnome integration
+exec --no-startup-id ~/.i3/dbusregister.sh
+
 # set the mod key to the meta key
 set $mod Mod4
 
