@@ -185,6 +185,8 @@
     "move through wrapped lines
     nnoremap j gj
     nnoremap k gk
+    vnoremap j gj
+    vnoremap k gk
 
     "make Y work the same way as C and D (yank to the end of the line)
     nnoremap Y y$
