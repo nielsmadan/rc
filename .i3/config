@@ -130,3 +130,5 @@ assign [title="Drive"] 2
 
 for_window [title="qmlscene"] floating enable; workspace 2; focus floating
 assign [title="qmlscene"] 2
+
+bindsym $mod+g exec mono /usr/lib/keepass2/KeePass.exe --auto-type
