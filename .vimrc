@@ -224,11 +224,6 @@
     "Set spell checking for commit logs
     au filetype svn,*commit*,rst setlocal spell
 
-    "Execute selection or execute file for python (overwrite: suspend program)
-    "we are writing to a 'file' here, where the file is the python interpreter
-    au FileType python noremap <c-z> :w !python<CR>
-    au FileType ruby noremap <c-z> :w !ruby<CR>
-
     "vimdiff options
     if &diff
         "quick arrow nav, left pull, right push (regardless of side)
