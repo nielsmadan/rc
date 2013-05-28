@@ -115,6 +115,9 @@ if [ -f ~/.localbashrc ]; then
     source ~/.localbashrc
 fi
 
+# if this is set, things go wrong when starting some programs (like gvim) from tmux
+unset DBUS_SESSION_BUS_ADDRESS
+
 export FIGNORE=%FIGNORE:.pyc
 export MANPAGER="less -X"
 
