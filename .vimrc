@@ -212,8 +212,8 @@
     nnoremap <leader>p "+p
 
     " Ctrl-j/k deletes blank line below/above, and Alt-j/k inserts.
-    " nnoremap <silent><C-j> m`:silent +g/\m^\s*$/d<CR>``:noh<CR>
-    " nnoremap <silent><C-k> m`:silent -g/\m^\s*$/d<CR>``:noh<CR>
+    nnoremap <silent><leader><a-j> m`:silent +g/\m^\s*$/d<CR>``:noh<CR>
+    nnoremap <silent><leader><a-k> m`:silent -g/\m^\s*$/d<CR>``:noh<CR>
     nnoremap <silent><a-j> :set paste<CR>m`o<Esc>``:set nopaste<CR>
     nnoremap <silent><a-k> :set paste<CR>m`O<Esc>``:set nopaste<CR>
 
