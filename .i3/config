@@ -124,6 +124,9 @@ bar {
         status_command i3status
 }
 
+# floating windows
+for_window [title="Pinboard*"] floating enable
+
 # work stuff
 for_window [title="Drive"] floating enable
 assign [title="Drive"] 2
