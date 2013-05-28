@@ -30,24 +30,33 @@
     pom = push origin master
 
 	d = difftool
+    dc = difftool --cached
     dns = diff --name-status
     outgoing = log origin..master
+
 [color]
 	ui = true
+
 [core]
 	editor = "gvim -f"
     excludesfile = ~/.global_gitignore
+
 [diff]
 	tool = gvimdiff
+
 [difftool]
 	prompt = false
+
 [merge]
     defaultToUpstream = true
 	tool = gvimdiff
+
 [user]
 	name = nielsmadan
 	email = nielsmadan@gmail.com
+
 [push]
 	default = simple
+
 [include]
     path = "/home/nielsm/.local_gitconfig"
