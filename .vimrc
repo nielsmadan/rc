@@ -165,6 +165,8 @@
 
 "--->MAPPINGS
     let mapleader = ","
+
+    "use :W to write file.
     cnoreabbrev <expr> W ((getcmdtype() is# ':' && getcmdline() is# 'W')?('w'):('W'))
 
     "Clear search highlighting
