@@ -128,8 +128,8 @@ bar {
 for_window [title="Pinboard*"] floating enable
 
 # work stuff
-for_window [title="Drive"] floating enable
-assign [title="Drive"] 2
+for_window [title="^Drive$"] floating enable
+assign [title="^Drive$"] 2
 
 for_window [title="qmlscene"] floating enable; workspace 2; focus floating
 assign [title="qmlscene"] 2
