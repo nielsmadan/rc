@@ -38,8 +38,12 @@ bindsym $mod+j focus down
 bindsym $mod+k focus up
 bindsym $mod+l focus right
 
-# toggle focus between outputs
-bindsym $mod+space workspace back_and_forth
+# toggle focus between workspaces
+bindsym Mod1+Tab workspace back_and_forth
+
+# move focus alone windows
+bindsym $mod+Tab focus right
+bindsym $mod+Shift+Tab focus left
 
 # move focused window
 bindsym $mod+Shift+h move left
