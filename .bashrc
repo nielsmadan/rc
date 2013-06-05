@@ -123,7 +123,7 @@ export MANPAGER="less -X"
 
 alias less="less -R"
 
-GREP_OPTIONS="--exclude-dir=\.svn --exclude=tags"
+GREP_OPTIONS="--exclude-dir=\.svn --exclude-dir=\.git --exclude=tags"
 export GREP_OPTIONS
 alias pygrep='grep --include="*.py"'
 alias xmlgrep='grep --include="*.xml"'
