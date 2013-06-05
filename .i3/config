@@ -1,5 +1,8 @@
 #fix for gnome integration
-exec --no-startup-id ~/.i3/dbusregister.sh
+exec --no-startup-id nm-applet
+exec --no-startup-id dropbox start
+exec --no-startup-id gnome-settings-daemon
+exec --no-startup-id ssh-add
 
 # set the mod key to the meta key
 set $mod Mod4
