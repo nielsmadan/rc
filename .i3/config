@@ -134,6 +134,7 @@ bar {
 # floating windows
 for_window [title="Pinboard*"] floating enable
 for_window [title="^Diorama$"] floating enable
+for_window [title="^i3exit:.*"] floating enable
 
 # work stuff
 for_window [title="^Drive$"] floating enable
