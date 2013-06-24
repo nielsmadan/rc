@@ -20,6 +20,7 @@
     r = rebase
     ri = rebase --interactive
     rbm = rebase master
+    rbc = rebase --continue
 
     pr = pull --rebase
 
@@ -28,6 +29,7 @@
 
     po = push origin
     pom = push origin master
+    porfm = push origin HEAD:refs/for/master
 
 	d = difftool
     dc = difftool --cached
