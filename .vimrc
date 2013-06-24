@@ -311,6 +311,8 @@
     " let g:mercury_leader_seq="<leader>t"
     " let g:mercury_no_defaults=1
     " let g:mercury_default_register="a"
+    " let g:mercury_filetype_override={"qml": "javascript"}
+    " let g:mercury_default_filetype="javascript"
 
     "configure supertab
     " let g:SuperTabDefaultCompletionType = "context"
