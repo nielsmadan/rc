@@ -90,6 +90,13 @@ bindsym $mod+8 workspace 8
 bindsym $mod+9 workspace 9
 bindsym $mod+0 workspace 10
 
+#switch to workspace pair
+bindsym $mod+Control+1 workspace 1; workspace 2
+bindsym $mod+Control+2 workspace 3; workspace 4
+bindsym $mod+Control+3 workspace 5; workspace 6
+bindsym $mod+Control+4 workspace 7; workspace 8
+bindsym $mod+Control+5 workspace 9: workspace 10
+
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace 1; workspace 1
 bindsym $mod+Shift+2 move container to workspace 2; workspace 2
@@ -140,11 +147,12 @@ for_window [title="Pinboard*"] floating enable
 for_window [title="^Diorama$"] floating enable
 for_window [title="^i3exit:.*"] floating enable
 
+# keepass auto-type
+bindsym $mod+g exec mono /usr/lib/keepass2/KeePass.exe --auto-type
+
 # work stuff
 for_window [title="^Drive$"] floating enable
 assign [title="^Drive$"] 2
 
 for_window [title="qmlscene"] floating enable; workspace 2; focus floating
 assign [title="qmlscene"] 2
-
-bindsym $mod+g exec mono /usr/lib/keepass2/KeePass.exe --auto-type
