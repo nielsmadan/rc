@@ -12,7 +12,11 @@ mercurial_keyring =
 hgext.extdiff =
 hggit = 
 hgext.bookmarks =
+pager =
 
 [extdiff]
 cmd.d = gvimdiff
 opts.d = --nofork
+
+[pager]
+pager = LESS='FRX' less
