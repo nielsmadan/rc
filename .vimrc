@@ -225,6 +225,16 @@
 
     "Set spell checking for commit logs
     au filetype svn,*commit*,rst setlocal spell
+    
+    fun! <SID>StripTrailingWhitespaces()
+        let l = line(".")
+        let c = col(".")
+        %s/\s\+$//e
+        call cursor(l, c)
+    endfun
+
+    "remove trailing whitespace for specific file types
+    au FileType qml,c,cpp,java,php,ruby,python au BufWritePre <buffer> :call <SID>StripTrailingWhitespaces()
 
     "vimdiff options
     if &diff
