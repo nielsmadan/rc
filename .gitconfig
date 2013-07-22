@@ -22,6 +22,8 @@
     rbm = rebase master
     rbc = rebase --continue
 
+    rhom = reset --hard origin/master
+
     pr = pull --rebase
 
     st = stash
