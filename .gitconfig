@@ -8,6 +8,8 @@
     com = checkout master
     cob = checkout -b
 
+    bl = branch -l
+
     s = status
 
     sm = submodule
