@@ -22,6 +22,7 @@
 
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
+        Bundle 'taglist.vim'
         Bundle 'mileszs/ack.vim'
 
         Bundle 'hexHighlight.vim'
