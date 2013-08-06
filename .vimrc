@@ -22,7 +22,6 @@
 
         Bundle 'tomtom/tcomment_vim'
         Bundle 'kien/ctrlp.vim'
-        Bundle 'fholgado/minibufexpl.vim'
         Bundle 'mileszs/ack.vim'
 
         Bundle 'hexHighlight.vim'
@@ -281,16 +280,7 @@
     if ! &diff
         let g:easytags_dynamic_files = 1 " add tags to project tag file (if it already exists)
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
-        let g:easytags_updatetime_autodisable = 1 " disable updatetime warning
     endif
-
-    "configure minibufexplorer
-    let g:miniBufExplMapWindowNavArrows=1 " ctrl + arrow = windows movement
-    let g:miniBufExplMapCTabSwitchWindows = 1 " ctrl( + shift) + tab = window movement
-    let g:miniBufExplUseSingleClick = 1 " click to go to buffer
-    let g:miniBufExplorerMoreThanOne = 999
-    let g:miniBufExplCheckDupeBufs = 0
-    nnoremap <leader>e :TMiniBufExplorer<CR>
 
     "configure vim-notes
     nnoremap <leader>nn :Note
