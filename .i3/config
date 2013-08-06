@@ -154,6 +154,8 @@ bindsym $mod+g exec mono /usr/lib/keepass2/KeePass.exe --auto-type
 for_window [title="^Drive$"] floating enable
 assign [title="^Drive$"] 2
 
+for_window [title="^qmlscreencap$"] floating enable
+
 for_window [title="^Foursquare.*$"] floating enable
 for_window [title="^Automotive Music$"] floating enable
 
