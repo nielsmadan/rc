@@ -283,6 +283,9 @@
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
     endif
 
+    "configure taglist.vim
+    nnoremap <leader>t :TlistToggle<CR><C-W>=
+
     "configure vim-notes
     nnoremap <leader>nn :Note
     nnoremap <leader>nd :DeleteNote
