@@ -4,6 +4,9 @@
     cm = commit -m
     ci = commit
 
+    ; show remote branches and sort them by date of last commit
+    brd = "!f() { for k in `git branch -a|sed s/^..//`;do echo -e `git log -1 --pretty=format:\"%Cgreen%ci %Cblue%cr%Creset\" \"$k\"`\t\"$k\";done|sort; }; f"
+
     co = checkout
     com = checkout master
     cob = checkout -b
