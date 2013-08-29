@@ -69,3 +69,6 @@
 
 [include]
     path = "/home/nielsm/.local_gitconfig"
+
+[rerere]
+	enabled = true
