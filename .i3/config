@@ -151,8 +151,8 @@ for_window [title="^i3exit:.*"] floating enable
 bindsym $mod+g exec mono /usr/lib/keepass2/KeePass.exe --auto-type
 
 # work stuff
-for_window [title="^Drive$"] floating enable
-assign [title="^Drive$"] 2
+for_window [title=".*Auto$"] floating enable
+assign [title=".*Auto$"] 2
 
 for_window [title="^qmlscreencap$"] floating enable
 
