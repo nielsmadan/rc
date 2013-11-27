@@ -11,6 +11,8 @@
     com = checkout master
     cob = checkout -b
 
+    cp = cherry-pick
+
     bl = branch -l
 
     s = status
