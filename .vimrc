@@ -33,6 +33,7 @@
         "Bundle 'joonty/vim-sauce.git'
         Bundle 'xolox/vim-shell'
         Bundle 'xolox/vim-notes'
+        Bundle 'xolox/vim-misc'
 
         " easytags does not like diff
         if ! &diff
