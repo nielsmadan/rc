@@ -22,5 +22,9 @@ fi
 
 [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc"
 
-complete -o default -o nospace -F _git g
+if [ -f ~/.git-completion.bash ]; then
+    . ~/.git-completion.bash
+    __git_complete g __git_main
+fi
+
 complete -F _command launch
