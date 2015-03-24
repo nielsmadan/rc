@@ -1,81 +1,69 @@
-"--->VUNDLE
-    filetype off
     
-    if has('win32') || has('win64')
-        set rtp+=$HOME/vimfiles/bundle/vundle/
-        call vundle#rc('$HOME/vimfiles/bundle/')
-    else
-        set rtp+=~/.vim/bundle/vundle/
-        call vundle#rc()
+call plug#begin("~/.vim/plugged")
 
-        "run shell in interactive mode to get aliases
-        set shellcmdflag=-ic
-    endif
-
-    Bundle 'gmarik/vundle'
+    Plug 'gmarik/vundle'
 
 "--->GENERAL PLUGINS
-        Bundle 'tpope/vim-surround'
-        Bundle 'tpope/vim-rsi'
-        Bundle 'tpope/vim-fugitive'
-        Bundle 'repeat.vim'
+        Plug 'tpope/vim-rsi'
+        Plug 'tpope/vim-fugitive'
+        Plug 'repeat.vim'
 
-        Bundle 'tomtom/tcomment_vim'
-        Bundle 'kien/ctrlp.vim'
-        Bundle 'taglist.vim'
-        Bundle 'mileszs/ack.vim'
+        Plug 'tomtom/tcomment_vim'
+        Plug 'kien/ctrlp.vim'
+        " Plug 'taglist.vim'
+        " Plug 'mileszs/ack.vim'
 
-        Bundle 'hexHighlight.vim'
-        " Bundle 'sjl/gundo.vim'
+        Plug 'hexHighlight.vim'
+        " Plug 'sjl/gundo.vim'
 
         " this is just a mirror
-        " Bundle 'rson/vim-conque'
-        "Bundle 'joonty/vim-sauce.git'
-        Bundle 'xolox/vim-shell'
-        Bundle 'xolox/vim-notes'
-        Bundle 'xolox/vim-misc'
+        " Plug 'rson/vim-conque'
+        "Plug 'joonty/vim-sauce.git'
+        Plug 'xolox/vim-shell'
+        " Plug 'xolox/vim-notes'
+        Plug 'xolox/vim-misc'
 
         " easytags does not like diff
         if ! &diff
-            Bundle 'xolox/vim-easytags'
+            " Plug 'xolox/vim-easytags'
         endif
 
-        Bundle 'Lokaltog/vim-easymotion'
-        Bundle 'ervandew/supertab'
-        "Bundle 'AutoTag' " remove dangling tags on closing vim (test with easytags)
-        "Bundle 'DirDiff.vim'
+        Plug 'Lokaltog/vim-easymotion'
+        " Plug 'ervandew/supertab'
+        "Plug 'AutoTag' " remove dangling tags on closing vim (test with easytags)
+        "Plug 'DirDiff.vim'
+
+        Plug 'nielsmadan/harlequin'
 
 "--->FRAMEWORKS
-        Bundle 'scrooloose/syntastic'
-        "Bundle 'Shougo/neocomplcache'
+        Plug 'scrooloose/syntastic'
+        "Plug 'Shougo/neocomplcache'
 
 "--->LANGUAGE SPECIFIC
-        "Bundle 'slimv'
-        Bundle 'guns/vim-clojure-static'
-        Bundle 'tpope/vim-fireplace'
+        "Plug 'slimv'
+        " Plug 'guns/vim-clojure-static'
+        " Plug 'tpope/vim-fireplace'
 
-        Bundle 'derekwyatt/vim-scala'
+        " Plug 'derekwyatt/vim-scala'
 
-        Bundle 'tpope/vim-ragtag'
-        Bundle 'matchit.zip'
+        " Plug 'tpope/vim-ragtag'
+        Plug 'matchit.zip'
 
         " latest version of built-in omnicomplete
-        Bundle 'pythoncomplete'
+        " Plug 'pythoncomplete'
         " improved syntax highlighting
-        Bundle 'python.vim'
-        "Bundle 'pydoc.vim'
+        " Plug 'python.vim'
+        "Plug 'pydoc.vim'
 
-        Bundle 'Jinja'
-        Bundle 'wikipedia.vim'
-        Bundle 'peterhoeg/vim-qml'
+        " Plug 'Jinja'
+        " Plug 'wikipedia.vim'
+        Plug 'peterhoeg/vim-qml'
 
 "--->MINE can't do it with git+ssh. :(
-        " Bundle 'git+ssh://git@github.com/nielsmadan/harlequin'
-        " Bundle 'git+ssh://git@github.com/nielsmadan/venom'
-        " Bundle 'git+ssh://git@github.com/nielsmadan/mercury'
+        " Plug 'git+ssh://git@github.com/nielsmadan/venom'
+        " Plug 'git+ssh://git@github.com/nielsmadan/mercury'
 
-"--->PATHOGEN
-    call pathogen#infect('pathogen')
+call plug#end()
 
 "--->OPTIONS
     filetype plugin indent on
