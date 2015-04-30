@@ -40,6 +40,7 @@
     po = push origin
     pom = push origin master
     porfm = push origin HEAD:refs/for/master
+    porfs = push origin HEAD:refs/for/staging
 
 	d = difftool
     dc = difftool --cached
