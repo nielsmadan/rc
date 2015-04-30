@@ -158,6 +158,7 @@ for_window [title="^qmlscreencap$"] floating enable
 
 for_window [title="^Foursquare.*$"] floating enable
 for_window [title="^Automotive Music$"] floating enable
+for_window [title="^carlotta$"] floating enable
 
 for_window [title="qmlscene"] floating enable; workspace 2; focus floating
 assign [title="qmlscene"] 2
