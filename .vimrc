@@ -10,14 +10,11 @@ call plug#begin("~/.vim/plugged")
 
         Plug 'tomtom/tcomment_vim'
         Plug 'kien/ctrlp.vim'
-        " Plug 'taglist.vim'
         " Plug 'mileszs/ack.vim'
 
         Plug 'hexHighlight.vim'
         " Plug 'sjl/gundo.vim'
 
-        " this is just a mirror
-        " Plug 'rson/vim-conque'
         "Plug 'joonty/vim-sauce.git'
         Plug 'xolox/vim-shell'
         " Plug 'xolox/vim-notes'
@@ -29,7 +26,6 @@ call plug#begin("~/.vim/plugged")
         endif
 
         Plug 'Lokaltog/vim-easymotion'
-        " Plug 'ervandew/supertab'
         "Plug 'AutoTag' " remove dangling tags on closing vim (test with easytags)
         "Plug 'DirDiff.vim'
 
@@ -271,9 +267,6 @@ call plug#end()
         let g:easytags_dynamic_files = 1 " add tags to project tag file (if it already exists)
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
     endif
-
-    "configure taglist.vim
-    nnoremap <leader>t :TlistToggle<CR><C-W>=
 
     "configure vim-notes
     nnoremap <leader>nn :Note
