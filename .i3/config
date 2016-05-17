@@ -115,6 +115,8 @@ bindsym $mod+Shift+c reload
 bindsym $mod+Shift+r restart
 # exit i3 (logs you out of your X session)
 bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -b 'Yes, exit i3' 'i3-msg exit'"
+# configure changing keyboard layout from us to english using alt shift
+exec --no-startup-id "setxkbmap -model pc105 -layout us,de -option grp:alt_shift_toggle"
 
 # resize window (you can also use the mouse for that)
 mode "resize" {
@@ -159,6 +161,7 @@ for_window [title="^qmlscreencap$"] floating enable
 for_window [title="^Foursquare.*$"] floating enable
 for_window [title="^Automotive Music$"] floating enable
 for_window [title="^carlotta$"] floating enable
+assign [title="carlotta"] 2
 
-for_window [title="qmlscene"] floating enable; workspace 2; focus floating
+for_wind [title="qmlscene"] floating enable; workspace 2; focus floating
 assign [title="qmlscene"] 2
