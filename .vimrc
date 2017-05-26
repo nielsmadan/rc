@@ -5,7 +5,7 @@ call plug#begin("~/.vim/plugged")
 "--->GENERAL PLUGINS
         Plug 'tpope/vim-rsi'
         Plug 'tpope/vim-fugitive'
-        Plug 'repeat.vim'
+        Plug 'tpope/vim-repeat'
 
         Plug 'rizzatti/dash.vim'
 
@@ -16,7 +16,7 @@ call plug#begin("~/.vim/plugged")
         Plug 'Shougo/neocomplete', { 'for': 'python' }
         " Plug 'mileszs/ack.vim'
 
-        Plug 'hexHighlight.vim'
+        Plug 'vim-scripts/hexHighlight.vim'
         " Plug 'sjl/gundo.vim'
 
         "Plug 'joonty/vim-sauce.git'
@@ -43,7 +43,7 @@ call plug#begin("~/.vim/plugged")
         " Plug 'tpope/vim-fireplace'
 
         " Plug 'tpope/vim-ragtag'
-        Plug 'matchit.zip'
+        Plug 'tmhedberg/matchit'
 
         " latest version of built-in omnicomplete
         " Plug 'pythoncomplete'
