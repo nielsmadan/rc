@@ -1,12 +1,13 @@
+execute pathogen#infect()
     
 call plug#begin("~/.vim/plugged")
-
-    Plug 'gmarik/vundle'
 
 "--->GENERAL PLUGINS
         Plug 'tpope/vim-rsi'
         Plug 'tpope/vim-fugitive'
         Plug 'repeat.vim'
+
+        Plug 'rizzatti/dash.vim'
 
         Plug 'tomtom/tcomment_vim'
         Plug 'kien/ctrlp.vim'
@@ -32,18 +33,14 @@ call plug#begin("~/.vim/plugged")
         "Plug 'AutoTag' " remove dangling tags on closing vim (test with easytags)
         "Plug 'DirDiff.vim'
 
-        Plug 'nielsmadan/harlequin'
-
 "--->FRAMEWORKS
         Plug 'scrooloose/syntastic'
         "Plug 'Shougo/neocomplcache'
 
 "--->LANGUAGE SPECIFIC
-        "Plug 'slimv'
+        " Plug 'slimv'
         " Plug 'guns/vim-clojure-static'
         " Plug 'tpope/vim-fireplace'
-
-        " Plug 'derekwyatt/vim-scala'
 
         " Plug 'tpope/vim-ragtag'
         Plug 'matchit.zip'
@@ -52,11 +49,10 @@ call plug#begin("~/.vim/plugged")
         " Plug 'pythoncomplete'
         " improved syntax highlighting
         " Plug 'python.vim'
-        "Plug 'pydoc.vim'
+        " Plug 'pydoc.vim'
 
         " Plug 'Jinja'
         " Plug 'wikipedia.vim'
-        Plug 'peterhoeg/vim-qml'
 
 "--->MINE can't do it with git+ssh. :(
         " Plug 'git+ssh://git@github.com/nielsmadan/venom'
@@ -88,9 +84,6 @@ call plug#end()
 
     "backspace over line breaks
     set backspace=indent,eol,start
-
-    "easily toggle paste
-    set pastetoggle=<f10>
 
     "file options
     set autowrite
