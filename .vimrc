@@ -12,29 +12,29 @@ call plug#begin("~/.vim/plugged")
         Plug 'tomtom/tcomment_vim'
         Plug 'kien/ctrlp.vim'
 
-        Plug 'Valloric/YouCompleteMe', { 'do': './install.sh' }
-        Plug 'Shougo/neocomplete', { 'for': 'python' }
+        " Plug 'Valloric/YouCompleteMe', { 'do': './install.sh' }
+        " Plug 'Shougo/neocomplete', { 'for': 'python' }
         " Plug 'mileszs/ack.vim'
 
         Plug 'vim-scripts/hexHighlight.vim'
         " Plug 'sjl/gundo.vim'
 
         "Plug 'joonty/vim-sauce.git'
-        Plug 'xolox/vim-shell'
+        " Plug 'xolox/vim-shell'
         " Plug 'xolox/vim-notes'
         Plug 'xolox/vim-misc'
 
         " easytags does not like diff
-        if ! &diff
-            Plug 'xolox/vim-easytags'
-        endif
+        " if ! &diff
+        "     Plug 'xolox/vim-easytags'
+        " endif
 
         Plug 'Lokaltog/vim-easymotion'
         "Plug 'AutoTag' " remove dangling tags on closing vim (test with easytags)
         "Plug 'DirDiff.vim'
 
 "--->FRAMEWORKS
-        Plug 'scrooloose/syntastic'
+        " Plug 'scrooloose/syntastic'
         "Plug 'Shougo/neocomplcache'
 
 "--->LANGUAGE SPECIFIC
@@ -43,7 +43,10 @@ call plug#begin("~/.vim/plugged")
         " Plug 'tpope/vim-fireplace'
 
         " Plug 'tpope/vim-ragtag'
+        Plug 'leafgarland/typescript-vim'
         Plug 'tmhedberg/matchit'
+        Plug 'Quramy/tsuquyomi'
+        Plug 'Quramy/vim-js-pretty-template'
 
         " latest version of built-in omnicomplete
         " Plug 'pythoncomplete'
@@ -249,11 +252,7 @@ call plug#end()
 
 "--->PLUGIN CONFIGURATION
 
-    "configure easytags, and tag management in general
-    let g:easytags_languages = {
-    \   'qml': {
-    \   }
-    \}
+    let g:yankee_prefix = "q"
 
     "YouCompleteMe
     let g:ycm_collect_identifiers_from_tags_files = 1
@@ -293,6 +292,10 @@ call plug#end()
     nnoremap <leader>zz :Require<CR>:Eval<CR>
     vnoremap <leader>zz :Eval<CR>
     nnoremap <leader>za :Require<CR>
+
+    "configure template highlighting
+    autocmd FileType typescript JsPreTmpl html
+    autocmd FileType typescript syn clear foldBraces " For leafgarland/typescript-vim users only.
 
     "configure mercury
     nnoremap <leader>rr :MercuryBM<CR>
