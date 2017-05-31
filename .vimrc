@@ -111,6 +111,8 @@ call plug#end()
     set shiftwidth=4
     set softtabstop=4
 
+    au BufRead,BufNewFile *.js setlocal shiftwidth=2
+
     "folding options
     set foldmethod=indent
     set foldminlines=2
@@ -217,7 +219,7 @@ call plug#end()
     endfun
 
     "remove trailing whitespace for specific file types
-    au FileType qml,c,cpp,java,php,ruby,python au BufWritePre <buffer> :call <SID>StripTrailingWhitespaces()
+    au FileType qml,js,c,cpp,java,php,ruby,python au BufWritePre <buffer> :call <SID>StripTrailingWhitespaces()
 
     "vimdiff options
     if &diff
