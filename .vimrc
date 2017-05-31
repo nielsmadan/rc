@@ -244,7 +244,10 @@ call plug#end()
         nnoremap <m-p><m-p> :diffput<CR>
 
         "when using gvimdiff as git difftool, it will open both sides in readonly mode, which is why we need the !
-        nnoremap <m-q> :wqall!<CR>
+        nnoremap <c-q> :wqall!<CR>
+
+        "looks like on mac there's some weird window resizing going on at the start when diffing.
+        au VimResized * wincmd =
     endif
 
 "--->COLORSCHEME
@@ -252,9 +255,6 @@ call plug#end()
     colo harlequin
 
 "--->PLUGIN CONFIGURATION
-
-    let g:yankee_prefix = "q"
-
     "YouCompleteMe
     let g:ycm_collect_identifiers_from_tags_files = 1
 
@@ -320,13 +320,8 @@ call plug#end()
     " \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
     " \ endif
 
-    "configure conque
-    " let g:ConqueTerm_EscKey = '<C-c>'
-    " let g:ConqueTerm_CWInsert = 1
-    " let g:ConqueTerm_ExecFileKey = '<F5>'
-
     "configure ctrl-p
-    let g:ctrlp_map = '<c-g>' " overwrite: display current file name and position
+    let g:ctrlp_map = '<c-g>' " start up the plugin
     let g:ctrlp_working_path_mode = '' " start file search from current root
     let g:ctrlp_switch_buffer = 0 " don't jump to a selected buffer if it's open
 
