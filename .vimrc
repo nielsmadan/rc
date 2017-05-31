@@ -12,7 +12,6 @@ call plug#begin("~/.vim/plugged")
         Plug 'tomtom/tcomment_vim'
         Plug 'kien/ctrlp.vim'
 
-        " Plug 'Valloric/YouCompleteMe', { 'do': './install.sh' }
         " Plug 'Shougo/neocomplete', { 'for': 'python' }
         " Plug 'mileszs/ack.vim'
 
@@ -34,7 +33,8 @@ call plug#begin("~/.vim/plugged")
         "Plug 'DirDiff.vim'
 
 "--->FRAMEWORKS
-        " Plug 'scrooloose/syntastic'
+        Plug 'scrooloose/syntastic'
+        Plug 'Valloric/YouCompleteMe', { 'do': './install.sh --clang-completer --tern-completer' }
         "Plug 'Shougo/neocomplcache'
 
 "--->LANGUAGE SPECIFIC
@@ -288,6 +288,7 @@ call plug#end()
                                 \ 'active_filetypes': ['python'],
                                 \ 'passive_filetypes': ['xml', 'rst'] }
     let g:syntastic_python_checker="flake8"
+    let g:syntastic_javascript_checkers = ['eslint']
 
     "configure vim-fireplace
     nnoremap <leader>zz :Require<CR>:Eval<CR>
