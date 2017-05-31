@@ -43,10 +43,9 @@ call plug#begin("~/.vim/plugged")
         " Plug 'tpope/vim-fireplace'
 
         " Plug 'tpope/vim-ragtag'
-        Plug 'leafgarland/typescript-vim'
-        Plug 'tmhedberg/matchit'
-        Plug 'Quramy/tsuquyomi'
-        Plug 'Quramy/vim-js-pretty-template'
+
+        Plug 'pangloss/vim-javascript'
+        Plug 'mxw/vim-jsx'
 
         " latest version of built-in omnicomplete
         " Plug 'pythoncomplete'
