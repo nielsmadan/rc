@@ -10,7 +10,8 @@
         "jsx": true
     },
     "plugins": [
-        "react"
+        "react",
+        "jest"
     ],
     "rules": {
         "strict": 0,
