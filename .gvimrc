@@ -6,6 +6,9 @@ if has("gui_running")
   elseif has("gui_win32")
     let s:FontSize = 12
     exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
+  elseif has("gui_macvim")
+    let s:FontSize = 14
+    exe "set guifont=Inconsolata:h" . s:FontSize
   endif
 endif
 
@@ -18,6 +21,8 @@ function! IncreaseFontSize()
         exe "set guifont=Inconsolata\\ " . s:FontSize
     elseif has("gui_win32")
         exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
+    elseif has("gui_macvim")
+        exe "set guifont=Inconsolata\\ " . s:FontSize
     endif
 endfunction
 
@@ -27,6 +32,8 @@ function! DecreaseFontSize()
         exe "set guifont=Inconsolata\\ " . s:FontSize
     elseif has("gui_win32")
         exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
+    elseif has("gui_macvim")
+        exe "set guifont=Inconsolata\\ " . s:FontSize
     endif
 endfunction
 
