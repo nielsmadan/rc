@@ -28,7 +28,7 @@ plugins=(git brew autojump macports extract vi-mode tmux themes)
 source $ZSH/oh-my-zsh.sh
 
 alias m="mvim"
-alias tnsgrep="grep --exclude=\"./node_modules/*\" --exclude=\"./platforms/*\""
+alias rnios="react-native run-ios && react-native log-ios"
 
 # User configuration
 
