@@ -244,7 +244,7 @@ call plug#end()
         nnoremap <m-p><m-p> :diffput<CR>
 
         "when using gvimdiff as git difftool, it will open both sides in readonly mode, which is why we need the !
-        nnoremap <c-q> :wqall!<CR>
+        nnoremap <c-i> :wqall!<CR>
 
         "looks like on mac there's some weird window resizing going on at the start when diffing.
         au VimResized * wincmd =
