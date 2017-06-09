@@ -13,14 +13,12 @@ call plug#begin("~/.vim/plugged")
         Plug 'kien/ctrlp.vim'
 
         " Plug 'Shougo/neocomplete', { 'for': 'python' }
-        " Plug 'mileszs/ack.vim'
 
         Plug 'vim-scripts/hexHighlight.vim'
         " Plug 'sjl/gundo.vim'
 
         "Plug 'joonty/vim-sauce.git'
         " Plug 'xolox/vim-shell'
-        " Plug 'xolox/vim-notes'
         Plug 'xolox/vim-misc'
 
         " easytags does not like diff
@@ -32,6 +30,8 @@ call plug#begin("~/.vim/plugged")
         "Plug 'AutoTag' " remove dangling tags on closing vim (test with easytags)
         "Plug 'DirDiff.vim'
 
+        Plug 'junegunn/goyo.vim'
+
 "--->FRAMEWORKS
         Plug 'scrooloose/syntastic'
         Plug 'Valloric/YouCompleteMe', { 'do': './install.sh --clang-completer --tern-completer' }
@@ -40,7 +40,6 @@ call plug#begin("~/.vim/plugged")
 "--->LANGUAGE SPECIFIC
         " Plug 'slimv'
         " Plug 'guns/vim-clojure-static'
-        " Plug 'tpope/vim-fireplace'
 
         " Plug 'tpope/vim-ragtag'
 
@@ -271,17 +270,6 @@ call plug#end()
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
     endif
 
-    "configure vim-notes
-    nnoremap <leader>nn :Note
-    nnoremap <leader>nd :DeleteNote
-    nnoremap <leader>ns :SearchNotes
-
-    let g:notes_suffix = '.txt'
-    let g:notes_smart_quotes = 0
-
-    "configure ack.vim
-    nnoremap <leader>a :Ack 
-
     "configure syntastic
     let g:syntastic_check_on_open = 1
     let g:syntastic_mode_map = {'mode': 'active',
@@ -289,15 +277,6 @@ call plug#end()
                                 \ 'passive_filetypes': ['xml', 'rst'] }
     let g:syntastic_python_checker="flake8"
     let g:syntastic_javascript_checkers = ['eslint']
-
-    "configure vim-fireplace
-    nnoremap <leader>zz :Require<CR>:Eval<CR>
-    vnoremap <leader>zz :Eval<CR>
-    nnoremap <leader>za :Require<CR>
-
-    "configure template highlighting
-    autocmd FileType typescript JsPreTmpl html
-    autocmd FileType typescript syn clear foldBraces " For leafgarland/typescript-vim users only.
 
     "configure mercury
     nnoremap <leader>rr :MercuryBM<CR>
@@ -307,19 +286,6 @@ call plug#end()
     " let g:mercury_default_register="a"
     " let g:mercury_filetype_override={"qml": "javascript"}
     " let g:mercury_default_filetype="javascript"
-
-    "configure supertab
-    " let g:SuperTabDefaultCompletionType = "context"
-    " let g:SuperTabContextDefaultCompletionType = "<c-p>"
-    " let g:SuperTabClosePreviewOnPopupClose = 1
-    " let g:SuperTabRetainCompletionDuration = 'completion'
-
-    "fall back to local completion if omni does not exist for file type
-    " autocmd FileType *
-    " \ if &omnifunc != '' |
-    " \   call SuperTabChain(&omnifunc, "<c-p>") |
-    " \   call SuperTabSetDefaultCompletionType("<c-x><c-u>") |
-    " \ endif
 
     "configure ctrl-p
     let g:ctrlp_map = '<c-g>' " start up the plugin
@@ -337,11 +303,40 @@ call plug#end()
     \ 'file': '\v\.(pyc|exe|so|dll)$',
     \ }
     
-    "configure yank ring
-    " nnoremap <silent> <F3> :YRShow<cr>
-    " inoremap <silent> <F3> <ESC>:YRShow<cr>
-    " let g:yankring_manage_numbered_reg = 1
-    " let g:yankring_zap_keys = 'f F t T / ?'
+    map <Leader>w :call WriteMode()<CR>
+    let g:write_mode = 0
+
+    function! WriteMode()
+        if (g:write_mode == 0)
+            if has("gui_running")
+              if has("gui_macvim")
+                let s:FontSize = 18
+                exe "set guifont=Inconsolata:h" . s:FontSize
+              endif
+            endif
+
+            setlocal spell spelllang=en_us
+            colo geisha
+
+            exe "Goyo 40%x60%"
+
+            g:write_mode = 1
+        elseif
+            if has("gui_running")
+              if has("gui_macvim")
+                let s:FontSize = 14
+                exe "set guifont=Inconsolata:h" . s:FontSize
+              endif
+            endif
+
+            colo harlequin
+            setlocal nospell
+
+            exe "Goyo!"
+
+            g:write_mode = 0
+        endif
+    endfunction
 
 "--->SMALL FUNCTIONS
     map <Leader>xml <Esc>:call FixupXml()
@@ -351,9 +346,8 @@ call plug#end()
         normal! gg=G
     endfunction
 
-    nnoremap <leader>w :w<CR>
-    map <Leader>qw <Esc>:call CleanClose(1)
-    map <Leader>q <Esc>:call CleanClose(0)
+    map <Leader>qw <Esc>:call CleanClose(1)<CR>
+    map <Leader>qq <Esc>:call CleanClose(0)<CR>
 
     function! CleanClose(tosave)
     if (a:tosave == 1)
