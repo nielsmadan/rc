@@ -11,10 +11,12 @@ call plug#begin("~/.vim/plugged")
 
         Plug 'tomtom/tcomment_vim'
         Plug 'kien/ctrlp.vim'
+        Plug 'sbdchd/neoformat'
 
         " Plug 'Shougo/neocomplete', { 'for': 'python' }
 
         Plug 'vim-scripts/hexHighlight.vim'
+        Plug 'vim-scripts/matchit.zip'
         " Plug 'sjl/gundo.vim'
 
         "Plug 'joonty/vim-sauce.git'
@@ -270,13 +272,26 @@ call plug#end()
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
     endif
 
+    "configure neoformat
+    let g:neoformat_javascript_prettier = {
+        \   'exe': 'prettier',
+        \   'args': ['--trailing-comma=all', '--print-width=120'],
+        \ }
+
+    let g:neoformat_enabled_javascript = ['prettier']
+
+    augroup neoformat_on_write
+      autocmd!
+      autocmd BufWritePre * Neoformat
+    augroup END
+
     "configure syntastic
     let g:syntastic_check_on_open = 1
     let g:syntastic_mode_map = {'mode': 'active',
                                 \ 'active_filetypes': ['python'],
                                 \ 'passive_filetypes': ['xml', 'rst'] }
     let g:syntastic_python_checker="flake8"
-    let g:syntastic_javascript_checkers = ['eslint']
+    let g:syntastic_javascript_checkers = ['eslint', 'flow']
 
     "configure mercury
     nnoremap <leader>rr :MercuryBM<CR>
