@@ -39,6 +39,11 @@
 
     po = push origin
     pom = push origin master
+
+    ; heroku
+    phm = push heroku master
+
+    ; gerrit
     porfm = push origin HEAD:refs/for/master
     porfs = push origin HEAD:refs/for/staging
 
