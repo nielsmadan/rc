@@ -315,6 +315,7 @@ call plug#end()
     \ }
 
     let g:ctrlp_custom_ignore = {
+    \ 'dir':  '\.git\|\|node_modules',
     \ 'file': '\v\.(pyc|exe|so|dll)$',
     \ }
     
