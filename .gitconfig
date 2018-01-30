@@ -57,7 +57,7 @@
 
 [core]
 	editor = "gvim -f"
-    excludesfile = ~/.global_gitignore
+	excludesfile = /Users/nielsm/.gitignore
 
 [diff]
 	tool = gvimdiff

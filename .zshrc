@@ -3,8 +3,10 @@
 
 # Path to your oh-my-zsh installation.
 export ZSH=/Users/nielsm/.oh-my-zsh
+export ANDROID_HOME=/Users/nielsm/Library/Android/sdk
+export GEM_HOME=/Users/nielsm/.gem
 
-export PATH=$PATH:/Users/nielsm/Library/Python/3.6/bin:/Users/nielsm/Library/Python/2.7/bin/
+export PATH=$PATH:$GEM_HOME/bin:/Users/nielsm/bin:/Users/nielsm/Library/Python/3.6/bin:/Users/nielsm/Library/Python/2.7/bin/
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
@@ -28,6 +30,12 @@ source $ZSH/oh-my-zsh.sh
 
 alias m="mvim"
 alias rnios="react-native run-ios && react-native log-ios"
+alias rnand="react-native run-android && react-native log-android"
+
+unsetopt correct_all
+
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
 
 # User configuration
 
