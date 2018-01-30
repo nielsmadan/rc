@@ -272,6 +272,9 @@ call plug#end()
         let g:easytags_by_filetype = '~/.tmp/' " store tag files by filetype in specified directory
     endif
 
+    " configure vim-jsx to highlight in .js files (not just .jsx)
+    let g:jsx_ext_required = 0
+
     "configure neoformat
     let g:neoformat_javascript_prettier = {
         \   'exe': 'prettier',
@@ -280,10 +283,48 @@ call plug#end()
 
     let g:neoformat_enabled_javascript = ['prettier']
 
-    augroup neoformat_on_write
-      autocmd!
-      autocmd BufWritePre * Neoformat
-    augroup END
+    function! ToggleFormatOnWrite()
+        if !exists('g:FormatOnWriteMarker')
+            let g:FormatOnWriteMarker = 1
+        endif
+
+        " Enable if the group was previously disabled
+        if (g:FormatOnWriteMarker == 1)
+            let g:FormatOnWriteMarker = 0
+
+            " actual augroup
+            augroup neoformat_on_write
+              autocmd!
+              autocmd BufWritePre * Neoformat
+            augroup END
+        else    " Clear the group if it was previously enabled
+            let g:FormatOnWriteMarker = 1
+
+            " resetting the augroup
+            augroup neoformat_on_write
+                autocmd!
+            augroup END
+        endif
+    endfunction
+
+    nnoremap <leader>f :call ToggleFormatOnWrite()<CR>
+
+    function! SyntasticESlintChecker()
+      let l:npm_bin = ''
+      let l:eslint = 'eslint'
+
+      if executable('npm')
+          let l:npm_bin = split(system('npm bin'), '\n')[0]
+      endif
+
+      if strlen(l:npm_bin) && executable(l:npm_bin . '/eslint')
+        let l:eslint = l:npm_bin . '/eslint'
+      endif
+
+      let b:syntastic_javascript_eslint_exec = l:eslint
+    endfunction
+
+    autocmd FileType javascript :call SyntasticESlintChecker()
 
     "configure syntastic
     let g:syntastic_check_on_open = 1
@@ -315,7 +356,7 @@ call plug#end()
     \ }
 
     let g:ctrlp_custom_ignore = {
-    \ 'dir':  '\.git\|\|node_modules',
+    \ 'dir': 'node_modules\|DS_Store\|git\|ios\|android',
     \ 'file': '\v\.(pyc|exe|so|dll)$',
     \ }
     
