@@ -4,9 +4,9 @@
 # Path to your oh-my-zsh installation.
 export ZSH=/Users/nielsm/.oh-my-zsh
 export ANDROID_HOME=/Users/nielsm/Library/Android/sdk
-export GEM_HOME=/Users/nielsm/.gem
 
-export PATH=$PATH:$GEM_HOME/bin:/Users/nielsm/bin:/Users/nielsm/Library/Python/3.6/bin:/Users/nielsm/Library/Python/2.7/bin/
+export PATH=$PATH:/Users/nielsm/bin:/Users/nielsm/Library/Python/3.6/bin:/Users/nielsm/Library/Python/2.7/bin/:/Users/nielsm/.fastlane/bin
+
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
@@ -24,13 +24,23 @@ ENABLE_CORRECTION="true"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git brew autojump macports extract vi-mode tmux themes react-native)
+plugins=(brew extract git history macports node npm vi-mode themes react-native yarn)
 
 source $ZSH/oh-my-zsh.sh
 
+alias bn="./node_modules/.bin/babel-node"
+alias hl="nodemon --exec 'heroku local' --signal SIGTERM"
 alias m="mvim"
-alias rnios="react-native run-ios && react-native log-ios"
+alias gat="gatsby"
+alias gatd="gatsby develop"
+alias rniosSE="react-native run-ios --simulator=\"iPhone SE (12.2)\"&& react-native log-ios"
+alias rnios7="react-native run-ios --simulator=\"iPhone 7 (12.2)\"&& react-native log-ios"
+alias rnios7plus="react-native run-ios --simulator=\"iPhone 7 Plus (12.2)\"&& react-native log-ios"
+alias rniosXR="react-native run-ios --simulator=\"iPhone Xʀ (12.2)\"&& react-native log-ios"
+alias rniospad="react-native run-ios --simulator=\"iPad (6th generation) (12.2)\"&& react-native log-ios"
+alias rnios7alt="react-native run-ios --simulator=\"iPhone 7\"&& react-native log-ios"
 alias rnand="react-native run-android && react-native log-android"
+alias rc="cd ~/rc"
 
 unsetopt correct_all
 
@@ -66,7 +76,13 @@ export LANG=en_US.UTF-8
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
+export NVM_DIR=~/.nvm
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
 if [[ -a ~/.localzshrc ]]
 then
   source ~/.localzshrc
 fi
+
+# Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
+export PATH="$PATH:$HOME/.rvm/bin"
