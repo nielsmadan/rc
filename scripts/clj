@@ -1,7 +1,0 @@
-#!/bin/bash
-
-if [ -z "$1" ]; then
-java -cp .:/usr/local/lib/jars/* jline.ConsoleRunner clojure.main
-else
-java clojure.main $1
-fi
