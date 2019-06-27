@@ -12,6 +12,8 @@
     cob = checkout -b
 
     cp = cherry-pick
+    cpa = cherry-pick --abort
+    cpc = cherry-pick --continue
 
     bl = branch -l
     bd = branch -D
@@ -29,6 +31,7 @@
     ri = rebase --interactive
     rbm = rebase master
     rbc = rebase --continue
+    rba = rebase --abort
 
     rhom = reset --hard origin/master
 
@@ -39,6 +42,7 @@
 
     po = push origin
     pom = push origin master
+    pof = push origin -f
 
     ; heroku
     phm = push heroku master
@@ -46,6 +50,9 @@
     ; gerrit
     porfm = push origin HEAD:refs/for/master
     porfs = push origin HEAD:refs/for/staging
+
+    sshow = "!f() { git stash show stash^{/$*} -p; }; f"
+    sapply = "!f() { git stash apply stash^{/$*}; }; f"
 
 	d = difftool
     dc = difftool --cached
@@ -70,7 +77,7 @@
 	tool = gvimdiff
 
 [user]
-	name = nielsmadan
+	name = Madan, Niels
 	email = nielsmadan@gmail.com
 
 [push]
@@ -81,3 +88,9 @@
 
 [rerere]
 	enabled = true
+
+[filter "lfs"]
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
