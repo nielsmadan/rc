@@ -65,6 +65,7 @@
 [core]
 	editor = "gvim -f"
 	excludesfile = /Users/nielsm/.gitignore
+	autocrlf = false
 
 [diff]
 	tool = gvimdiff
@@ -77,8 +78,8 @@
 	tool = gvimdiff
 
 [user]
-	name = Madan, Niels
-	email = nielsmadan@gmail.com
+	name = Niels Madan
+	email = nielsmadan@quantumcraft.io
 
 [push]
 	default = simple
@@ -94,3 +95,9 @@
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
+[difftool "sourcetree"]
+	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+	path = 
+[mergetool "sourcetree"]
+	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+	trustExitCode = true
