@@ -23,8 +23,8 @@ Plug 'junegunn/fzf.vim'
 
 "--->FRAMEWORKS
 " Plug 'scrooloose/syntastic'
-Plug 'w0rp/ale'
-Plug 'Valloric/YouCompleteMe', { 'do': './install.py --clang-completer --ts-completer' }
+Plug 'dense-analysis/ale'
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
 
 "--->LANGUAGE SPECIFIC
 Plug 'peterhoeg/vim-qml'
@@ -54,9 +54,10 @@ set mousehide "hide mouse while typing
 set laststatus=2
 set lazyredraw "don't redraw while executing macros
 set more "active pager
-set shortmess+=I "no intro
+set shortmess+=Ic "no intro
 set display=lastline "show as much of last line as possible if it doesn't fit.
 set helpheight=0 "no min window height for help window.
+set cmdheight=2 "more space for commands.
 
 "do not create backup files
 set nobackup
@@ -139,11 +140,6 @@ cnoreabbrev <expr> W ((getcmdtype() is# ':' && getcmdline() is# 'W')?('w'):('W')
 "Clear search highlighting
 nnoremap <leader><space> :noh<CR>
 
-"Folding shortcuts
-nnoremap <leader>1 :set foldlevel=1<CR>
-nnoremap <leader>2 :set foldlevel=2<CR>
-nnoremap <leader>3 :set foldlevel=3<CR>
-
 "Switch mode options
 inoremap jj <C-c>
 inoremap Jj <C-c>
@@ -173,8 +169,8 @@ vnoremap <leader>p "+p
 nnoremap <leader>p "+p
 
 "Search/Replace word under cursor
-nnoremap <Leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
-nnoremap <Leader><c-s> :bufdo %s/<C-r><C-w>//gc \| update<s-left><s-left><left><left><left><left>
+nnoremap <leader>s :%s/<C-r><C-w>//gc<Left><Left><Left>
+nnoremap <leader><c-s> :bufdo %s/<C-r><C-w>//gc \| update<s-left><s-left><left><left><left><left>
 
 "Set spell checking for commit logs
 au filetype svn,*commit*,rst setlocal spell
@@ -209,7 +205,7 @@ if &diff
   nnoremap <m-p><m-p> :diffput<CR>
 
   "when using gvimdiff as git difftool, it will open both sides in readonly mode, which is why we need the !
-  nnoremap <c-i> :wqall!<CR>
+  nnoremap <leader><c-i> :wqall!<CR>
 
   "looks like on mac there's some weird window resizing going on at the start when diffing.
   au VimResized * wincmd =
@@ -220,25 +216,78 @@ let &t_Co = 256
 colo harlequin
 
 "--->PLUGIN CONFIGURATION
+" CoC
+inoremap <silent><expr> <TAB>
+      \ pumvisible() ? "\<C-n>" :
+      \ <SID>check_back_space() ? "\<TAB>" :
+      \ coc#refresh()
+inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
+
+function! s:check_back_space() abort
+  let col = col('.') - 1
+  return !col || getline('.')[col - 1]  =~# '\s'
+endfunction
+
+if has('patch8.1.1068')
+  " Use `complete_info` if your (Neo)Vim version supports it.
+  inoremap <expr> <cr> complete_info()["selected"] != "-1" ? "\<C-y>" : "\<C-g>u\<CR>"
+else
+  imap <expr> <cr> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
+endif
+
+" Use <c-space> to trigger completion.
+inoremap <silent><expr> <c-space> coc#refresh()
+
+" Use `[g` and `]g` to navigate diagnostics
+nmap <silent> [g <Plug>(coc-diagnostic-prev)
+nmap <silent> ]g <Plug>(coc-diagnostic-next)
+
+" GoTo code navigation.
+nmap <silent> gd <Plug>(coc-definition)
+nmap <silent> gy <Plug>(coc-type-definition)
+nmap <silent> gi <Plug>(coc-implementation)
+nmap <silent> gr <Plug>(coc-references)
+
+" Symbol renaming.
+nmap <leader>rn <Plug>(coc-rename)
+
+" Introduce function text object
+" NOTE: Requires 'textDocument.documentSymbol' support from the language server.
+xmap if <Plug>(coc-funcobj-i)
+xmap af <Plug>(coc-funcobj-a)
+omap if <Plug>(coc-funcobj-i)
+omap af <Plug>(coc-funcobj-a)
+
+" Use <TAB> for selections ranges.
+" NOTE: Requires 'textDocument/selectionRange' support from the language server.
+" coc-tsserver, coc-python are the examples of servers that support it.
+nmap <silent> <TAB> <Plug>(coc-range-select)
+xmap <silent> <TAB> <Plug>(coc-range-select)
+
 "YouCompleteMe
-let g:ycm_filter_diagnostics = {
-      \ "javascript": {
-      \      "regex": [ "ts file", "expected" ],
-      \    }
-      \ }
+" let g:ycm_filter_diagnostics = {
+"       \ "javascript": {
+"       \      "regex": [ "ts file", "expected" ],
+"       \    }
+"       \ }
 
-nnoremap <leader>gr :YcmCompleter GoToReferences<CR>
-nnoremap <leader>gd :YcmCompleter GoToDefinition<CR>
-nnoremap <leader>gt :YcmCompleter GetType<CR>
-
+" nnoremap <leader>gr :YcmCompleter GoToReferences<CR>
+" nnoremap <leader>gd :YcmCompleter GoToDefinition<CR>
+" nnoremap <leader>gt :YcmCompleter GetType<CR>
 
 " Flow linting
-let g:ale_linters = {'javascript': ['eslint', 'flow']}
-let g:ale_linters_ignore = {'javascript': ['tsserver']}
+" let g:ale_linters = {'javascript': ['eslint', 'flow']}
+" let g:ale_linters_ignore = {'javascript': ['tsserver']}
+" let g:ale_fixers = {'javascript': ['prettier']}
 
 " Typescript linting
-" let g:ale_linters = {'javascript': ['eslint', 'tsserver']}
-" let g:ale_linters_ignore = {'javascript': ['flow']}
+let g:ale_linters = {'javascript': ['eslint', 'tsserver']}
+let g:ale_linters_ignore = {'javascript': ['flow']}
+let g:ale_fixers = {
+\ 'typescript.tsx': ['prettier'],
+\ 'typescript': ['prettier'],
+\ 'javascript': ['prettier'],
+\}
 
 " configure vim-jsx to highlight in .js files (not just .jsx)
 let g:jsx_ext_required = 0
@@ -247,9 +296,33 @@ let g:jsx_ext_required = 0
 let g:javascript_plugin_flow = 1
 
 " configure autoformat
-nnoremap <leader>a :Autoformat<CR>
-au BufWrite * :Autoformat
 au FileType yaml let b:autoformat_autoindent=0
+
+function! ToggleFormatOnWrite()
+  if !exists('g:FormatOnWriteMarker')
+    let g:FormatOnWriteMarker = 1
+  endif
+
+  " Enable if the group was previously disabled
+  if (g:FormatOnWriteMarker == 1)
+    let g:FormatOnWriteMarker = 0
+
+    " actual augroup
+    augroup format_on_write
+      autocmd!
+      au BufWrite * :Autoformat
+    augroup END
+  else    " Clear the group if it was previously enabled
+    let g:FormatOnWriteMarker = 1
+
+    " resetting the augroup
+    augroup format_on_write
+      autocmd!
+    augroup END
+  endif
+endfunction
+
+nnoremap <leader>f :call ToggleFormatOnWrite()<CR>
 
 "configure ctrl-p
 let g:ctrlp_map = '<c-g>' " start up the plugin
@@ -309,17 +382,6 @@ function! WriteMode()
   endif
 endfunction
 
-"--->SMALL FUNCTIONS
-map <Leader>xml <Esc>:call FixupXml()
-
-function! FixupXml()
-  %s/></>\r</g
-  normal! gg=G
-endfunction
-
-map <Leader>qw <Esc>:call CleanClose(1)<CR>
-map <Leader>qq <Esc>:call CleanClose(0)<CR>
-
 map <Leader>i <Esc>:set guifont=Inconsolata:h10<CR>
 
 function! CleanClose(tosave)
@@ -339,8 +401,6 @@ function! CleanClose(tosave)
   endif
   exe "bd".to_del_buf_nr
 endfunction
-
-nnoremap <leader><c-b> :set guifont=Inconsolata:h20
 
 "Show syntax highlighting groups for word under cursor
 nnoremap <leader><c-p> :call <SID>SynStack()<CR>
