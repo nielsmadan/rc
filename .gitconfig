@@ -63,13 +63,16 @@
 	ui = true
 
 [core]
-	editor = "gvim -f"
+	editor = "mvim -f"
 	excludesfile = /Users/nielsm/.gitignore
 	autocrlf = false
 
 [diff]
-	tool = gvimdiff
+	tool = mvimdiff
 
+[difftool "mvimdiff"]
+  cmd = mvim -f -d \"$LOCAL\" \"$REMOTE\"
+    
 [difftool]
 	prompt = false
 

@@ -28,20 +28,7 @@ plugins=(brew extract git history macports node npm vi-mode themes react-native 
 
 source $ZSH/oh-my-zsh.sh
 
-alias bn="./node_modules/.bin/babel-node"
-alias hl="nodemon --exec 'heroku local' --signal SIGTERM"
 alias m="mvim"
-alias gat="gatsby"
-alias gatd="gatsby develop"
-alias rniosSE="react-native run-ios --simulator=\"iPhone SE\""
-alias rnios7="react-native run-ios --simulator=\"iPhone 7\""
-alias rnios8="react-native run-ios --simulator=\"iPhone 8\""
-alias rnios7plus="react-native run-ios --simulator=\"iPhone 7 Plus (12.4)\"&& react-native log-ios"
-alias rniosXR="react-native run-ios --simulator=\"iPhone Xʀ\"&& react-native log-ios"
-alias rnios11="react-native run-ios --simulator=\"iPhone 11\""
-alias rniospad="react-native run-ios --simulator=\"iPad (6th generation) (12.4)\"&& react-native log-ios"
-alias rnand="react-native run-android && react-native log-android"
-alias rc="cd ~/rc"
 
 unsetopt correct_all
 
