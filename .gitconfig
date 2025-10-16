@@ -8,7 +8,7 @@
     brd = "!f() { for k in `git branch -a|sed s/^..//`;do echo -e `git log -1 --pretty=format:\"%Cgreen%ci %Cblue%cr%Creset\" \"$k\"`\t\"$k\";done|sort; }; f"
 
     co = checkout
-    com = checkout master
+    com = checkout main
     cob = checkout -b
 
     cp = cherry-pick
@@ -29,11 +29,11 @@
 
     r = rebase
     ri = rebase --interactive
-    rbm = rebase master
+    rbm = rebase main
     rbc = rebase --continue
     rba = rebase --abort
 
-    rhom = reset --hard origin/master
+    rhom = reset --hard origin/main
 
     pr = pull --rebase
 
@@ -41,14 +41,14 @@
     sp = stash pop
 
     po = push origin
-    pom = push origin master
+    pom = push origin main
     pof = push origin -f
 
     ; heroku
-    phm = push heroku master
+    phm = push heroku main
 
     ; gerrit
-    porfm = push origin HEAD:refs/for/master
+    porfm = push origin HEAD:refs/for/main
     porfs = push origin HEAD:refs/for/staging
 
     sshow = "!f() { git stash show stash^{/$*} -p; }; f"
@@ -57,7 +57,7 @@
 	d = difftool
     dc = difftool --cached
     dns = diff --name-status
-    outgoing = log origin..master
+    outgoing = log origin..main
 
 [color]
 	ui = true
@@ -98,9 +98,7 @@
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
-[difftool "sourcetree"]
-	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
-	path = 
-[mergetool "sourcetree"]
-	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
-	trustExitCode = true
+[includeIf "gitdir:/Users/nielsmadan/wrksp/efg/"]
+	path = /Users/nielsmadan/.gitconfig-efg
+[coderabbit]
+	machineId = cli/6c5e8ab9ec2a487bb0ae781af83db5c6
