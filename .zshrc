@@ -27,19 +27,24 @@ ZSH_THEME=""
 # Oh My Zsh plugins.
 plugins=(
   brew
-  macports
+  bun
+  docker
+  docker-compose
+  dotenv
+  extract
+  eza
+  git
+  history
   macos
+  macports
   node
   npm
   nvm
-  vscode
-  docker
-  eza
-  extract
-  git
-  history
+  pyenv
   vi-mode
+  vscode
   yarn
+  zoxide
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
@@ -58,16 +63,6 @@ source "$ZSH/oh-my-zsh.sh"
 
 # rbenv (Ruby Version Manager)
 eval "$(rbenv init - zsh)"
-
-# pyenv (Python Version Manager)
-export PYENV_ROOT="$HOME/.pyenv"
-command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init -)"
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # mise
 eval "$(mise activate zsh)"
@@ -106,6 +101,8 @@ if [ -f ~/.fzf.zsh ]; then
     bindkey '^R' fzf-global-history-widget
 fi
 
+alias j="z"
+
 alias m="mvim"
 alias n="neovide &"
 
@@ -119,6 +116,9 @@ alias rc="cd ~/rc"
 alias srcz="source .zshrc"
 alias zshrc="mvim ~/.zshrc"
 
+alias claude="~/.claude/local/claude"
+alias clco="claude --continue"
+
 # ---------------------------------------------------------------------------
 #  Tool-specific Completions (e.g. gcloud)
 #  NOTE: It is recommended to install gcloud via Homebrew to manage this automatically.
@@ -131,10 +131,7 @@ if [ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/google-clou
 
 export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
 
-alias claude="~/.claude/local/claude"
-alias clco="claude --continue"
-
-# for more reliable watchman
+# increase resources for reliable watchman
 ulimit -n 65536
 ulimit -u 2048
 
@@ -144,8 +141,8 @@ alias setdockerlocal='docker context use default && echo "✅ Docker now using L
 alias setdockermini='docker context use mac-mini && echo "✅ Docker now using MAC MINI"'
 alias dockerwhere='docker context show'
 
+# pure
+
 fpath+=("$HOME/.zsh/pure")
 autoload -U promptinit; promptinit
 prompt pure
-
-eval "$(zoxide init zsh)"
