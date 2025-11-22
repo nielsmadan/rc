@@ -4,9 +4,6 @@
     cm = commit -m
     ci = commit
 
-    ; show remote branches and sort them by date of last commit
-    brd = "!f() { for k in `git branch -a|sed s/^..//`;do echo -e `git log -1 --pretty=format:\"%Cgreen%ci %Cblue%cr%Creset\" \"$k\"`\t\"$k\";done|sort; }; f"
-
     co = checkout
     com = checkout main
     cob = checkout -b
@@ -20,15 +17,11 @@
 
     s = status
 
-    sm = submodule
-
     l = log --pretty=oneline --abbrev-commit
     gl = log --graph --pretty=oneline --abbrev-commit
 
-    ; cl = "!f() { git clone $* ; case $* in *your.host.com*) git config user.name \"Your Name\" && git config user.email \"your.email@company.com\" ;; esac }; f"
-
     r = rebase
-    ri = rebase --interactive
+    rbi = rebase --interactive
     rbm = rebase main
     rbc = rebase --continue
     rba = rebase --abort
@@ -38,23 +31,14 @@
     pr = pull --rebase
 
     st = stash
+    stu = stash --keep-index
     sp = stash pop
 
     po = push origin
     pom = push origin main
     pof = push origin -f
 
-    ; heroku
-    phm = push heroku main
-
-    ; gerrit
-    porfm = push origin HEAD:refs/for/main
-    porfs = push origin HEAD:refs/for/staging
-
-    sshow = "!f() { git stash show stash^{/$*} -p; }; f"
-    sapply = "!f() { git stash apply stash^{/$*}; }; f"
-
-	d = difftool
+    d = difftool
     dc = difftool --cached
     dns = diff --name-status
     outgoing = log origin..main
@@ -77,7 +61,7 @@
 	prompt = false
 
 [merge]
-    defaultToUpstream = true
+  defaultToUpstream = true
 	tool = gvimdiff
 
 [user]
@@ -88,7 +72,7 @@
 	default = simple
 
 [include]
-    path = "/home/nielsm/.local_gitconfig"
+  path = "/home/nielsm/.local_gitconfig"
 
 [rerere]
 	enabled = true
@@ -98,7 +82,6 @@
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
+
 [includeIf "gitdir:/Users/nielsmadan/wrksp/efg/"]
 	path = /Users/nielsmadan/.gitconfig-efg
-[coderabbit]
-	machineId = cli/6c5e8ab9ec2a487bb0ae781af83db5c6
