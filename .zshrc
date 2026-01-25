@@ -30,7 +30,6 @@ plugins=(
   bun
   docker
   docker-compose
-  dotenv
   extract
   eza
   git
@@ -63,6 +62,11 @@ source "$ZSH/oh-my-zsh.sh"
 
 # rbenv (Ruby Version Manager)
 eval "$(rbenv init - zsh)"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # mise
 eval "$(mise activate zsh)"
@@ -106,18 +110,26 @@ alias j="z"
 alias m="mvim"
 alias n="neovide &"
 
-alias todo="mvim ~/Dropbox/notes/todos/mathfiend.md"
-alias idea="mvim ~/Dropbox/notes/ideas/mathfiend.md"
-alias note="mvim ~/Dropbox/notes/overview.md"
+note() {
+  mvim -c "cd ~/Dropbox/notes" ~/Dropbox/notes/overview.md
+}
+
+todo() {
+  mvim -c "cd ~/Dropbox/notes" ~/Dropbox/notes/todos/mathfiend.md
+}
+
+idea() {
+  mvim -c "cd ~/Dropbox/notes" ~/Dropbox/notes/ideas/mathfiend.md
+}
 
 alias flt="flutter"
 
 alias rc="cd ~/rc"
-alias srcz="source .zshrc"
+alias srcz="source ~/.zshrc"
 alias zshrc="mvim ~/.zshrc"
 
-alias claude="~/.claude/local/claude"
-alias clco="claude --continue"
+# AI tools (Claude, etc.)
+[ -f ~/.airc ] && source ~/.airc
 
 # ---------------------------------------------------------------------------
 #  Tool-specific Completions (e.g. gcloud)
@@ -141,8 +153,28 @@ alias setdockerlocal='docker context use default && echo "✅ Docker now using L
 alias setdockermini='docker context use mac-mini && echo "✅ Docker now using MAC MINI"'
 alias dockerwhere='docker context show'
 
+bindkey '^[b' backward-word  # ESC+b
+bindkey '^[f' forward-word   # ESC+f
+
 # pure
 
 fpath+=("$HOME/.zsh/pure")
 autoload -U promptinit; promptinit
 prompt pure
+
+## [Completion]
+## Completion scripts setup. Remove the following line to uninstall
+[[ -f /Users/nielsmadan/.dart-cli-completion/zsh-config.zsh ]] && . /Users/nielsmadan/.dart-cli-completion/zsh-config.zsh || true
+## [/Completion]
+
+
+# pnpm
+export PNPM_HOME="/Users/nielsmadan/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
+
+# bun completions
+[ -s "/Users/nielsmadan/.bun/_bun" ] && source "/Users/nielsmadan/.bun/_bun"

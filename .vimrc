@@ -208,6 +208,9 @@ endfun
 
 "vimdiff options
 if &diff
+  set wrap
+  set linebreak
+
   "quick arrow nav, left pull, right push (regardless of side)
   nnoremap <down> ]c
   nnoremap <up> [c
