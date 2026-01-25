@@ -5,8 +5,13 @@
     ci = commit
 
     co = checkout
-    com = checkout main
     cob = checkout -b
+
+    ; com = checkout main or master
+    com = !git switch $(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@') 2>/dev/null || git switch main 2>/dev/null || git switch master
+
+    ; checkout "parent" branch
+    cop = "!git checkout $(git log --oneline --decorate --first-parent | grep -v \"$(git branch --show-current)\" | head -1 | sed 's/.*(\\([^,)]*\\)).*/\\1/')"
 
     cp = cherry-pick
     cpa = cherry-pick --abort
@@ -37,6 +42,7 @@
     po = push origin
     pom = push origin main
     pof = push origin -f
+    puoh = push -u origin HEAD
 
     d = difftool
     dc = difftool --cached
@@ -85,3 +91,6 @@
 
 [includeIf "gitdir:/Users/nielsmadan/wrksp/efg/"]
 	path = /Users/nielsmadan/.gitconfig-efg
+
+[includeIf "gitdir:/Users/nielsmadan/wrksp/haufe/"]
+	path = /Users/nielsmadan/.gitconfig-haufe
