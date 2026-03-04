@@ -1,0 +1,48 @@
+# Development helper functions
+
+# Create iOS simulator named after current directory
+# Usage: mksim [device] [ios_version]
+# Examples:
+#   mksim                        # Latest iPhone Pro, latest iOS
+#   mksim "iPhone 16"            # iPhone 16, latest iOS
+#   mksim "iPhone 16" 18.5       # iPhone 16, iOS 18.5
+mksim() {
+    local parent=$(basename "$(dirname "$PWD")")
+    local current=$(basename "$PWD")
+    local name="${parent}/${current}"
+    local device="${1:-}"
+    local ios_version="${2:-}"
+
+    # Get latest runtime if not specified
+    if [[ -z "$ios_version" ]]; then
+        ios_version=$(xcrun simctl list runtimes -j | jq -r '.runtimes | map(select(.isAvailable)) | sort_by(.version) | last | .identifier')
+    else
+        ios_version="com.apple.CoreSimulator.SimRuntime.iOS-${ios_version//./-}"
+    fi
+
+    # Get latest iPhone Pro if not specified
+    if [[ -z "$device" ]]; then
+        device=$(xcrun simctl list devicetypes -j | jq -r '.devicetypes | map(select(.name | test("iPhone.*Pro$"))) | sort_by(.name) | last | .identifier')
+    else
+        device=$(xcrun simctl list devicetypes -j | jq -r --arg d "$device" '.devicetypes | map(select(.name == $d)) | first | .identifier')
+    fi
+
+    if [[ -z "$device" || "$device" == "null" ]]; then
+        echo "Error: Device not found. Available devices:"
+        xcrun simctl list devicetypes | grep iPhone
+        return 1
+    fi
+
+    echo "Creating simulator '$name' with $device on $ios_version..."
+    local uuid=$(xcrun simctl create "$name" "$device" "$ios_version")
+
+    if [[ -n "$uuid" ]]; then
+        echo "Booting simulator..."
+        xcrun simctl boot "$uuid"
+        open -a Simulator
+        echo "Simulator '$name' ($uuid) is running"
+    else
+        echo "Error: Failed to create simulator"
+        return 1
+    fi
+}
