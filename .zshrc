@@ -68,6 +68,9 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
+# Rust / Cargo
+. "$HOME/.cargo/env"
+
 # mise
 eval "$(mise activate zsh)"
 
@@ -110,16 +113,15 @@ alias j="z"
 alias m="mvim"
 alias n="neovide &"
 
-note() {
-  mvim -c "cd ~/Dropbox/notes" ~/Dropbox/notes/overview.md
-}
-
-todo() {
-  mvim -c "cd ~/Dropbox/notes" ~/Dropbox/notes/todos/mathfiend.md
-}
-
-idea() {
-  mvim -c "cd ~/Dropbox/notes" ~/Dropbox/notes/ideas/mathfiend.md
+loadenv() {
+  local envfile="${1:-.env}"
+  if [[ -f "$envfile" ]]; then
+    set -a && source "$envfile" && set +a
+    echo "Loaded $envfile"
+  else
+    echo "File not found: $envfile"
+    return 1
+  fi
 }
 
 alias flt="flutter"
@@ -130,6 +132,9 @@ alias zshrc="mvim ~/.zshrc"
 
 # AI tools (Claude, etc.)
 [ -f ~/.airc ] && source ~/.airc
+
+# Dev helper functions (mksim, etc.)
+[ -f ~/.devrc ] && source ~/.devrc
 
 # ---------------------------------------------------------------------------
 #  Tool-specific Completions (e.g. gcloud)
@@ -167,6 +172,11 @@ prompt pure
 [[ -f /Users/nielsmadan/.dart-cli-completion/zsh-config.zsh ]] && . /Users/nielsmadan/.dart-cli-completion/zsh-config.zsh || true
 ## [/Completion]
 
+set_tab_title() {
+  echo -ne "\033]0;${PWD##*/}\033\\"
+}
+
+precmd_functions+=(set_tab_title)
 
 # pnpm
 export PNPM_HOME="/Users/nielsmadan/Library/pnpm"
@@ -178,3 +188,6 @@ esac
 
 # bun completions
 [ -s "/Users/nielsmadan/.bun/_bun" ] && source "/Users/nielsmadan/.bun/_bun"
+
+# opencode
+export PATH=/Users/nielsmadan/.opencode/bin:$PATH
