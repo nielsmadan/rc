@@ -25,6 +25,11 @@
     l = log --pretty=oneline --abbrev-commit
     gl = log --graph --pretty=oneline --abbrev-commit
 
+    wta = worktree add
+    wtls = worktree list
+    wtrm = worktree remove
+    wtp = worktree prune
+
     r = rebase
     rbi = rebase --interactive
     rbm = rebase main
@@ -33,6 +38,7 @@
 
     rhom = reset --hard origin/main
 
+    fom = fetch origin main
     pr = pull --rebase
 
     st = stash
@@ -76,6 +82,7 @@
 
 [push]
 	default = simple
+	autoSetupRemote = true
 
 [include]
   path = "/home/nielsm/.local_gitconfig"
@@ -94,3 +101,5 @@
 
 [includeIf "gitdir:/Users/nielsmadan/wrksp/haufe/"]
 	path = /Users/nielsmadan/.gitconfig-haufe
+[rebase]
+	autoStash = true
