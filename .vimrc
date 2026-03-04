@@ -51,6 +51,9 @@ Plug 'jparise/vim-graphql'
 
 Plug 'dart-lang/dart-vim-plugin'
 
+Plug 'preservim/vim-markdown'
+Plug 'junegunn/goyo.vim'
+
 "--->MINE can't do it with git+ssh. :(
 Plug '~/wrksp/harlequin'
 
@@ -196,7 +199,7 @@ nnoremap <leader>n :e %:h/
 nnoremap <leader>~ :e ~/.vimrc<CR>
 
 "Set spell checking for commit logs
-au filetype svn,*commit*,rst setlocal spell
+au filetype svn,*commit*,rst,markdown setlocal spell
 
 fun! <SID>StripTrailingWhitespaces()
   let l = line(".")
@@ -420,6 +423,28 @@ nnoremap <silent><nowait> <space>k  :<C-u>CocPrev<CR>
 " Resume latest coc list.
 nnoremap <silent><nowait> <space>p  :<C-u>CocListResume<CR>
 
+
+" Goyo + Limelight
+let g:goyo_width = 120
+nnoremap <leader><leader>w :Goyo<CR>
+
+function! s:goyo_enter()
+  set guifont=Monaco:h16
+  set linespace=2
+endfunction
+
+function! s:goyo_leave()
+  set guifont=Monaco:h12
+  set linespace=0
+endfunction
+
+autocmd! User GoyoEnter nested call <SID>goyo_enter()
+autocmd! User GoyoLeave nested call <SID>goyo_leave()
+
+" vim-markdown
+let g:vim_markdown_frontmatter = 1
+let g:vim_markdown_folding_disabled = 1
+let g:vim_markdown_conceal_code_cblocks = 0
 
 " Typescript linting
 let g:ale_linters = {'javascript': ['eslint_d', 'tsserver']}
