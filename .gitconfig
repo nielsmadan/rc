@@ -85,7 +85,7 @@
 	autoSetupRemote = true
 
 [include]
-  path = "/home/nielsm/.local_gitconfig"
+  path = ~/.gitconfig-local
 
 [rerere]
 	enabled = true
@@ -96,10 +96,5 @@
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 
-[includeIf "gitdir:/Users/nielsmadan/wrksp/efg/"]
-	path = /Users/nielsmadan/.gitconfig-efg
-
-[includeIf "gitdir:/Users/nielsmadan/wrksp/haufe/"]
-	path = /Users/nielsmadan/.gitconfig-haufe
 [rebase]
 	autoStash = true
