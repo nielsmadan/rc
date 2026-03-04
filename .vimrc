@@ -52,7 +52,7 @@ Plug 'jparise/vim-graphql'
 Plug 'dart-lang/dart-vim-plugin'
 
 "--->MINE can't do it with git+ssh. :(
-Plug 'nielsmadan/harlequin'
+Plug '~/wrksp/harlequin'
 
 call plug#end()
 
@@ -91,6 +91,7 @@ set wrap
 set textwidth=119
 set formatoptions=cqn1
 set linebreak
+set diffopt+=followwrap,internal,algorithm:histogram,context:8
 
 "override any ftplugin that thinks it's a good idea to redefine
 "the formatoptions that were explicitly set in .vimrc. >:|
@@ -98,6 +99,7 @@ augroup reset_fo
   au!
   au FileType * setlocal formatoptions-=r
   au FileType * setlocal formatoptions-=o
+  au FileType markdown setlocal formatoptions-=t textwidth=0
 augroup end
 
 "indent options
@@ -111,10 +113,7 @@ au BufRead,BufNewFile *.js,*.json,*.tsx,*.ts,*.yaml,*.swift,Jenkinsfile setlocal
 au BufNewFile,BufRead Jenkinsfile setf groovy
 au BufNewFile,BufRead *.prisma setf graphql
 
-"folding options
-set foldmethod=indent
-set foldminlines=2
-set foldlevelstart=20
+set nofoldenable
 
 "search options
 set hlsearch
