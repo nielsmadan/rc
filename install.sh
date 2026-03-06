@@ -19,6 +19,15 @@ link() {
   echo "link $dest -> $src"
 }
 
+# Install vim-plug if not present
+if [ ! -f "$DOTFILES_DIR/.vim/autoload/plug.vim" ]; then
+  curl -fLo "$DOTFILES_DIR/.vim/autoload/plug.vim" --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  echo "installed vim-plug"
+else
+  echo "skip vim-plug (already installed)"
+fi
+
 link .vimrc          ~/.vimrc
 link .gvimrc         ~/.gvimrc
 link .vim            ~/.vim
