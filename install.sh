@@ -36,3 +36,4 @@ link .gitignore      ~/.gitignore
 link .zshrc          ~/.zshrc
 link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
+link nvim            ~/.config/nvim

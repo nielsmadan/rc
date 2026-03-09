@@ -2,3 +2,4 @@
 .vim/plugged
 .vim/autoload/plug.vim
 .vim/.netrwhist
+nvim/lazy-lock.json
