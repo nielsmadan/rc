@@ -11,20 +11,14 @@ Plug 'tpope/vim-commentary'
 
 Plug 'github/copilot.vim'
 
-Plug 'mileszs/ack.vim'
-
-Plug 'vim-autoformat/vim-autoformat'
 Plug 'sbdchd/neoformat'
 
-Plug 'vim-scripts/hexHighlight.vim'
-Plug 'vim-scripts/ReplaceWithRegister'
+Plug 'inkarkat/vim-ReplaceWithRegister'
 
 Plug 'andymass/vim-matchup'
 Plug 'ap/vim-css-color'
 
-Plug 'xolox/vim-misc'
-
-Plug 'Lokaltog/vim-easymotion'
+Plug 'easymotion/vim-easymotion'
 
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
@@ -40,12 +34,12 @@ Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'peterhoeg/vim-qml'
 
 Plug 'pangloss/vim-javascript'
-Plug 'mxw/vim-jsx'
+Plug 'MaxMEllon/vim-jsx-pretty'
 
 Plug 'keith/swift.vim'
 
 Plug 'leafgarland/typescript-vim'
-Plug 'ianks/vim-tsx'
+Plug 'peitalin/vim-jsx-typescript'
 
 Plug 'jparise/vim-graphql'
 
@@ -245,14 +239,6 @@ let &t_Co = 256
 colo harlequin
 
 "--->PLUGIN CONFIGURATION
-" Ack
-if executable('ag')
-  let g:ackprg = 'ag --vimgrep'
-endif
-
-cnoreabbrev Ack Ack!
-nnoremap <Leader>a :Ack!<Space>
-
 " CoC
 " Having longer updatetime (default is 4000 ms = 4 s) leads to noticeable
 " delays and poor user experience.
@@ -446,7 +432,8 @@ let g:vim_markdown_frontmatter = 1
 let g:vim_markdown_folding_disabled = 1
 let g:vim_markdown_conceal_code_cblocks = 0
 
-" Typescript linting
+" ALE (disable LSP to avoid overlap with CoC)
+let g:ale_disable_lsp = 1
 let g:ale_linters = {'javascript': ['eslint_d', 'tsserver']}
 let g:ale_linters_ignore = {'javascript': ['flow']}
 let g:ale_fixers = {
@@ -462,11 +449,6 @@ let g:jsx_ext_required = 0
 
 " configure flow highlighting
 let g:javascript_plugin_flow = 1
-
-" configure autoformat
-let g:autoformat_verbosemode=2
-
-au FileType yaml let b:autoformat_autoindent=0
 
 function! ToggleFormatOnWrite()
   if !exists('g:FormatOnWriteMarker')
