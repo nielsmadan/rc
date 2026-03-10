@@ -37,3 +37,11 @@ link .zshrc          ~/.zshrc
 link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
 link nvim            ~/.config/nvim
+
+# Create local config files if they don't exist
+if [ ! -f ~/.zshrc.local ]; then
+  touch ~/.zshrc.local
+  echo "created ~/.zshrc.local"
+else
+  echo "skip ~/.zshrc.local (already exists)"
+fi

@@ -136,6 +136,9 @@ alias zshrc="mvim ~/.zshrc"
 # Dev helper functions (mksim, etc.)
 [ -f ~/.devrc ] && source ~/.devrc
 
+# Local config (not checked in)
+[ -f ~/.zshrc.local ] && source ~/.zshrc.local
+
 # ---------------------------------------------------------------------------
 #  Tool-specific Completions (e.g. gcloud)
 #  NOTE: It is recommended to install gcloud via Homebrew to manage this automatically.
