@@ -88,7 +88,7 @@ set wrap
 set textwidth=119
 set formatoptions=cqn1
 set linebreak
-set diffopt+=followwrap,internal,algorithm:histogram,context:8
+set diffopt+=followwrap,internal,algorithm:histogram,indent-heuristic,context:8
 
 "override any ftplugin that thinks it's a good idea to redefine
 "the formatoptions that were explicitly set in .vimrc. >:|
