@@ -55,6 +55,11 @@ ENABLE_CORRECTION="true"
 # Load Oh My Zsh. This MUST come after the settings above.
 source "$ZSH/oh-my-zsh.sh"
 
+# Completion styling
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+zstyle ':completion:*' menu select
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
 
 # ---------------------------------------------------------------------------
 #  Tool & Language Version Managers (nvm, pyenv, rbenv, bun, mise)
@@ -92,6 +97,15 @@ setopt correct
 
 setopt no_share_history
 setopt append_history
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_VERIFY
+setopt EXTENDED_HISTORY
+
+setopt AUTO_CD
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+setopt PUSHD_SILENT
 
 if [ -f ~/.fzf.zsh ]; then
     source ~/.fzf.zsh
