@@ -38,6 +38,17 @@ link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
 link nvim            ~/.config/nvim
 
+# Obsidian vimrc
+read -p "Obsidian vault path (leave empty to skip): " obsidian_vault
+if [ -n "$obsidian_vault" ]; then
+  obsidian_vault="${obsidian_vault/#\~/$HOME}"
+  if [ -d "$obsidian_vault" ]; then
+    link .obsidian.vimrc "$obsidian_vault/.obsidian.vimrc"
+  else
+    echo "skip obsidian vimrc (vault not found: $obsidian_vault)"
+  fi
+fi
+
 # Create local config files if they don't exist
 if [ ! -f ~/.zshrc.local ]; then
   touch ~/.zshrc.local
