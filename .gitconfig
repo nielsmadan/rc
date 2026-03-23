@@ -18,6 +18,7 @@
     cpc = cherry-pick --continue
 
     bl = branch -l
+    blso = branch --sort=-committerdate
     bd = branch -D
 
     s = status
