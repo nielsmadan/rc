@@ -37,10 +37,6 @@ function! DecreaseFontSize()
     endif
 endfunction
 
-winpos 0 0
-set lines=999
-set columns=999
-
 set guioptions-=m  "remove menu bar
 set guioptions-=T  "remove toolbar
 set guioptions-=l  "no scroll bars (left and right)
