@@ -52,6 +52,9 @@
     puoh = push -u origin HEAD
 
     d = difftool
+    d1 = difftool HEAD~1
+    d2 = difftool HEAD~2
+    d3 = difftool HEAD~3
     dc = difftool --cached
     dns = diff --name-status
     outgoing = log origin..main
