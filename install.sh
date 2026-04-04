@@ -37,6 +37,7 @@ link .zshrc          ~/.zshrc
 link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
 link nvim            ~/.config/nvim
+link mise/config.toml ~/.config/mise/config.toml
 
 # Obsidian vimrc
 read -p "Obsidian vault path (leave empty to skip): " obsidian_vault

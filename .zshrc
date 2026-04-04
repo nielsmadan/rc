@@ -27,7 +27,6 @@ ZSH_THEME=""
 # Oh My Zsh plugins.
 plugins=(
   brew
-  bun
   docker
   docker-compose
   extract
@@ -38,8 +37,7 @@ plugins=(
   macports
   node
   npm
-  nvm
-  pyenv
+  mise
   vi-mode
   vscode
   yarn
@@ -62,16 +60,8 @@ zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path ~/.zsh/cache
 
 # ---------------------------------------------------------------------------
-#  Tool & Language Version Managers (nvm, pyenv, rbenv, bun, mise)
+#  Tool & Language Version Managers (mise)
 # ---------------------------------------------------------------------------
-
-# rbenv (Ruby Version Manager)
-eval "$(rbenv init - zsh)"
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
-[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # Rust / Cargo
 . "$HOME/.cargo/env"
@@ -107,20 +97,16 @@ setopt AUTO_PUSHD
 setopt PUSHD_IGNORE_DUPS
 setopt PUSHD_SILENT
 
-if [ -f ~/.fzf.zsh ]; then
-    source ~/.fzf.zsh
-    
-    # Custom function to search global history with fzf
-    fzf-global-history-widget() {
-        local selected
-        selected=$(fc -l 1 | fzf --tac --no-sort --exact | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//')
-        BUFFER=$selected
-        zle end-of-line
-    }
-    
-    zle -N fzf-global-history-widget
-    bindkey '^R' fzf-global-history-widget
-fi
+# Custom function to search global history with fzf
+fzf-global-history-widget() {
+    local selected
+    selected=$(fc -l 1 | fzf --tac --no-sort --exact | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//')
+    BUFFER=$selected
+    zle end-of-line
+}
+
+zle -N fzf-global-history-widget
+bindkey '^R' fzf-global-history-widget
 
 alias j="z"
 
@@ -195,16 +181,6 @@ set_tab_title() {
 
 precmd_functions+=(set_tab_title)
 
-# pnpm
-export PNPM_HOME="/Users/nielsmadan/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
-# pnpm end
-
-# bun completions
-[ -s "/Users/nielsmadan/.bun/_bun" ] && source "/Users/nielsmadan/.bun/_bun"
 
 # opencode
 export PATH=/Users/nielsmadan/.opencode/bin:$PATH
