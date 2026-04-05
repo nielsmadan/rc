@@ -477,7 +477,6 @@ endfunction
 nnoremap <leader>f :call ToggleFormatOnWrite()<CR>
 
 "configure fzf
-set rtp+=/opt/homebrew/opt/fzf
 nnoremap <C-G> :Files<CR>
 
 "configure copilot
