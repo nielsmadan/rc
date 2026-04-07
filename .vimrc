@@ -436,7 +436,11 @@ let g:vim_markdown_conceal_code_cblocks = 0
 
 " ALE (disable LSP to avoid overlap with CoC)
 let g:ale_disable_lsp = 1
-let g:ale_linters = {'javascript': ['eslint_d', 'tsserver']}
+let g:ale_linters = {
+      \ 'javascript': ['eslint_d', 'biome', 'tsserver'],
+      \ 'typescript': ['eslint_d', 'biome'],
+      \ 'typescriptreact': ['eslint_d', 'biome'],
+      \}
 let g:ale_linters_ignore = {'javascript': ['flow']}
 let g:ale_fixers = {
       \ 'typescript.tsx': ['prettierd'],
