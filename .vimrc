@@ -240,6 +240,8 @@ colo harlequin
 
 "--->PLUGIN CONFIGURATION
 " CoC
+let g:coc_global_extensions = ['coc-tsserver', 'coc-json', 'coc-html', 'coc-css', 'coc-pyright', 'coc-snippets']
+
 " Having longer updatetime (default is 4000 ms = 4 s) leads to noticeable
 " delays and poor user experience.
 set updatetime=300
@@ -412,7 +414,7 @@ nnoremap <silent><nowait> <space>p  :<C-u>CocListResume<CR>
 
 " Goyo + Limelight
 let g:goyo_width = 120
-nnoremap <leader><leader>w :Goyo<CR>
+nnoremap <leader><leader>g :Goyo<CR>
 
 function! s:goyo_enter()
   set guifont=Monaco:h16
