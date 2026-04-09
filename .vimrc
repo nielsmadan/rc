@@ -434,21 +434,37 @@ let g:vim_markdown_frontmatter = 1
 let g:vim_markdown_folding_disabled = 1
 let g:vim_markdown_conceal_code_cblocks = 0
 
-" ALE (disable LSP to avoid overlap with CoC)
-let g:ale_disable_lsp = 1
+" ALE (selectively ignore tsserver to avoid overlap with CoC)
 let g:ale_linters = {
-      \ 'javascript': ['eslint_d', 'biome', 'tsserver'],
+      \ 'javascript': ['eslint_d', 'biome'],
       \ 'typescript': ['eslint_d', 'biome'],
       \ 'typescriptreact': ['eslint_d', 'biome'],
       \}
-let g:ale_linters_ignore = {'javascript': ['flow']}
+let g:ale_linters_ignore = {
+      \ 'javascript': ['flow', 'tsserver'],
+      \ 'typescript': ['tsserver'],
+      \ 'typescriptreact': ['tsserver'],
+      \}
+function! GetJSFixer(buffer) abort
+  if !empty(findfile('biome.json', expand('#' . a:buffer . ':p:h') . ';'))
+    return 'biome'
+  endif
+  return 'prettierd'
+endfunction
+
 let g:ale_fixers = {
-      \ 'typescript.tsx': ['prettierd'],
-      \ 'typescript': ['prettierd'],
-      \ 'javascript': ['prettierd'],
+      \ 'typescript.tsx': [function('GetJSFixer')],
+      \ 'typescript': [function('GetJSFixer')],
+      \ 'javascript': [function('GetJSFixer')],
       \}
 
 let g:ale_python_pylint_options = '--rcfile ./pylintrc'
+
+" Neoformat: try biome first, fall back to prettierd
+let g:neoformat_enabled_javascript = ['biome', 'prettierd']
+let g:neoformat_enabled_typescript = ['biome', 'prettierd']
+let g:neoformat_enabled_typescriptreact = ['biome', 'prettierd']
+let g:neoformat_try_node_exe = 1
 
 " configure vim-jsx to highlight in .js files (not just .jsx)
 let g:jsx_ext_required = 0
