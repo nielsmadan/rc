@@ -241,6 +241,7 @@ colo harlequin
 "--->PLUGIN CONFIGURATION
 " CoC
 let g:coc_global_extensions = ['coc-tsserver', 'coc-json', 'coc-html', 'coc-css', 'coc-pyright', 'coc-snippets']
+let g:coc_user_config = {'suggest.noselect': v:true}
 
 " Having longer updatetime (default is 4000 ms = 4 s) leads to noticeable
 " delays and poor user experience.
@@ -274,6 +275,9 @@ let g:coc_snippet_next = '<tab>'
 " <C-g>u breaks current undo, please make your own choice.
 inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
       \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+
+" Use <Space> to accept selected completion item, or insert a normal space.
+inoremap <silent><expr> <Space> coc#pum#visible() ? coc#pum#confirm() : "\<Space>"
 
 " Use <c-space> to trigger completion.
 if has('nvim')
