@@ -257,12 +257,13 @@ set signcolumn=yes
 " NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
 " other plugin before putting this into your config.
 inoremap <silent><expr> <TAB>
-      \ coc#pum#visible() ? coc#pum#next(1):
+      \ coc#pum#visible() ? coc#pum#confirm() :
       \ exists('b:_copilot.suggestions') ? copilot#Accept("\<CR>") :
       \ coc#expandableOrJumpable() ? "\<C-r>=coc#rpc#request('doKeymap', ['snippets-expand-jump',''])\<CR>" :
       \ CheckBackspace() ? "\<TAB>" :
       \ coc#refresh()
-inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
+inoremap <expr><C-j> coc#pum#visible() ? coc#pum#next(1) : "\<C-j>"
+inoremap <expr><C-k> coc#pum#visible() ? coc#pum#prev(1) : "\<C-k>"
 
 function! CheckBackspace() abort
   let col = col('.') - 1
@@ -275,9 +276,6 @@ let g:coc_snippet_next = '<tab>'
 " <C-g>u breaks current undo, please make your own choice.
 inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
       \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
-
-" Use <Space> to accept selected completion item, or insert a normal space.
-inoremap <silent><expr> <Space> coc#pum#visible() ? coc#pum#confirm() : "\<Space>"
 
 " Use <c-space> to trigger completion.
 if has('nvim')
