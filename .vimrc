@@ -241,7 +241,6 @@ colo harlequin
 "--->PLUGIN CONFIGURATION
 " CoC
 let g:coc_global_extensions = ['coc-tsserver', 'coc-json', 'coc-html', 'coc-css', 'coc-pyright', 'coc-snippets']
-let g:coc_user_config = {'suggest.noselect': v:true}
 
 " Having longer updatetime (default is 4000 ms = 4 s) leads to noticeable
 " delays and poor user experience.
