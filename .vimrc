@@ -501,6 +501,8 @@ nnoremap <leader>f :call ToggleFormatOnWrite()<CR>
 
 "configure fzf
 nnoremap <C-G> :Files<CR>
+nnoremap <C-T> :Rg<CR>
+nnoremap <leader>t :Rg <C-r><C-w><CR>
 
 "configure copilot
 let g:copilot_enabled = 0
