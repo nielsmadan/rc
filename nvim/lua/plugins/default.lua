@@ -18,37 +18,31 @@ return {
 	},
 
 	{
-		"nvim-telescope/telescope.nvim",
-		branch = "0.1.x",
-		dependencies = {
-			"nvim-lua/plenary.nvim",
-			{
-				"nvim-telescope/telescope-fzf-native.nvim",
-				build = "make",
-			},
-		},
-		config = function()
-			require("telescope").setup({
-				defaults = {
-					mappings = {
-						i = {
-							["<c-j>"] = require("telescope.actions").move_selection_next,
-							["<c-k>"] = require("telescope.actions").move_selection_previous,
+		"folke/snacks.nvim",
+		priority = 1000,
+		lazy = false,
+		---@type snacks.Config
+		opts = {
+			picker = {
+				win = {
+					input = {
+						keys = {
+							["<C-c>"] = { "close", mode = { "i", "n" } },
+							["<C-k>"] = { "list_down", mode = { "i", "n" } },
+							["<C-j>"] = { "list_up", mode = { "i", "n" } },
 						},
 					},
 				},
-			})
-
-			require("telescope").load_extension("fzf")
-
-			local builtin = require("telescope.builtin")
-
-			vim.keymap.set("n", "<c-g>", builtin.find_files, {})
-			vim.keymap.set("n", "<leader><c-g>", builtin.git_files, {})
-			vim.keymap.set("n", "<leader>f", builtin.live_grep, {})
-			vim.keymap.set("n", "<leader>qq", builtin.buffers, {})
-			vim.keymap.set("n", "<leader>qa", builtin.help_tags, {})
-		end,
+			},
+		},
+    -- stylua: ignore
+    keys = {
+      { "<C-g>",        function() Snacks.picker.files() end,     desc = "Find Files" },
+      { "<leader><C-g>", function() Snacks.picker.git_files() end, desc = "Git Files" },
+      { "<leader>f",    function() Snacks.picker.grep() end,      desc = "Live Grep" },
+      { "<leader>qq",   function() Snacks.picker.buffers() end,   desc = "Buffers" },
+      { "<leader>qa",   function() Snacks.picker.help() end,      desc = "Help Tags" },
+    },
 	},
 
 	{
