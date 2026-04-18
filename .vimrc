@@ -9,8 +9,6 @@ Plug 'tpope/vim-eunuch'
 Plug 'tpope/vim-vinegar'
 Plug 'tpope/vim-commentary'
 
-Plug 'github/copilot.vim'
-
 Plug 'sbdchd/neoformat'
 
 Plug 'inkarkat/vim-ReplaceWithRegister'
@@ -258,7 +256,6 @@ set signcolumn=yes
 " other plugin before putting this into your config.
 inoremap <silent><expr> <TAB>
       \ coc#pum#visible() ? coc#pum#confirm() :
-      \ exists('b:_copilot.suggestions') ? copilot#Accept("\<CR>") :
       \ coc#expandableOrJumpable() ? "\<C-r>=coc#rpc#request('doKeymap', ['snippets-expand-jump',''])\<CR>" :
       \ CheckBackspace() ? "\<TAB>" :
       \ coc#refresh()
@@ -504,14 +501,6 @@ nnoremap <leader>f :call ToggleFormatOnWrite()<CR>
 nnoremap <C-G> :Files<CR>
 nnoremap <C-T> :Rg<CR>
 nnoremap <leader>t :Rg <C-r><C-w><CR>
-
-"configure copilot
-let g:copilot_enabled = 0
-
-nnoremap <leader>cpe :Copilot enable<CR>
-nnoremap <leader>cpd :Copilot disable<CR>
-
-let g:copilot_no_tab_map = v:true
 
 autocmd User EasyMotionPromptBegin :let b:coc_diagnostic_disable = 1
 autocmd User EasyMotionPromptEnd :let b:coc_diagnostic_disable = 0
