@@ -1,14 +1,8 @@
 return {
 	{
-		"nvim-lualine/lualine.nvim",
-		dependencies = { "nvim-tree/nvim-web-devicons" },
-	},
-
-	{
 		"nvim-treesitter/nvim-treesitter",
-		build = function()
-			require("nvim-treesitter.install").update({ with_sync = true })()
-		end,
+		branch = "master",
+		build = ":TSUpdate",
 		config = function()
 			require("nvim-treesitter.configs").setup({
 				highlight = {
@@ -69,44 +63,15 @@ return {
       { "r", mode = "o", function() require("flash").remote() end, desc = "Remote Flash" },
       { "R", mode = { "o", "x" }, function() require("flash").treesitter_search() end, desc = "Treesitter Search" },
       { "<c-s>", mode = { "c" }, function() require("flash").toggle() end, desc = "Toggle Flash Search" },
+      { "<leader><leader>w", mode = { "n", "x", "o" }, function() require("flash").jump({ search = { forward = true, wrap = false, multi_window = false } }) end, desc = "Flash Forward" },
+      { "<leader><leader>b", mode = { "n", "x", "o" }, function() require("flash").jump({ search = { forward = false, wrap = false, multi_window = false } }) end, desc = "Flash Backward" },
     },
-	},
-
-	{
-		"smoka7/hop.nvim",
-		version = "*",
-		opts = {
-			keys = "etovxqpdygfblzhckisuran",
-		},
-		config = function()
-			require("hop").setup({})
-
-			local hop = require("hop")
-
-			local directions = require("hop.hint").HintDirection
-
-			vim.keymap.set("", "<leader><leader>w", function()
-				hop.hint_words({ direction = directions.AFTER_CURSOR })
-			end, { remap = true })
-
-			vim.keymap.set("", "<leader><leader>b", function()
-				hop.hint_words({ direction = directions.BEFORE_CURSOR })
-			end, { remap = true })
-		end,
 	},
 
 	{
 		"folke/which-key.nvim",
 		event = "VeryLazy",
-		init = function()
-			vim.o.timeout = true
-			vim.o.timeoutlen = 300
-		end,
-		opts = {
-			-- your configuration comes here
-			-- or leave it empty to use the default settings
-			-- refer to the configuration section below
-		},
+		opts = {},
 	},
 
 	{
@@ -175,7 +140,7 @@ return {
 				},
 				format_on_save = {
 					timeout_ms = 500,
-					lsp_fallback = true,
+					lsp_format = "fallback",
 				},
 			})
 		end,
