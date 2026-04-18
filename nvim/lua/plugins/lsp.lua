@@ -161,6 +161,7 @@ return {
 
 			local servers = {
 				eslint = {},
+				vtsls = {},
 				lua_ls = {
 					settings = {
 						Lua = {
@@ -228,10 +229,5 @@ return {
 			fuzzy = { implementation = "prefer_rust_with_warning" },
 		},
 		opts_extend = { "sources.default" },
-	},
-	{
-		"pmizio/typescript-tools.nvim",
-		dependencies = { "nvim-lua/plenary.nvim", "neovim/nvim-lspconfig" },
-		opts = {},
 	},
 }
