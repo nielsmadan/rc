@@ -184,21 +184,4 @@ return {
 		end,
 	},
 
-	{
-		"zbirenbaum/copilot.lua",
-		cmd = "Copilot",
-		event = "InsertEnter",
-		config = function()
-			require("copilot").setup({
-				suggestion = {
-					keymap = {
-						accept = "<M-l>",
-						next = "<C-,>",
-						prev = "<M-[>",
-						dismiss = "<C-]>",
-					},
-				},
-			})
-		end,
-	},
 }
