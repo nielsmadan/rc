@@ -101,15 +101,18 @@ return {
 	},
 
 	{
-		"nvim-tree/nvim-tree.lua",
-		version = "*",
-		lazy = false,
-		dependencies = {
-			"nvim-tree/nvim-web-devicons",
+		"stevearc/oil.nvim",
+		---@module 'oil'
+		---@type oil.SetupOpts
+		opts = {
+			view_options = { show_hidden = true },
 		},
-		config = function()
-			require("nvim-tree").setup({})
-		end,
+		lazy = false,
+    -- stylua: ignore
+    keys = {
+      { "<leader><leader>f", function() require("oil").open() end,                 desc = "Oil (current file dir)" },
+      { "<leader><leader>r", function() require("oil").open(vim.fn.getcwd()) end,  desc = "Oil (cwd / project root)" },
+    },
 	},
 
 	{
@@ -151,6 +154,9 @@ return {
 			-- - sd'   - [S]urround [D]elete [']quotes
 			-- - sr)'  - [S]urround [R]eplace [)] [']
 			require("mini.surround").setup()
+
+			-- File/directory icons (used by oil.nvim automatically).
+			require("mini.icons").setup()
 
 			-- Simple and easy statusline.
 			--  You could remove this setup call if you don't like it,
