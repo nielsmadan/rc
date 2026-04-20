@@ -9,8 +9,6 @@ Plug 'tpope/vim-eunuch'
 Plug 'tpope/vim-vinegar'
 Plug 'tpope/vim-commentary'
 
-Plug 'sbdchd/neoformat'
-
 Plug 'inkarkat/vim-ReplaceWithRegister'
 
 Plug 'andymass/vim-matchup'
@@ -459,40 +457,17 @@ let g:ale_fixers = {
 
 let g:ale_python_pylint_options = '--rcfile ./pylintrc'
 
-" Neoformat: try biome first, fall back to prettierd
-let g:neoformat_enabled_javascript = ['biome', 'prettierd']
-let g:neoformat_enabled_typescript = ['biome', 'prettierd']
-let g:neoformat_enabled_typescriptreact = ['biome', 'prettierd']
-let g:neoformat_try_node_exe = 1
-
 " configure vim-jsx to highlight in .js files (not just .jsx)
 let g:jsx_ext_required = 0
 
 " configure flow highlighting
 let g:javascript_plugin_flow = 1
 
+let g:ale_fix_on_save = 0
+
 function! ToggleFormatOnWrite()
-  if !exists('g:FormatOnWriteMarker')
-    let g:FormatOnWriteMarker = 1
-  endif
-
-  " Enable if the group was previously disabled
-  if (g:FormatOnWriteMarker == 1)
-    let g:FormatOnWriteMarker = 0
-
-    " actual augroup
-    augroup format_on_write
-      autocmd!
-      au BufWrite * :Neoformat
-    augroup END
-  else    " Clear the group if it was previously enabled
-    let g:FormatOnWriteMarker = 1
-
-    " resetting the augroup
-    augroup format_on_write
-      autocmd!
-    augroup END
-  endif
+  let g:ale_fix_on_save = !get(g:, 'ale_fix_on_save', 0)
+  echo 'ale_fix_on_save = ' . g:ale_fix_on_save
 endfunction
 
 nnoremap <leader>f :call ToggleFormatOnWrite()<CR>
