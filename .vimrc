@@ -442,18 +442,23 @@ let g:ale_linters_ignore = {
       \ 'typescript': ['tsserver'],
       \ 'typescriptreact': ['tsserver'],
       \}
-function! GetJSFixer(buffer) abort
-  if !empty(findfile('biome.json', expand('#' . a:buffer . ':p:h') . ';'))
-    return 'biome'
+
+" Pick the JS/TS fixer per-buffer: biome if biome.json is found, else prettierd.
+" Assigned via b:ale_fixers rather than a Funcref in g:ale_fixers, because
+" Funcrefs there must return fixer output (dict/list/0), not a fixer name.
+function! s:SetJSFixer() abort
+  if !empty(findfile('biome.json', expand('%:p:h') . ';'))
+    let b:ale_fixers = ['biome']
+  else
+    let b:ale_fixers = ['prettierd']
   endif
-  return 'prettierd'
 endfunction
 
-let g:ale_fixers = {
-      \ 'typescript.tsx': [function('GetJSFixer')],
-      \ 'typescript': [function('GetJSFixer')],
-      \ 'javascript': [function('GetJSFixer')],
-      \}
+augroup js_fixers
+  autocmd!
+  autocmd FileType javascript,javascriptreact,typescript,typescriptreact,typescript.tsx
+        \ call s:SetJSFixer()
+augroup END
 
 let g:ale_python_pylint_options = '--rcfile ./pylintrc'
 
