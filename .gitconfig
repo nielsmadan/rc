@@ -51,12 +51,19 @@
     pof = push origin -f
     puoh = push -u origin HEAD
 
-    ; No args -> diffview (full repo view). With args (file paths, revs) -> per-file neovide difftool.
-    d = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c DiffviewOpen; else git difftool \"$@\"; fi; }; f"
-    d1 = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen HEAD~1'; else git difftool HEAD~1 \"$@\"; fi; }; f"
-    d2 = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen HEAD~2'; else git difftool HEAD~2 \"$@\"; fi; }; f"
-    d3 = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen HEAD~3'; else git difftool HEAD~3 \"$@\"; fi; }; f"
-    dc = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen --cached'; else git difftool --cached \"$@\"; fi; }; f"
+    ; mvim difftool (default tool, see [diff] below).
+    d = difftool
+    d1 = difftool HEAD~1
+    d2 = difftool HEAD~2
+    d3 = difftool HEAD~3
+    dc = difftool --cached
+
+    ; Neovide + diffview.nvim. No args -> diffview (full repo view). With args (file paths, revs) -> per-file neovide difftool.
+    nd = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c DiffviewOpen; else git difftool -t neovide \"$@\"; fi; }; f"
+    nd1 = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen HEAD~1'; else git difftool -t neovide HEAD~1 \"$@\"; fi; }; f"
+    nd2 = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen HEAD~2'; else git difftool -t neovide HEAD~2 \"$@\"; fi; }; f"
+    nd3 = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen HEAD~3'; else git difftool -t neovide HEAD~3 \"$@\"; fi; }; f"
+    ndc = "!f() { if [ $# -eq 0 ]; then neovide --no-fork -- -c 'DiffviewOpen --cached'; else git difftool -t neovide --cached \"$@\"; fi; }; f"
     dns = diff --name-status
     outgoing = log origin..main
 
@@ -69,7 +76,10 @@
 	autocrlf = false
 
 [diff]
-	tool = neovide
+	tool = mvimdiff
+
+[difftool "mvimdiff"]
+	cmd = mvim -f -d \"$LOCAL\" \"$REMOTE\"
 
 [difftool "neovide"]
 	cmd = neovide --no-fork --no-tabs \"$LOCAL\" \"$REMOTE\" -- -d
