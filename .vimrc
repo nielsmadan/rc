@@ -8,6 +8,7 @@ Plug 'tpope/vim-surround'
 Plug 'tpope/vim-eunuch'
 Plug 'tpope/vim-vinegar'
 Plug 'tpope/vim-commentary'
+Plug 'tpope/vim-dispatch'
 
 Plug 'inkarkat/vim-ReplaceWithRegister'
 
@@ -461,6 +462,19 @@ augroup js_fixers
   autocmd FileType javascript,javascriptreact,typescript,typescriptreact,typescript.tsx
         \ call s:SetJSFixer()
 augroup END
+
+" Project-wide checks -> quickfix list (async via vim-dispatch)
+command! TSCheck Dispatch tsc --noEmit
+command! Lint    Dispatch biome check .
+command! Knip    Dispatch npx knip --reporter compact
+
+" Quickfix navigation
+nnoremap ]q :cnext<CR>
+nnoremap [q :cprev<CR>
+nnoremap ]Q :clast<CR>
+nnoremap [Q :cfirst<CR>
+nnoremap <leader>q :botright copen<CR>
+nnoremap <leader>Q :cclose<CR>
 
 let g:ale_python_pylint_options = '--rcfile ./pylintrc'
 
