@@ -27,6 +27,7 @@ vim.g.maplocalleader = "\\"
 require("/config/gui")
 require("/config/opt")
 require("/config/cmd")
+require("/config/diff")
 
 -- Setup lazy.nvim
 require("lazy").setup({

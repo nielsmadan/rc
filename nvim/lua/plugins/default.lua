@@ -101,6 +101,12 @@ return {
 	},
 
 	{
+		"sindrets/diffview.nvim",
+		cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFocusFiles", "DiffviewFileHistory" },
+		opts = {},
+	},
+
+	{
 		"stevearc/oil.nvim",
 		---@module 'oil'
 		---@type oil.SetupOpts
