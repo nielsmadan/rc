@@ -1,16 +1,9 @@
 call plug#begin("~/.vim/plugged")
 
 "--->GENERAL PLUGINS
-Plug 'tpope/vim-rsi'
-Plug 'tpope/vim-fugitive'
 Plug 'tpope/vim-repeat'
-Plug 'tpope/vim-surround'
 Plug 'tpope/vim-eunuch'
-Plug 'tpope/vim-vinegar'
-Plug 'tpope/vim-commentary'
 Plug 'tpope/vim-dispatch'
-
-Plug 'inkarkat/vim-ReplaceWithRegister'
 
 Plug 'andymass/vim-matchup'
 Plug 'ap/vim-css-color'
@@ -28,11 +21,6 @@ Plug 'dense-analysis/ale'
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
 
 "--->LANGUAGE SPECIFIC
-Plug 'peterhoeg/vim-qml'
-
-Plug 'pangloss/vim-javascript'
-Plug 'MaxMEllon/vim-jsx-pretty'
-
 Plug 'keith/swift.vim'
 
 Plug 'leafgarland/typescript-vim'
@@ -477,12 +465,6 @@ nnoremap <leader>q :botright copen<CR>
 nnoremap <leader>Q :cclose<CR>
 
 let g:ale_python_pylint_options = '--rcfile ./pylintrc'
-
-" configure vim-jsx to highlight in .js files (not just .jsx)
-let g:jsx_ext_required = 0
-
-" configure flow highlighting
-let g:javascript_plugin_flow = 1
 
 let g:ale_fix_on_save = 0
 
