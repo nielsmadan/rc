@@ -36,7 +36,7 @@ nvim/
     plugins/            # auto-imported by lazy via { import = "plugins" }
       default.lua       # treesitter, snacks, flash, trouble, diffview, oil, conform, mini.*
       lsp.lua           # lspconfig + mason + blink.cmp; LspAttach autocmd defines gd/gr/gI/<leader>rn/...
-      ai.lua            # codecompanion.nvim (anthropic adapter)
+      ai.lua            # codecompanion.nvim (claude_code ACP adapter)
       colorscheme.lua   # loads `harlequin` from ~/wrksp/harlequin (local, not in this repo)
 ```
 
@@ -53,6 +53,10 @@ The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` refe
 ## Git integration
 
 `.gitconfig` wires Neovide as both `diff.tool` and `merge.tool`. The custom `git d` / `git d1` / `git dc` aliases launch `neovide --no-fork -c DiffviewOpen ...` for whole-repo diffs (no args) or fall through to per-file `git difftool` (with args). Editor for commit messages is `mvim -f`.
+
+## Hammerspoon
+
+`hammerspoon/init.lua` is symlinked to `~/.hammerspoon/init.lua`. The config auto-reloads on save via `hs.pathwatcher`. Currently it does one thing: auto-moves windows of the apps listed in `EDITOR_APPS` (Neovide, MacVim, "Code" for VS Code) to the monitor whose name matches the `MAIN_SCREEN_NAME` constant at the top of the file. The move triggers on window creation (`hs.window.filter` → `windowCreated`) and on screen-configuration changes (`hs.screen.watcher`) — so plugging the main monitor in re-homes already-open editor windows. If `MAIN_SCREEN_NAME` is blank or doesn't match, the move logic no-ops silently. Every screen-config change also posts an `hs.alert` listing connected screen names (and prints to the Hammerspoon Console) so the right name can be copied into the constant.
 
 ## Tool versions
 
