@@ -103,7 +103,11 @@ return {
 	{
 		"sindrets/diffview.nvim",
 		cmd = { "DiffviewOpen", "DiffviewClose", "DiffviewToggleFiles", "DiffviewFocusFiles", "DiffviewFileHistory" },
-		opts = {},
+		opts = {
+			file_panel = {
+				win_config = { width = 64 },
+			},
+		},
 	},
 
 	{
