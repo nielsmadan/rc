@@ -38,6 +38,7 @@ link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
 link nvim            ~/.config/nvim
 link mise/config.toml ~/.config/mise/config.toml
+link hammerspoon     ~/.hammerspoon
 link iterm2/SaveWindowArrangement.py "$HOME/Library/Application Support/iTerm2/Scripts/SaveWindowArrangement.py"
 
 # Obsidian vimrc
