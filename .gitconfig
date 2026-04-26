@@ -80,7 +80,9 @@
 	tool = mvimdiff
 
 [difftool "mvimdiff"]
-	cmd = mvim -f -d \"$LOCAL\" \"$REMOTE\"
+	; Small sleep works around a race where consecutive `mvim -f` invocations
+	; lose the GUI handoff and silently fall back to terminal vim.
+	cmd = sleep 0.3 && mvim -f -d \"$LOCAL\" \"$REMOTE\"
 
 [difftool "neovide"]
 	cmd = neovide --no-fork --no-tabs \"$LOCAL\" \"$REMOTE\" -- -d
