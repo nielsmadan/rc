@@ -56,7 +56,11 @@ The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` refe
 
 ## Hammerspoon
 
-`hammerspoon/init.lua` is symlinked to `~/.hammerspoon/init.lua`. The config auto-reloads on save via `hs.pathwatcher`. Currently it does one thing: auto-moves windows of the apps listed in `EDITOR_APPS` (Neovide, MacVim, "Code" for VS Code) to the monitor whose name matches the `MAIN_SCREEN_NAME` constant at the top of the file. The move triggers on window creation (`hs.window.filter` → `windowCreated`) and on screen-configuration changes (`hs.screen.watcher`) — so plugging the main monitor in re-homes already-open editor windows. If `MAIN_SCREEN_NAME` is blank or doesn't match, the move logic no-ops silently. Every screen-config change also posts an `hs.alert` listing connected screen names (and prints to the Hammerspoon Console) so the right name can be copied into the constant.
+`hammerspoon/init.lua` is symlinked to `~/.hammerspoon/init.lua`. The config auto-reloads on save via `hs.pathwatcher`. It does two things:
+
+1. **Editor homing.** Auto-moves windows of the apps listed in `EDITOR_APPS` (Neovide, MacVim, "Code" for VS Code) to the monitor whose name matches the `MAIN_SCREEN_NAME` constant at the top of the file. The move triggers on window creation (`hs.window.filter` → `windowCreated`) and on screen-configuration changes (`hs.screen.watcher`) — so plugging the main monitor in re-homes already-open editor windows. If `MAIN_SCREEN_NAME` is blank or doesn't match, the move logic no-ops silently. Every screen-config change also posts an `hs.alert` listing connected screen names (and prints to the Hammerspoon Console) so the right name can be copied into the constant.
+
+2. **Window placement hotkeys.** `Ctrl+1/2/3` = top/middle/bottom vertical thirds (rows). `Cmd+Shift+1/2` = left/right horizontal halves (columns). `Ctrl+Space` = fill screen. All operate on the focused window's current screen and use `screen:frame()` (so they respect the menu bar and dock). Replaces Moom's hotkey-only usage.
 
 ## Tool versions
 
