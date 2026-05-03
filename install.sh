@@ -40,6 +40,18 @@ link nvim            ~/.config/nvim
 link mise/config.toml ~/.config/mise/config.toml
 link hammerspoon     ~/.hammerspoon
 link iterm2/SaveWindowArrangement.py "$HOME/Library/Application Support/iTerm2/Scripts/SaveWindowArrangement.py"
+link iterm2/dynamic-profile.json   "$HOME/Library/Application Support/iTerm2/DynamicProfiles/rc.json"
+
+# iTerm2 global prefs. Run with iTerm2 *not* running, otherwise iTerm2's in-memory
+# copy is flushed back to disk on quit and overwrites these values. Sets the "rc"
+# dynamic profile as default and dims inactive split panes to 10%.
+if ps -A -o comm | grep -q '/iTerm2$'; then
+  echo "skip iTerm2 defaults (iTerm2 is running — quit it and re-run install.sh)"
+else
+  defaults write com.googlecode.iterm2 "Default Bookmark Guid" -string "rc-dotfiles-split-nav"
+  defaults write com.googlecode.iterm2 SplitPaneDimmingAmount  -float  0.1
+  echo "wrote iTerm2 defaults"
+fi
 
 # Obsidian vimrc
 read -p "Obsidian vault path (leave empty to skip): " obsidian_vault
