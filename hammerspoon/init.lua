@@ -95,35 +95,4 @@ end):start()
 -- Defer initial pass so hs.application's registry is fully populated.
 hs.timer.doAfter(0.5, homeAllEditorWindows)
 
--- Window placement hotkeys. Fractions are of the screen's frame (excludes
--- menu bar and dock). Thirds are rows (top/middle/bottom); halves are
--- columns (left/right). The focused window respects setFrame first try,
--- so we toggle setFrameCorrectness off (skip retry loop) and pass
--- duration=0 (skip animation) to get a single instant resize.
-local function place(fx, fy, fw, fh)
-  return function()
-    local win = hs.window.focusedWindow()
-    if not win or not win:isStandard() then return end
-    local sf = win:screen():frame()
-    local prev = hs.window.setFrameCorrectness
-    hs.window.setFrameCorrectness = false
-    win:setFrame({
-      x = sf.x + sf.w * fx,
-      y = sf.y + sf.h * fy,
-      w = sf.w * fw,
-      h = sf.h * fh,
-    }, 0)
-    hs.window.setFrameCorrectness = prev
-  end
-end
-
-hs.hotkey.bind({ "ctrl" }, "1", place(0, 0,     1, 1 / 3))
-hs.hotkey.bind({ "ctrl" }, "2", place(0, 1 / 3, 1, 1 / 3))
-hs.hotkey.bind({ "ctrl" }, "3", place(0, 2 / 3, 1, 1 / 3))
-
-hs.hotkey.bind({ "cmd", "shift" }, "1", place(0,     0, 1 / 2, 1))
-hs.hotkey.bind({ "cmd", "shift" }, "2", place(1 / 2, 0, 1 / 2, 1))
-
-hs.hotkey.bind({ "ctrl" }, "space", place(0, 0, 1, 1))
-
 hs.alert.show("Hammerspoon loaded")
