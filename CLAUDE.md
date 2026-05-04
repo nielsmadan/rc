@@ -56,11 +56,15 @@ The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` refe
 
 ## Hammerspoon
 
-`hammerspoon/init.lua` is symlinked to `~/.hammerspoon/init.lua`. The config auto-reloads on save via `hs.pathwatcher`. It does two things:
+`hammerspoon/init.lua` is symlinked to `~/.hammerspoon/init.lua`. The config auto-reloads on save via `hs.pathwatcher`. Its sole job is **per-app window homing**: auto-move windows of known apps to the monitor whose name matches the `MAIN_SCREEN_NAME` constant at the top of the file, with each app placed according to a frame-computation function in the `APP_PLACEMENTS` table. The move triggers on window creation (`hs.window.filter` → `windowCreated`) and on screen-configuration changes (`hs.screen.watcher`) — so plugging the main monitor in re-homes already-open managed windows.
 
-1. **Editor homing.** Auto-moves windows of the apps listed in `EDITOR_APPS` (Neovide, MacVim, "Code" for VS Code) to the monitor whose name matches the `MAIN_SCREEN_NAME` constant at the top of the file. The move triggers on window creation (`hs.window.filter` → `windowCreated`) and on screen-configuration changes (`hs.screen.watcher`) — so plugging the main monitor in re-homes already-open editor windows. If `MAIN_SCREEN_NAME` is blank or doesn't match, the move logic no-ops silently. Every screen-config change also posts an `hs.alert` listing connected screen names (and prints to the Hammerspoon Console) so the right name can be copied into the constant.
+Current `APP_PLACEMENTS`:
+- **Neovide / MacVim / Code** (VS Code) — `centeredWithMargin`: centered on the screen with `MARGIN_FRAC` (10%) padding on each side.
+- **Juggler** — `leftDock(480)`: anchored to the screen's left edge, 480px wide, full height.
 
-2. **Window placement hotkeys.** `Ctrl+1/2/3` = top/middle/bottom vertical thirds (rows). `Cmd+Shift+1/2` = left/right horizontal halves (columns). `Ctrl+Space` = fill screen. All operate on the focused window's current screen and use `screen:frame()` (so they respect the menu bar and dock). Replaces Moom's hotkey-only usage.
+Adding a new managed app = add an entry to `APP_PLACEMENTS` mapping its app name (matched exactly via `hs.application.get(name, true)` so e.g. "Code" doesn't fuzzy-match "Xcode") to a placement function. Reuse `centeredWithMargin` / `leftDock` or write a new one (takes the screen frame `sf`, returns `{x, y, w, h}`).
+
+If `MAIN_SCREEN_NAME` is blank or doesn't match, the move logic no-ops silently. Every screen-config change also posts an `hs.alert` listing connected screen names (and prints to the Hammerspoon Console) so the right name can be copied into the constant.
 
 ## Tool versions
 
