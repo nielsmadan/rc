@@ -28,6 +28,16 @@ else
   echo "skip vim-plug (already installed)"
 fi
 
+# Install pure-prompt if not present. .zshrc references $HOME/.zsh/pure on
+# fpath; without it, `prompt pure` fails silently and zsh falls back to
+# its default %m%# prompt.
+if [ ! -d "$HOME/.zsh/pure" ]; then
+  git clone --depth=1 https://github.com/sindresorhus/pure.git "$HOME/.zsh/pure"
+  echo "installed pure-prompt"
+else
+  echo "skip pure-prompt (already installed)"
+fi
+
 link .vimrc          ~/.vimrc
 link .gvimrc         ~/.gvimrc
 link .vim            ~/.vim
