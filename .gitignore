@@ -5,3 +5,4 @@
 .vim/.netrwhist
 .claude/settings.local.json
 nvim/lazy-lock.json
+hammerspoon/local.lua

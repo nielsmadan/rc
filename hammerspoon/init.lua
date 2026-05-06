@@ -1,11 +1,13 @@
--- Fill this in once the main monitor is plugged in. The screen watcher
--- below posts an hs.alert listing connected screen names whenever the
--- screen set changes, so the exact name will appear on screen the next
--- time the monitor is connected.
-local MAIN_SCREEN_NAME = "LG HDR 5K"
+-- Per-machine config (monitor names, app placements, window rules) is
+-- loaded from ~/.hammerspoon/local.lua — see local.lua.example in this
+-- directory for the API. That file is gitignored so each machine has
+-- its own. Without it, no auto-placement happens; the F18 modal still
+-- works fine. The screen watcher below posts an hs.alert listing
+-- connected screen names on every screen-config change, so the right
+-- name to put in local.lua appears on screen when monitors are plugged.
 
--- Fraction of each side left as empty margin around centered windows.
--- Window ends up 1 - 2*MARGIN_FRAC wide and tall, centered on the screen.
+-- Fraction of each side left as empty margin around centered windows
+-- (used by the centeredWithMargin helper passed to local.lua).
 local MARGIN_FRAC = 0.1
 
 -- Retries setFrame with workarounds for known macOS quirks; needed for
@@ -47,6 +49,10 @@ local hyper        = hs.hotkey.modal.new()
 local windowMode   = hs.hotkey.modal.new()
 local verticalMode = hs.hotkey.modal.new()
 local horizMode    = hs.hotkey.modal.new()
+
+-- Forward-declared so the F18+W+H binding below can call it; the actual
+-- definition lives further down with the rest of the placement code.
+local homeAllManagedWindows
 
 local hint            -- current hs.alert handle (or nil)
 local hyperActive    -- true while F18 is held; guards double-enter
@@ -110,7 +116,7 @@ hyper:bind({}, "w", function()
   hyperConsumed = true
   hyper:exit()
   windowMode:enter()
-  showHint("window: f=fill  v=rows  b=cols  esc=cancel")
+  showHint("window: f=fill  v=rows  b=cols  h=home  esc=cancel")
 end)
 
 -- window mode terminals/submodes.
@@ -126,6 +132,12 @@ end)
 windowMode:bind({}, "b", function()
   windowMode:exit(); horizMode:enter()
   showHint("horizontal (cols): 1=left  2=right  esc=cancel")
+end)
+
+-- Manual re-home: re-runs the placement pass over all managed windows.
+-- Same code path that fires on screen-config change / system wake.
+windowMode:bind({}, "h", function()
+  leaveAll(); homeAllManagedWindows()
 end)
 
 -- Vertical (rows) — full width, fractional height.
@@ -147,16 +159,17 @@ hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", function(files)
   end
 end):start()
 
-local function mainScreen()
-  if MAIN_SCREEN_NAME == "" then return nil end
+local function findScreen(name)
+  if not name or name == "" then return nil end
   for _, s in ipairs(hs.screen.allScreens()) do
-    if s:name() == MAIN_SCREEN_NAME then return s end
+    if s:name() == name then return s end
   end
   return nil
 end
 
--- Per-app placement on the main screen. Each entry is a function that
--- takes the screen frame and returns the target window frame.
+-- Placement helpers — each takes a screen frame and returns the target
+-- window frame. Project convention: "vertical" = stacked rows, "horizontal"
+-- = side-by-side cols.
 local function centeredWithMargin(sf)
   return {
     x = sf.x + sf.w * MARGIN_FRAC,
@@ -172,26 +185,54 @@ local function leftDock(width)
   end
 end
 
-local APP_PLACEMENTS = {
-  Neovide = centeredWithMargin,
-  MacVim  = centeredWithMargin,
-  Code    = centeredWithMargin,
-  Juggler = leftDock(480),
-}
+local function bottomThird(sf)
+  return { x = sf.x, y = sf.y + sf.h * 2 / 3, w = sf.w, h = sf.h / 3 }
+end
+
+-- Load ~/.hammerspoon/local.lua for per-machine MAIN_SCREEN_NAME,
+-- APP_PLACEMENTS and WINDOW_RULES. Missing file = empty config, no
+-- auto-placement (modal still works). See local.lua.example for the API.
+local function loadLocalConfig(helpers)
+  local chunk = loadfile(hs.configdir .. "/local.lua")
+  if not chunk then return {} end
+  local ok, fn = pcall(chunk)
+  if not ok or type(fn) ~= "function" then
+    hs.alert.show("local.lua: expected function(helpers) → cfg, got " .. tostring(fn), 5)
+    return {}
+  end
+  local ok2, cfg = pcall(fn, helpers)
+  if not ok2 then
+    hs.alert.show("local.lua threw: " .. tostring(cfg), 5)
+    return {}
+  end
+  return cfg or {}
+end
+
+local localCfg = loadLocalConfig({
+  centeredWithMargin = centeredWithMargin,
+  leftDock           = leftDock,
+  bottomThird        = bottomThird,
+})
+
+local MAIN_SCREEN_NAME = localCfg.main_screen     or ""
+local APP_PLACEMENTS   = localCfg.app_placements  or {}
+local WINDOW_RULES     = localCfg.window_rules    or {}
+
+local function ruleMatches(rule, win)
+  local app = win:application()
+  if not app or app:name() ~= rule.app then return false end
+  if rule.titlePattern and not (win:title() or ""):match(rule.titlePattern) then
+    return false
+  end
+  return true
+end
 
 -- Neovide (winit-based) only honors AX setFrame on the focused window —
 -- macOS clamps the request otherwise. So we focus briefly, setFrame, then
--- continue. Caller is responsible for restoring prior focus if desired.
--- `done` is called after the move completes, enabling sequential chaining.
-local function moveToMain(win, done)
-  done = done or function() end
-  if not win or not win:isStandard() then return done() end
-  local target = mainScreen()
-  if not target then return done() end
-  local app = win:application()
-  local placement = app and APP_PLACEMENTS[app:name()]
-  if not placement then return done() end
-  local frame = placement(target:frame())
+-- continue. The same dance is harmless for other apps.
+local function applyPlacement(win, screen, placement, done)
+  if not screen or not placement then return done() end
+  local frame = placement(screen:frame())
   win:focus()
   hs.timer.doAfter(0.05, function()
     if win:isStandard() then win:setFrame(frame) end
@@ -199,15 +240,60 @@ local function moveToMain(win, done)
   end)
 end
 
+-- Resolve which (screen, placement) to use for a given window — first
+-- matching WINDOW_RULES wins; otherwise fall back to APP_PLACEMENTS on
+-- MAIN_SCREEN_NAME. Returns nil if nothing matches.
+local function resolvePlacement(win)
+  for _, rule in ipairs(WINDOW_RULES) do
+    if ruleMatches(rule, win) then
+      return findScreen(rule.screen), rule.placement
+    end
+  end
+  local app = win:application()
+  local placement = app and APP_PLACEMENTS[app:name()]
+  if placement then return findScreen(MAIN_SCREEN_NAME), placement end
+  return nil, nil
+end
+
+local function moveToMain(win, done)
+  done = done or function() end
+  if not win or not win:isStandard() then return done() end
+  local screen, placement = resolvePlacement(win)
+  if not screen or not placement then return done() end
+  applyPlacement(win, screen, placement, done)
+end
+
+-- Union of APP_PLACEMENTS keys and WINDOW_RULES app names. Both the
+-- window filter (event subscription) and homeAllManagedWindows (initial /
+-- screen-change pass) iterate this list.
+local managedAppNames = {}
+do
+  local seen = {}
+  for name in pairs(APP_PLACEMENTS) do
+    if not seen[name] then table.insert(managedAppNames, name); seen[name] = true end
+  end
+  for _, rule in ipairs(WINDOW_RULES) do
+    if not seen[rule.app] then table.insert(managedAppNames, rule.app); seen[rule.app] = true end
+  end
+end
+
 -- Iterate managed windows sequentially — each window's focus+setFrame must
 -- complete before the next begins, otherwise concurrent `focus()` calls
 -- race and only the last app's window actually moves.
-local function homeAllManagedWindows()
+function homeAllManagedWindows()
+  -- Build a name → true set for O(1) exact matching. We can't use
+  -- hs.application.get(name) here: it only takes one arg (the second,
+  -- "exact", is silently dropped) and dispatches a substring search,
+  -- so "Code" would also match "Xcode", and the empty-result/window-
+  -- fallback path can return non-application objects that lack
+  -- :allWindows (which crashed line 271).
+  local wanted = {}
+  for _, name in ipairs(managedAppNames) do wanted[name] = true end
+
   local windows = {}
-  for appName in pairs(APP_PLACEMENTS) do
-    -- exact=true so "Code" doesn't fuzzy-match "Xcode"
-    local app = hs.application.get(appName, true)
-    if app then
+  for _, app in ipairs(hs.application.runningApplications()) do
+    local name = app:name()
+    if name and wanted[name] then
       for _, win in ipairs(app:allWindows()) do
         table.insert(windows, win)
       end
@@ -225,18 +311,20 @@ local function homeAllManagedWindows()
   step(1)
 end
 
-local managedAppNames = {}
-for name in pairs(APP_PLACEMENTS) do
-  table.insert(managedAppNames, name)
-end
-local managedFilter = hs.window.filter.new(managedAppNames)
--- Wrap so window_filter's extra (appName, event) args don't reach
--- moveToMain — it expects (win, done) where `done` is a callback, and
--- otherwise the appName string ends up bound to `done` and the early-
--- return paths crash with "attempt to call a string value".
-managedFilter:subscribe(hs.window.filter.windowCreated, function(win)
-  moveToMain(win)
-end)
+-- Placement runs only on three triggers — we deliberately do NOT
+-- subscribe to per-window events:
+--   1. The 0.5s post-load timer below (initial pass after Hammerspoon
+--      starts).
+--   2. screen.watcher (monitor connected/disconnected/reconfigured).
+--   3. caffeinate.watcher systemDidWake (after sleep).
+-- Subscribing to windowCreated/windowTitleChanged caused a feedback loop
+-- with iTerm2: setFrame → iTerm2 snaps to char grid → prompt redraws →
+-- OSC title escape → windowTitleChanged → setFrame → ... ad infinitum.
+hs.caffeinate.watcher.new(function(event)
+  if event == hs.caffeinate.watcher.systemDidWake then
+    homeAllManagedWindows()
+  end
+end):start()
 
 hs.screen.watcher.new(function()
   local names = {}

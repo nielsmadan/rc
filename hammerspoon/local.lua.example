@@ -1,0 +1,51 @@
+-- Copy to local.lua (gitignored) on each machine and customize.
+--
+--   cp hammerspoon/local.lua.example hammerspoon/local.lua
+--
+-- This file returns a function that takes a `helpers` table (built-in
+-- placement functions exposed by init.lua) and returns a config table
+-- consumed by hammerspoon/init.lua.
+--
+-- Helpers provided in `h`:
+--   h.centeredWithMargin       — function(sf) → frame; 10% margin all around
+--   h.leftDock(width)          — returns function(sf); anchored left, full height
+--   h.bottomThird              — function(sf) → frame; full width, bottom 1/3
+--
+-- You can also write your own placement functions inline; each takes
+-- the target screen's frame `sf = {x, y, w, h}` (which already excludes
+-- the menu bar and dock) and returns the desired window frame.
+--
+-- Lookups for screens and apps are by EXACT name. Screen names appear
+-- in the hs.alert that fires on every screen-config change. App names
+-- come from `app:name()` (typically the CFBundleName, e.g. "iTerm2").
+
+return function(h)
+  return {
+    -- Monitor that APP_PLACEMENTS targets. Leave "" or omit to disable
+    -- per-app homing entirely.
+    main_screen = "LG HDR 5K",
+
+    -- App name → placement function. Each app's windows get placed on
+    -- main_screen using the function whenever the homing pass runs.
+    app_placements = {
+      Neovide = h.centeredWithMargin,
+      MacVim  = h.centeredWithMargin,
+      Code    = h.centeredWithMargin,
+      Juggler = h.leftDock(480),
+    },
+
+    -- Per-window rules — checked first, first match wins. Each rule:
+    --   app          = exact app name
+    --   titlePattern = optional Lua pattern matched against win:title()
+    --   screen       = exact monitor name (can differ from main_screen)
+    --   placement    = function(sf) → frame
+    window_rules = {
+      {
+        app          = "iTerm2",
+        titlePattern = "^config",
+        screen       = "LG Ultra HD",
+        placement    = h.bottomThird,
+      },
+    },
+  }
+end

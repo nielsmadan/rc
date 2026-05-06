@@ -92,3 +92,22 @@ if [ ! -f ~/.zshrc.local ]; then
 else
   echo "skip ~/.zshrc.local (already exists)"
 fi
+
+# Per-machine Hammerspoon config (gitignored). Stub returns empty config
+# so init.lua's loadfile/return-function check passes — no auto-placement
+# until customized. See hammerspoon/local.lua.example for the full API.
+if [ ! -f "$DOTFILES_DIR/hammerspoon/local.lua" ]; then
+  cat > "$DOTFILES_DIR/hammerspoon/local.lua" <<'EOF'
+-- Per-machine Hammerspoon config. See local.lua.example for the API.
+return function(h)
+  return {
+    -- main_screen    = "...",
+    -- app_placements = {},
+    -- window_rules   = {},
+  }
+end
+EOF
+  echo "created hammerspoon/local.lua"
+else
+  echo "skip hammerspoon/local.lua (already exists)"
+fi
