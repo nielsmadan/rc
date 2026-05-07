@@ -44,7 +44,7 @@ The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` refe
    - **`APP_PLACEMENTS`** (fallback). Map of app name → placement function on `MAIN_SCREEN_NAME`. Currently: `Neovide`/`MacVim`/`Code` → `centeredWithMargin`, `Juggler` → `leftDock(480)`.
 
    For title-pattern rules to take effect, the title needs to be set *before* one of the three trigger events fires. Practical workflow: open the iTerm2 window, set its title to e.g. `config` (Cmd+I → Window Title, or `echo -ne "\033]0;config\007"` in the shell), then trigger a re-home — toggling display mirroring or putting the lid down for a few seconds will work, otherwise the rule kicks in on the next monitor change / sleep-wake naturally.
-2. **F18-leader window-placement modal.** Hold F18 to enter, then `w` for window mode, then `f`/`v`/`b`/`h` for fill/rows/cols/home (re-run the homing pass on all managed windows — same code path as monitor change / wake), then `1`/`2`/`⇧1`-`⇧3` for the rows/cols submodes. Full key map and rationale in the comment block at the top of `hammerspoon/init.lua`.
+2. **F18-leader window-placement modal.** Hold F18 to enter, then `w` for window mode, then a flat terminal key: `f` (fill), `1`/`2`/`3` (top/middle/bottom third), `q`/`w` (top/bottom half), `a`/`s` (left/right half), or `h` (home — re-run the homing pass on all managed windows, same code path as monitor change / wake). Full key map and rationale in the comment block at the top of `hammerspoon/init.lua`.
 
 ### Per-machine config: `hammerspoon/local.lua`
 

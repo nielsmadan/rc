@@ -20,11 +20,12 @@ hs.window.setFrameCorrectness = true
 -- On the Moonlander, assign any free key to F18 in Oryx.
 --
 -- Sequence: F18+W → window mode, then:
---   f         = fullscreen (fill screen)
---   v 1 / v 2 = top / bottom half (vertical = stacked rows)
---   v ⇧1/⇧2/⇧3 = top / middle / bottom third
---   b 1 / b 2 = left / right half (horizontal = side-by-side cols)
---   esc       = abort from any sub-mode
+--   f       = fullscreen (fill screen)
+--   1 / 2 / 3 = top / middle / bottom third (vertical = stacked rows)
+--   q / w   = top / bottom half (vertical = stacked rows)
+--   a / s   = left / right half (horizontal = side-by-side cols)
+--   h       = home (re-run placement pass)
+--   esc     = abort
 -- After F18+W the chord is released; subsequent keys are pressed plain.
 -- F18 itself is consumed (apps never see it as a literal F18 keypress).
 
@@ -45,10 +46,8 @@ local function place(fx, fy, fw, fh)
   end
 end
 
-local hyper        = hs.hotkey.modal.new()
-local windowMode   = hs.hotkey.modal.new()
-local verticalMode = hs.hotkey.modal.new()
-local horizMode    = hs.hotkey.modal.new()
+local hyper      = hs.hotkey.modal.new()
+local windowMode = hs.hotkey.modal.new()
 
 -- Forward-declared so the F18+W+H binding below can call it; the actual
 -- definition lives further down with the rest of the placement code.
@@ -76,7 +75,7 @@ local function clearHint()
 end
 
 local function leaveAll()
-  hyper:exit(); windowMode:exit(); verticalMode:exit(); horizMode:exit()
+  hyper:exit(); windowMode:exit()
   clearHint()
   hyperActive = false
 end
@@ -106,50 +105,36 @@ hs.hotkey.bind({}, "f18",
 )
 
 -- Esc cancels from any mode.
-hyper:bind({}, "escape",        leaveAll)
-windowMode:bind({}, "escape",   leaveAll)
-verticalMode:bind({}, "escape", leaveAll)
-horizMode:bind({}, "escape",    leaveAll)
+hyper:bind({}, "escape",      leaveAll)
+windowMode:bind({}, "escape", leaveAll)
 
 -- hyper + W → enter window mode (and exit hyper so F18-up is harmless).
 hyper:bind({}, "w", function()
   hyperConsumed = true
   hyper:exit()
   windowMode:enter()
-  showHint("window: f=fill  v=rows  b=cols  h=home  esc=cancel")
+  showHint("window: f=fill  1/2/3=thirds  q/w=rows  a/s=cols  h=home  esc=cancel")
 end)
 
--- window mode terminals/submodes.
-windowMode:bind({}, "f", function()
-  leaveAll(); place(0, 0, 1, 1)()
-end)
+-- window mode terminals.
+windowMode:bind({}, "f", function() leaveAll(); place(0, 0, 1, 1)() end)
 
-windowMode:bind({}, "v", function()
-  windowMode:exit(); verticalMode:enter()
-  showHint("vertical (rows): 1=top  2=bottom  ⇧1/2/3=thirds  esc=cancel")
-end)
+-- Vertical thirds (rows) — full width, 1/3 height.
+windowMode:bind({}, "1", function() leaveAll(); place(0, 0,     1, 1 / 3)() end)
+windowMode:bind({}, "2", function() leaveAll(); place(0, 1 / 3, 1, 1 / 3)() end)
+windowMode:bind({}, "3", function() leaveAll(); place(0, 2 / 3, 1, 1 / 3)() end)
 
-windowMode:bind({}, "b", function()
-  windowMode:exit(); horizMode:enter()
-  showHint("horizontal (cols): 1=left  2=right  esc=cancel")
-end)
+-- Vertical halves (rows) — full width, 1/2 height.
+windowMode:bind({}, "q", function() leaveAll(); place(0, 0,     1, 1 / 2)() end)
+windowMode:bind({}, "w", function() leaveAll(); place(0, 1 / 2, 1, 1 / 2)() end)
+
+-- Horizontal halves (cols) — 1/2 width, full height.
+windowMode:bind({}, "a", function() leaveAll(); place(0,     0, 1 / 2, 1)() end)
+windowMode:bind({}, "s", function() leaveAll(); place(1 / 2, 0, 1 / 2, 1)() end)
 
 -- Manual re-home: re-runs the placement pass over all managed windows.
 -- Same code path that fires on screen-config change / system wake.
-windowMode:bind({}, "h", function()
-  leaveAll(); homeAllManagedWindows()
-end)
-
--- Vertical (rows) — full width, fractional height.
-verticalMode:bind({}, "1",        function() leaveAll(); place(0, 0,     1, 1 / 2)() end)
-verticalMode:bind({}, "2",        function() leaveAll(); place(0, 1 / 2, 1, 1 / 2)() end)
-verticalMode:bind({ "shift" }, "1", function() leaveAll(); place(0, 0,     1, 1 / 3)() end)
-verticalMode:bind({ "shift" }, "2", function() leaveAll(); place(0, 1 / 3, 1, 1 / 3)() end)
-verticalMode:bind({ "shift" }, "3", function() leaveAll(); place(0, 2 / 3, 1, 1 / 3)() end)
-
--- Horizontal (cols) — fractional width, full height.
-horizMode:bind({}, "1", function() leaveAll(); place(0,     0, 1 / 2, 1)() end)
-horizMode:bind({}, "2", function() leaveAll(); place(1 / 2, 0, 1 / 2, 1)() end)
+windowMode:bind({}, "h", function() leaveAll(); homeAllManagedWindows() end)
 -- ──────────────────────────────────────────────────────────────────────
 
 -- Reload on save of any .lua under ~/.hammerspoon
