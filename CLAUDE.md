@@ -84,8 +84,39 @@ Or `launchctl kickstart gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18`.
 
 ## Tool versions
 
-`mise/config.toml` (symlinked to `~/.config/mise/config.toml`) pins node/ruby/python/java/bun/go/fzf/pnpm. `mise activate` is hooked in `.zshrc`.
+`mise/config.toml` (symlinked to `~/.config/mise/config.toml`) pins node/ruby/python/java/bun/go/fzf/pnpm/sops/age. `mise activate` is hooked in `.zshrc`.
+
+## Secrets management
+
+Dev API keys (e.g. `JINA_API_KEY`) live in `secrets/secrets.yaml` in this repo, encrypted with [SOPS](https://github.com/getsops/sops) using [age](https://github.com/FiloSottile/age) recipients. Each Mac has its own age identity at `~/.config/sops/age/keys.txt` (mode 600); the corresponding **public** keys are listed in `.sops.yaml` at the repo root. The encrypted file is safe to commit — that's the whole point.
+
+Why this setup: API keys must not sit in long-lived shell env, because Claude Code agents (and similar tools) routinely run `env`/`printenv`/cat configs, and those values end up in transcripts. SOPS' `exec-env` injects decrypted values into a subprocess only — the parent shell never sees them.
+
+Architecture:
+- **`.sops.yaml`** (repo root) — SOPS creation rules. Lists allowed age recipients (public keys, one per Mac). Plaintext, committed.
+- **`secrets/secrets.yaml`** (repo) — encrypted YAML. Variable names are visible (diff-friendly); values are AES-256-GCM ciphertext, decryptable only by listed recipients. Committed.
+- **`SOPS_AGE_KEY_FILE`** — env var set in `.zshrc` to `~/.config/sops/age/keys.txt`. macOS' default location for SOPS is `~/Library/Application Support/sops/age/keys.txt` (path with spaces); we use the cleaner XDG location.
+- **CLI wrappers** in `.zshrc` (`claude`, `codex`, `gemini`) invoke each tool via `sops exec-env "$SOPS_SECRETS" --` so keys land only in that subprocess.
+- **HTTP-based MCP servers** (e.g. Jina, Todoist) in `~/.claude.json` use `${ENV_VAR}` headers; Claude Code interpolates those at startup. Since our `claude` wrapper goes through `sops exec-env`, Claude Code receives the env var. The parent shell does not.
+- **stdio MCP servers** with env-var deps can use `command: "sops"` `args: ["exec-env", "<repo>/secrets/secrets.yaml", "--", "<server>"]` directly, so even Claude Code's own process never sees their keys.
+
+Fresh-machine bootstrap:
+1. Clone the repo and run `install.sh` — generates an age identity at `~/.config/sops/age/keys.txt` if missing and prints the public key.
+2. On a Mac that already decrypts: append the new public key to `.sops.yaml`, then `sops updatekeys ~/rc/secrets/secrets.yaml`. Commit + push.
+3. On the new Mac: `git pull`. Verify with `sops -d --extract '["JINA_API_KEY"]' ~/rc/secrets/secrets.yaml`.
+
+Adding a new secret:
+1. `sops edit ~/rc/secrets/secrets.yaml` — opens `$EDITOR` (mvim) on plaintext.
+2. Add a line: `OPENAI_API_KEY: sk-xxx`. Save & exit; SOPS re-encrypts in place.
+3. `git add secrets/secrets.yaml && git commit && git push` so other Macs can pull.
+4. If the new env var is referenced by a CLI tool that doesn't auto-receive env from the wrappers, add a wrapper function in `.zshrc`.
+
+Rotation: `sops edit ~/rc/secrets/secrets.yaml`, change the value, save. Commit + push. No restart needed; SOPS reads the file each call. The entry's old ciphertext disappears from the file (history lives in `git log`).
+
+Migration status: keys still in `~/.airc` work via the legacy plain-env path. Once a key is in `secrets.yaml` and verified via `sops -d --extract`, remove the corresponding `export` line from `~/.airc` so it's not duplicated in shell env.
+
+Note on `.kdbx`: the file at `~/syncthing/keepass/dev-secrets.kdbx` is left in place for personal-life secrets browsed via KeePassXC (different security/UX posture from dev secrets).
 
 ## Local-only files (not in this repo)
 
-`.zshrc` sources `~/.airc`, `~/.devrc`, and `~/.zshrc.local` if present (`.devrc` is in the repo and symlinked in; the others are user-local). `.gitconfig` includes `~/.gitconfig-local`. Don't expect to find these here.
+`.zshrc` sources `~/.airc`, `~/.devrc`, and `~/.zshrc.local` if present (`.devrc` is in the repo and symlinked in; the others are user-local). `.gitconfig` includes `~/.gitconfig-local`. Don't expect to find these here. (`~/.airc` is being phased out as keys migrate to fnox — see the Secrets management section.)

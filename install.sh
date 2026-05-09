@@ -93,6 +93,26 @@ else
   echo "skip ~/.zshrc.local (already exists)"
 fi
 
+# SOPS age identity — needs to exist at ~/.config/sops/age/keys.txt for
+# sops to decrypt secrets/secrets.yaml. If missing, generate a fresh one
+# (per-machine; the resulting public key must be added to .sops.yaml on
+# any Mac that already decrypts, then `sops updatekeys` re-wraps).
+if [ ! -f "$HOME/.config/sops/age/keys.txt" ]; then
+  if command -v age-keygen >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config/sops/age"
+    age-keygen -o "$HOME/.config/sops/age/keys.txt"
+    chmod 600 "$HOME/.config/sops/age/keys.txt"
+    echo
+    echo "sops: generated fresh age identity at ~/.config/sops/age/keys.txt"
+    echo "Add the printed public key (above) to .sops.yaml on a Mac that"
+    echo "already decrypts secrets/secrets.yaml, then run:"
+    echo "  sops updatekeys ~/rc/secrets/secrets.yaml"
+    echo "Commit + push, then \`git pull\` here to be able to decrypt."
+  else
+    echo "sops: age-keygen not on PATH — run \`mise install\` then re-run install.sh"
+  fi
+fi
+
 # Per-machine Hammerspoon config (gitignored). Stub returns empty config
 # so init.lua's loadfile/return-function check passes — no auto-placement
 # until customized. See hammerspoon/local.lua.example for the full API.

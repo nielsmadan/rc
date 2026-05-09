@@ -130,8 +130,44 @@ alias rc="cd ~/rc"
 alias srcz="source ~/.zshrc"
 alias zshrc="mvim ~/.zshrc"
 
-# AI tools (Claude, etc.)
+# AI tools (Claude, etc.) — legacy plain-env source. Migrate each key into
+# secrets/secrets.yaml (via `sops edit`), then remove the corresponding
+# `export` line from ~/.airc so it's not also in shell env.
 [ -f ~/.airc ] && source ~/.airc
+
+# SOPS reads the age identity from this path. Default macOS location uses a
+# space-padded `Library/Application Support/sops/age/` path; we keep ours at
+# the cross-platform XDG location instead.
+export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
+
+# `sops edit` shells out to $EDITOR and waits for it to exit. Plain `mvim`
+# (our $EDITOR) spawns its GUI in the background and returns instantly, which
+# makes sops think the user saved an empty file. Force a terminal nvim for
+# sops specifically.
+export SOPS_EDITOR=nvim
+
+# AI CLI wrappers — invoke each via `sops exec-env` so its API keys are
+# injected only into the subprocess, never into this shell's env.
+#
+# `sops exec-env <file> <command>` takes the command as a single string that
+# sops re-tokenizes via the shell, NOT a `--`-separated argv. We use
+# `printf '%q '` to shell-quote each user-supplied arg so prompts with spaces
+# (`claude -p "tell me about cats"`) survive the round-trip.
+SOPS_SECRETS="$HOME/rc/secrets/secrets.yaml"
+claude()   { sops exec-env "$SOPS_SECRETS" "claude $(printf '%q ' "$@")"; }
+codex()    { sops exec-env "$SOPS_SECRETS" "codex $(printf '%q ' "$@")"; }
+gemini()   { sops exec-env "$SOPS_SECRETS" "gemini $(printf '%q ' "$@")"; }
+opencode() { sops exec-env "$SOPS_SECRETS" "opencode $(printf '%q ' "$@")"; }
+
+# Editor wrappers — codecompanion.nvim reads CLAUDE_CODE_OAUTH_TOKEN from
+# env, so nvim/mvim/neovide need the secrets injected too. The existing
+# `m` / `n` aliases (mvim, neovide &) keep working: they expand to the
+# function name, then the function runs.
+nvim()    { sops exec-env "$SOPS_SECRETS" "nvim $(printf '%q ' "$@")"; }
+mvim()    { sops exec-env "$SOPS_SECRETS" "mvim $(printf '%q ' "$@")"; }
+neovide() { sops exec-env "$SOPS_SECRETS" "neovide $(printf '%q ' "$@")"; }
+
+alias sec="sops edit $SOPS_SECRETS"
 
 # Dev helper functions (mksim, etc.)
 [ -f ~/.devrc ] && source ~/.devrc

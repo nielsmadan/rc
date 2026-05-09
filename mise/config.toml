@@ -7,6 +7,8 @@ bun = "1.3.9"
 go = "1.25.3"
 fzf = "0.59.0"
 pnpm = "latest"
+sops = "latest"
+age = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
