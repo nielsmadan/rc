@@ -153,7 +153,7 @@ export SOPS_EDITOR=nvim
 # sops re-tokenizes via the shell, NOT a `--`-separated argv. We use
 # `printf '%q '` to shell-quote each user-supplied arg so prompts with spaces
 # (`claude -p "tell me about cats"`) survive the round-trip.
-SOPS_SECRETS="$HOME/rc/secrets/secrets.yaml"
+SOPS_SECRETS="$HOME/.config/sops/secrets.yaml"
 claude()   { sops exec-env "$SOPS_SECRETS" "claude $(printf '%q ' "$@")"; }
 codex()    { sops exec-env "$SOPS_SECRETS" "codex $(printf '%q ' "$@")"; }
 gemini()   { sops exec-env "$SOPS_SECRETS" "gemini $(printf '%q ' "$@")"; }
