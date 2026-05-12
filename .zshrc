@@ -130,6 +130,10 @@ alias rc="cd ~/rc"
 alias srcz="source ~/.zshrc"
 alias zshrc="mvim ~/.zshrc"
 
+# Inside kitty, route ssh through the kitten so xterm-kitty terminfo gets
+# installed on the remote — otherwise prompt redraws produce garbled output.
+[[ "$TERM" == "xterm-kitty" ]] && alias ssh="kitten ssh"
+
 # AI tools (Claude, etc.) — legacy plain-env source. Migrate each key into
 # secrets/secrets.yaml (via `sops edit`), then remove the corresponding
 # `export` line from ~/.airc so it's not also in shell env.
