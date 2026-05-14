@@ -9,6 +9,10 @@ fzf = "0.59.0"
 pnpm = "latest"
 sops = "latest"
 age = "latest"
+"npm:@agentclientprotocol/claude-agent-acp" = "latest"
+"npm:agent-browser" = "latest"
+"npm:firebase-tools" = "latest"
+"npm:wrangler" = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]

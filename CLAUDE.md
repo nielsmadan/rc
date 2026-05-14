@@ -86,6 +86,8 @@ Or `launchctl kickstart gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18`.
 
 `mise/config.toml` (symlinked to `~/.config/mise/config.toml`) pins node/ruby/python/java/bun/go/fzf/pnpm/sops/age. `mise activate` is hooked in `.zshrc`.
 
+Global npm CLIs are managed through mise's `npm:` backend (`npm:wrangler`, `npm:firebase-tools`, `npm:agent-browser`, `npm:@agentclientprotocol/claude-agent-acp`) so they survive `node` version bumps and stay reproducible. Add new ones with `mise use -g npm:<pkg>` rather than `npm install -g`. `claude-agent-acp` is load-bearing — it's the ACP bridge `nvim/lua/plugins/ai.lua`'s CodeCompanion `claude_code` adapter spawns.
+
 ## Secrets management
 
 Dev API keys (e.g. `JINA_API_KEY`) live in `secrets/secrets.yaml` in this repo, encrypted with [SOPS](https://github.com/getsops/sops) using [age](https://github.com/FiloSottile/age) recipients. Each Mac has its own age identity at `~/.config/sops/age/keys.txt` (mode 600); the corresponding **public** keys are listed in `.sops.yaml` at the repo root. The encrypted file is safe to commit — that's the whole point.
