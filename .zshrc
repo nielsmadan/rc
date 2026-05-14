@@ -10,6 +10,9 @@ export ZSH="$HOME/.oh-my-zsh"
 # Path for Android SDK
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 
+# Keep brew auto-update, but silence the env-hint footer it prints
+export HOMEBREW_NO_ENV_HINTS=1
+
 # Add various tools to the PATH
 export PATH="$PATH:$ANDROID_HOME/emulator"
 export PATH="$PATH:$ANDROID_HOME/tools"
