@@ -42,7 +42,6 @@ link .vimrc          ~/.vimrc
 link .gvimrc         ~/.gvimrc
 link .vim            ~/.vim
 link .gitconfig      ~/.gitconfig
-link .gitignore      ~/.gitignore
 link .zshrc          ~/.zshrc
 link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
