@@ -137,8 +137,8 @@ windowMode:bind({}, "s", function() leaveAll(); place(1 / 2, 0, 1 / 2, 1)() end)
 windowMode:bind({}, "h", function() leaveAll(); homeAllManagedWindows() end)
 -- ──────────────────────────────────────────────────────────────────────
 
--- Reload on save of any .lua under ~/.hammerspoon
-hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", function(files)
+-- Reload on save of any .lua under ~/.hammerspoon.
+local configWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", function(files)
   for _, f in ipairs(files) do
     if f:match("%.lua$") then hs.reload(); return end
   end
@@ -369,13 +369,13 @@ end
 -- Subscribing to windowCreated/windowTitleChanged caused a feedback loop
 -- with iTerm2: setFrame → iTerm2 snaps to char grid → prompt redraws →
 -- OSC title escape → windowTitleChanged → setFrame → ... ad infinitum.
-hs.caffeinate.watcher.new(function(event)
+local wakeWatcher = hs.caffeinate.watcher.new(function(event)
   if event == hs.caffeinate.watcher.systemDidWake then
     homeAllManagedWindows()
   end
 end):start()
 
-hs.screen.watcher.new(function()
+local screenWatcher = hs.screen.watcher.new(function()
   local names = {}
   for _, s in ipairs(hs.screen.allScreens()) do
     table.insert(names, s:name())
