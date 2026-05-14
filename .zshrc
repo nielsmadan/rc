@@ -66,9 +66,6 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 #  Tool & Language Version Managers (mise)
 # ---------------------------------------------------------------------------
 
-# Rust / Cargo
-. "$HOME/.cargo/env"
-
 # mise
 eval "$(mise activate zsh)"
 
@@ -215,7 +212,7 @@ prompt pure
 
 ## [Completion]
 ## Completion scripts setup. Remove the following line to uninstall
-[[ -f /Users/nielsmadan/.dart-cli-completion/zsh-config.zsh ]] && . /Users/nielsmadan/.dart-cli-completion/zsh-config.zsh || true
+[[ -f "$HOME/.dart-cli-completion/zsh-config.zsh" ]] && . "$HOME/.dart-cli-completion/zsh-config.zsh" || true
 ## [/Completion]
 
 set_tab_title() {
@@ -226,4 +223,4 @@ precmd_functions+=(set_tab_title)
 
 
 # opencode
-export PATH=/Users/nielsmadan/.opencode/bin:$PATH
+export PATH="$HOME/.opencode/bin:$PATH"
