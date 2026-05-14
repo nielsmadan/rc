@@ -48,14 +48,14 @@ The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` refe
 
 ### Per-machine config: `hammerspoon/local.lua`
 
-`MAIN_SCREEN_NAME`, `APP_PLACEMENTS`, and `WINDOW_RULES` are **not** in `init.lua` — they live in `hammerspoon/local.lua`, which is **gitignored** (each machine has its own). `init.lua` exposes the placement helpers (`centeredWithMargin`, `leftDock(width)`, `bottomThird`) to the local file via a `helpers` argument; the local file returns the per-machine config table.
+`MAIN_SCREEN_NAME`, `APP_PLACEMENTS`, and `WINDOW_RULES` are **not** in `init.lua` — they live in `hammerspoon/local.lua`, which is **gitignored** (each machine has its own). `init.lua` exposes the placement helpers (`centeredWithMargin`, `leftDock(width)`, `rightOf(width)`, the `topThird`/`middleThird`/`bottomThird` and `topHalf`/`bottomHalf`/`leftHalf`/`rightHalf` family) to the local file via a `helpers` argument; the local file returns the per-machine config table.
 
 `install.sh` writes an empty stub at `hammerspoon/local.lua` if one doesn't exist, so a fresh install never errors on a missing file. The stub is a no-op that returns empty config — edit it (or copy from `local.lua.example` for a starting point) to enable auto-placement on this machine.
 
 If `local.lua` is missing, the homing logic silently no-ops (the F18 modal still works fine). If `local.lua` has a runtime error, an `hs.alert` shows it on reload.
 
 Adding a managed window in `local.lua`:
-- **By app**: append to `app_placements`. Reuse `h.centeredWithMargin` / `h.leftDock(width)` / `h.bottomThird`, or write a new placement function (takes the screen frame `sf`, returns `{x, y, w, h}`).
+- **By app**: append to `app_placements`. Reuse a built-in helper (`h.centeredWithMargin`, `h.leftDock(width)`, `h.rightOf(width)`, `h.topThird`/`h.middleThird`/`h.bottomThird`, `h.topHalf`/`h.bottomHalf`, `h.leftHalf`/`h.rightHalf`), or write a new placement function (takes the screen frame `sf`, returns `{x, y, w, h}`).
 - **By window title**: append to `window_rules`. Mark the target window's title (in iTerm2: Cmd+I → Window Title; in any shell: `echo -ne "\033]0;config\007"`) so it matches your `titlePattern`.
 
 App names are matched exactly via `app:name()` (no Xcode-vs-Code fuzzy collisions). Screen names need exact matches too — every screen-config change posts an `hs.alert` listing connected screen names so you can copy the right one in. Project convention: "vertical" = stacked rows, "horizontal" = side-by-side columns (opposite of CSS/Moom).

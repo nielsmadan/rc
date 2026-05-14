@@ -170,8 +170,43 @@ local function leftDock(width)
   end
 end
 
+-- The region to the right of a left dock of the given width — full height,
+-- fills the remaining width. Pair with leftDock(width) to tile a screen.
+local function rightOf(width)
+  return function(sf)
+    return { x = sf.x + width, y = sf.y, w = sf.w - width, h = sf.h }
+  end
+end
+
+-- Vertical thirds (stacked rows) — full width, 1/3 height.
+local function topThird(sf)
+  return { x = sf.x, y = sf.y, w = sf.w, h = sf.h / 3 }
+end
+
+local function middleThird(sf)
+  return { x = sf.x, y = sf.y + sf.h / 3, w = sf.w, h = sf.h / 3 }
+end
+
 local function bottomThird(sf)
   return { x = sf.x, y = sf.y + sf.h * 2 / 3, w = sf.w, h = sf.h / 3 }
+end
+
+-- Vertical halves (stacked rows) — full width, 1/2 height.
+local function topHalf(sf)
+  return { x = sf.x, y = sf.y, w = sf.w, h = sf.h / 2 }
+end
+
+local function bottomHalf(sf)
+  return { x = sf.x, y = sf.y + sf.h / 2, w = sf.w, h = sf.h / 2 }
+end
+
+-- Horizontal halves (side-by-side cols) — 1/2 width, full height.
+local function leftHalf(sf)
+  return { x = sf.x, y = sf.y, w = sf.w / 2, h = sf.h }
+end
+
+local function rightHalf(sf)
+  return { x = sf.x + sf.w / 2, y = sf.y, w = sf.w / 2, h = sf.h }
 end
 
 -- Load ~/.hammerspoon/local.lua for per-machine MAIN_SCREEN_NAME,
@@ -196,7 +231,14 @@ end
 local localCfg = loadLocalConfig({
   centeredWithMargin = centeredWithMargin,
   leftDock           = leftDock,
+  rightOf            = rightOf,
+  topThird           = topThird,
+  middleThird        = middleThird,
   bottomThird        = bottomThird,
+  topHalf            = topHalf,
+  bottomHalf         = bottomHalf,
+  leftHalf           = leftHalf,
+  rightHalf          = rightHalf,
 })
 
 local MAIN_SCREEN_NAME = localCfg.main_screen     or ""
@@ -212,18 +254,12 @@ local function ruleMatches(rule, win)
   return true
 end
 
--- Neovide (winit-based) only honors AX setFrame on the focused window —
--- macOS clamps the request otherwise. So we focus briefly, setFrame, then
--- continue. The same dance is harmless for other apps.
-local function applyPlacement(win, screen, placement, done)
-  if not screen or not placement then return done() end
-  local frame = placement(screen:frame())
-  win:focus()
-  hs.timer.doAfter(0.05, function()
-    if win:isStandard() then win:setFrame(frame) end
-    hs.timer.doAfter(0.05, done)
-  end)
-end
+-- Apps that ignore AX setFrame unless their window is focused (winit-based —
+-- macOS clamps the request otherwise). Their windows need the focus → setFrame
+-- dance in Phase 2 of homeAllManagedWindows; every other app is placed
+-- instantly and in parallel. Add an app here if its windows don't land on a
+-- re-home.
+local FOCUS_TO_PLACE = { Neovide = true }
 
 -- Resolve which (screen, placement) to use for a given window — first
 -- matching WINDOW_RULES wins; otherwise fall back to APP_PLACEMENTS on
@@ -240,14 +276,6 @@ local function resolvePlacement(win)
   return nil, nil
 end
 
-local function moveToMain(win, done)
-  done = done or function() end
-  if not win or not win:isStandard() then return done() end
-  local screen, placement = resolvePlacement(win)
-  if not screen or not placement then return done() end
-  applyPlacement(win, screen, placement, done)
-end
-
 -- Union of APP_PLACEMENTS keys and WINDOW_RULES app names. Both the
 -- window filter (event subscription) and homeAllManagedWindows (initial /
 -- screen-change pass) iterate this list.
@@ -262,16 +290,20 @@ do
   end
 end
 
--- Iterate managed windows sequentially — each window's focus+setFrame must
--- complete before the next begins, otherwise concurrent `focus()` calls
--- race and only the last app's window actually moves.
+-- Re-home every managed window in two phases:
+--   1. Native apps — placed instantly and in parallel in one synchronous
+--      pass (no focus, no per-window timers). setFrameCorrectness off +
+--      0 duration = a single immediate AX set: no retry jitter, no slide.
+--   2. FOCUS_TO_PLACE apps — only honor setFrame on the focused window, so
+--      these get focus → setFrame, sequenced (concurrent focus() calls
+--      race) and async (so Phase 1 stays instant). Usually 0-1 windows.
 function homeAllManagedWindows()
   -- Build a name → true set for O(1) exact matching. We can't use
   -- hs.application.get(name) here: it only takes one arg (the second,
   -- "exact", is silently dropped) and dispatches a substring search,
   -- so "Code" would also match "Xcode", and the empty-result/window-
   -- fallback path can return non-application objects that lack
-  -- :allWindows (which crashed line 271).
+  -- :allWindows.
   local wanted = {}
   for _, name in ipairs(managedAppNames) do wanted[name] = true end
 
@@ -285,13 +317,45 @@ function homeAllManagedWindows()
     end
   end
 
+  -- Phase 1 — instant, parallel placement for everything that doesn't need
+  -- focus; FOCUS_TO_PLACE windows are deferred to Phase 2.
+  local deferred = {}
+  local correctness = hs.window.setFrameCorrectness
+  hs.window.setFrameCorrectness = false
+  for _, win in ipairs(windows) do
+    if win:isStandard() then
+      local screen, placement = resolvePlacement(win)
+      if screen and placement then
+        local frame = placement(screen:frame())
+        local app = win:application()
+        if app and FOCUS_TO_PLACE[app:name()] then
+          deferred[#deferred + 1] = { win = win, frame = frame }
+        else
+          win:setFrame(frame, 0)
+        end
+      end
+    end
+  end
+  hs.window.setFrameCorrectness = correctness
+
+  -- Phase 2 — focus → setFrame for winit-based apps, one window at a time.
+  if #deferred == 0 then return end
   local prev = hs.window.focusedWindow()
   local function step(i)
-    if i > #windows then
+    if i > #deferred then
       if prev and prev:isStandard() then prev:focus() end
       return
     end
-    moveToMain(windows[i], function() step(i + 1) end)
+    local d = deferred[i]
+    if d.win:isStandard() then
+      d.win:focus()
+      hs.timer.doAfter(0.05, function()
+        if d.win:isStandard() then d.win:setFrame(d.frame, 0) end
+        hs.timer.doAfter(0.05, function() step(i + 1) end)
+      end)
+    else
+      step(i + 1)
+    end
   end
   step(1)
 end
