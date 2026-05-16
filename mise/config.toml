@@ -13,6 +13,7 @@ age = "latest"
 "npm:@agentclientprotocol/claude-agent-acp" = "latest"
 "npm:agent-browser" = "latest"
 "npm:firebase-tools" = "latest"
+"npm:rn-logs-cli" = "latest"
 "npm:wrangler" = "latest"
 
 [settings]
