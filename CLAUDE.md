@@ -35,6 +35,8 @@ The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` refe
 
 `.gitconfig` wires Neovide as both `diff.tool` and `merge.tool`. The custom `git d` / `git d1` / `git dc` aliases launch `neovide --no-fork -c DiffviewOpen ...` for whole-repo diffs (no args) or fall through to per-file `git difftool` (with args). Editor for commit messages is `mvim -f`.
 
+The global gitignore lives at `git/ignore` in this repo, symlinked to `~/.config/git/ignore` (git's XDG default — no `core.excludesfile` setting is needed in `.gitconfig`). It's the *global* excludes file, applied to every repo on this machine. **Distinct from the repo's own `.gitignore`** at the root, which only ignores machine-local files within this repo (vim plugins, `hammerspoon/local.lua`, etc.). Don't conflate them — a prior misstep (commit `0c39b43`) symlinked the repo's `.gitignore` to `~/.gitignore` and had to be reverted.
+
 ## Hammerspoon
 
 `hammerspoon/init.lua` is symlinked to `~/.hammerspoon/init.lua`. The config auto-reloads on save via `hs.pathwatcher`. Two responsibilities:

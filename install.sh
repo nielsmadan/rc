@@ -47,6 +47,7 @@ link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
 link nvim            ~/.config/nvim
 link mise/config.toml ~/.config/mise/config.toml
+link git/ignore      ~/.config/git/ignore
 link secrets/secrets.yaml ~/.config/sops/secrets.yaml
 link hammerspoon     ~/.hammerspoon
 link iterm2/SaveWindowArrangement.py "$HOME/Library/Application Support/iTerm2/Scripts/SaveWindowArrangement.py"
