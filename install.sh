@@ -45,6 +45,7 @@ link .gitconfig      ~/.gitconfig
 link .zshrc          ~/.zshrc
 link .devrc          ~/.devrc
 link kitty.conf      ~/.config/kitty/kitty.conf
+link wezterm.lua     ~/.config/wezterm/wezterm.lua
 link nvim            ~/.config/nvim
 link mise/config.toml ~/.config/mise/config.toml
 link git/ignore      ~/.config/git/ignore
