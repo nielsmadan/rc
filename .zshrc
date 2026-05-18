@@ -132,7 +132,13 @@ alias zshrc="mvim ~/.zshrc"
 
 # Inside kitty, route ssh through the kitten so xterm-kitty terminfo gets
 # installed on the remote — otherwise prompt redraws produce garbled output.
-[[ "$TERM" == "xterm-kitty" ]] && alias ssh="kitten ssh"
+# Same idea for iTerm2: it2ssh ships shell integration + terminfo to the remote.
+# WezTerm uses TERM=xterm-256color by default, so no wrapper needed.
+if [[ "$TERM" == "xterm-kitty" ]]; then
+  alias ssh="kitten ssh"
+elif [[ "$LC_TERMINAL" == "iTerm2" ]] && command -v it2ssh >/dev/null 2>&1; then
+  alias ssh="it2ssh"
+fi
 
 # AI tools (Claude, etc.) — legacy plain-env source. Migrate each key into
 # secrets/secrets.yaml (via `sops edit`), then remove the corresponding
