@@ -134,7 +134,7 @@ alias zshrc="mvim ~/.zshrc"
 # installed on the remote — otherwise prompt redraws produce garbled output.
 # Same idea for iTerm2: it2ssh ships shell integration + terminfo to the remote.
 # WezTerm uses TERM=xterm-256color by default, so no wrapper needed.
-if [[ "$TERM" == "xterm-kitty" ]]; then
+if [[ "$TERM" == "xterm-kitty" ]] && command -v kitten >/dev/null 2>&1; then
   alias ssh="kitten ssh"
 elif [[ "$LC_TERMINAL" == "iTerm2" ]] && command -v it2ssh >/dev/null 2>&1; then
   alias ssh="it2ssh"
