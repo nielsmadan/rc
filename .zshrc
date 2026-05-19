@@ -163,19 +163,31 @@ export SOPS_EDITOR=nvim
 # sops re-tokenizes via the shell, NOT a `--`-separated argv. We use
 # `printf '%q '` to shell-quote each user-supplied arg so prompts with spaces
 # (`claude -p "tell me about cats"`) survive the round-trip.
+#
+# If sops, the secrets file, or the age identity is missing on this machine,
+# fall through to the bare command — useful on hosts that don't need the
+# dev secrets (e.g. fresh installs where you just want mvim/nvim to work).
 SOPS_SECRETS="$HOME/.config/sops/secrets.yaml"
-claude()   { sops exec-env "$SOPS_SECRETS" "claude $(printf '%q ' "$@")"; }
-codex()    { sops exec-env "$SOPS_SECRETS" "codex $(printf '%q ' "$@")"; }
-gemini()   { sops exec-env "$SOPS_SECRETS" "gemini $(printf '%q ' "$@")"; }
-opencode() { sops exec-env "$SOPS_SECRETS" "opencode $(printf '%q ' "$@")"; }
+_sops_exec() {
+  local cmd=$1; shift
+  if command -v sops >/dev/null 2>&1 && [ -f "$SOPS_SECRETS" ] && [ -f "$SOPS_AGE_KEY_FILE" ]; then
+    sops exec-env "$SOPS_SECRETS" "$cmd $(printf '%q ' "$@")"
+  else
+    command "$cmd" "$@"
+  fi
+}
+claude()   { _sops_exec claude   "$@"; }
+codex()    { _sops_exec codex    "$@"; }
+gemini()   { _sops_exec gemini   "$@"; }
+opencode() { _sops_exec opencode "$@"; }
 
 # Editor wrappers — codecompanion.nvim reads CLAUDE_CODE_OAUTH_TOKEN from
 # env, so nvim/mvim/neovide need the secrets injected too. The existing
 # `m` / `n` aliases (mvim, neovide &) keep working: they expand to the
 # function name, then the function runs.
-nvim()    { sops exec-env "$SOPS_SECRETS" "nvim $(printf '%q ' "$@")"; }
-mvim()    { sops exec-env "$SOPS_SECRETS" "mvim $(printf '%q ' "$@")"; }
-neovide() { sops exec-env "$SOPS_SECRETS" "neovide $(printf '%q ' "$@")"; }
+nvim()    { _sops_exec nvim    "$@"; }
+mvim()    { _sops_exec mvim    "$@"; }
+neovide() { _sops_exec neovide "$@"; }
 
 alias sec="sops edit $SOPS_SECRETS"
 
