@@ -4,6 +4,7 @@ call plug#begin("~/.vim/plugged")
 Plug 'tpope/vim-repeat'
 Plug 'tpope/vim-eunuch'
 Plug 'tpope/vim-dispatch'
+Plug 'tpope/vim-commentary'
 
 Plug 'andymass/vim-matchup'
 Plug 'ap/vim-css-color'

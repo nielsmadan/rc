@@ -141,6 +141,13 @@ Note: `<space>` is literal space, not leader.
 |---|---|---|
 | `<leader>f` | n | Toggle `ale_fix_on_save` (overrides CoC's `<leader>f` in normal mode) |
 
+## Commentary
+
+| Key | Mode | Action |
+|---|---|---|
+| `gc` | n/v | Toggle comment (motion in normal, selection in visual) |
+| `gcc` | n | Toggle comment on current line |
+
 ## Goyo
 
 | Key | Mode | Action |
