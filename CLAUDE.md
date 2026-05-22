@@ -82,7 +82,9 @@ Or `launchctl kickstart gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18`.
 
 ## iTerm2
 
-`iterm2/` holds a dynamic profile (symlinked into `~/Library/Application Support/iTerm2/DynamicProfiles/`), a colorscheme (`rc.itermcolors`, imported manually inside iTerm2), and `SaveWindowArrangement.py` (symlinked into iTerm2's Scripts dir).
+`iterm2/` holds a dynamic profile (symlinked into `~/Library/Application Support/iTerm2/DynamicProfiles/`), a colorscheme (`rc.itermcolors`, imported manually inside iTerm2), and `SaveWindowArrangement.py`.
+
+`SaveWindowArrangement.py` is symlinked into iTerm2's `Scripts/AutoLaunch/` dir, so it runs as a long-lived daemon at iTerm2 startup. It does two things: (1) registers the `save_window_arrangement` RPC, bound to **Cmd+S** via a key mapping in `dynamic-profile.json` (action `60` = "Invoke Script Function") — on an untitled window it prompts for a name, sets that as the window title, then saves; (2) auto-saves any window that has a title set, re-saving its named arrangement (name = the title) on a debounce whenever it changes. A window is "known"/auto-saved **iff it has an iTerm2 window title** — the same titles used for Hammerspoon `WINDOW_RULES`. Untitled windows are ignored. Changing the RPC name or the Cmd+S binding means editing both the script and `dynamic-profile.json` in lockstep.
 
 `install.sh` also writes two iTerm2 `defaults` (default-profile GUID + 10% inactive-pane dimming) — but **only when iTerm2 is not running**. iTerm2 flushes its in-memory prefs to disk on quit and would clobber any `defaults write` made while it was open. If install reports `skip iTerm2 defaults`, quit iTerm2 and re-run `install.sh`.
 

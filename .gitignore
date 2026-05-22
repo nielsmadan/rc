@@ -7,3 +7,4 @@
 nvim/lazy-lock.json
 hammerspoon/local.lua
 install.local
+__pycache__/

@@ -93,7 +93,11 @@ link mise             mise/config.toml ~/.config/mise/config.toml
 link gitignore        git/ignore       ~/.config/git/ignore
 link secrets          secrets/secrets.yaml ~/.config/sops/secrets.yaml
 link hammerspoon      hammerspoon      ~/.hammerspoon
-link iterm2-savewindow iterm2/SaveWindowArrangement.py "$HOME/Library/Application Support/iTerm2/Scripts/SaveWindowArrangement.py"
+# SaveWindowArrangement.py runs as an AutoLaunch daemon (auto-saves window
+# arrangements + registers the Cmd+S RPC). Drop the pre-daemon manual-script
+# symlink from the plain Scripts dir if a prior install left one there.
+rm -f "$HOME/Library/Application Support/iTerm2/Scripts/SaveWindowArrangement.py"
+link iterm2-savewindow iterm2/SaveWindowArrangement.py "$HOME/Library/Application Support/iTerm2/Scripts/AutoLaunch/SaveWindowArrangement.py"
 link iterm2-profile   iterm2/dynamic-profile.json     "$HOME/Library/Application Support/iTerm2/DynamicProfiles/rc.json"
 
 # LaunchAgent: hidutil remap of Caps Lock → F18 (used by Hammerspoon as

@@ -25,6 +25,11 @@
           "Action": 19,
           "Text": "",
           "Label": "Select Split Pane Right"
+        },
+        "0x73-0x100000-0x1": {
+          "Action": 60,
+          "Text": "save_window_arrangement()",
+          "Label": "Save Window Arrangement"
         }
       },
       "Ansi 0 Color": {
