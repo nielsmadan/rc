@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Personal dotfiles for macOS. `install.sh` symlinks files from this repo into `$HOME` (and a few other places like `~/.config/nvim`, `~/.config/kitty`, iTerm2's scripts dir). Editing a file here = editing the live config. Re-running `install.sh` is idempotent.
 
+## Per-machine install skip list (`install.local`)
+
+Every `link` call in `install.sh` carries a short **alias** as its first argument (`gitignore`, `zshrc`, `nvim`, …). `install.local` (repo root, **gitignored**, one alias per line) is a per-machine opt-out: an uncommented alias means `install.sh` skips that target — it won't re-link it, and if the destination is currently a symlink into this repo it's **detached** into a real machine-local copy (`cp -R`) so it can be edited without affecting the repo. Re-comment the line to hand the target back to the repo symlink on the next run.
+
+`install.sh` generates `install.local` on first run (at the end, after every `link` call) with all aliases listed but commented out, so the default file skips nothing. The alias list is single-sourced: `link()` appends each alias to a `SEEN_KEYS` array, and the stub is built from that — no separate hardcoded list to keep in sync. **When adding or removing a `link` call, just give it an alias; the stub updates itself.**
+
 ## Two editor configs coexist
 
 This repo maintains **both** a legacy Vim config and a modern Neovim config in parallel — they are not migrating from one to the other.
