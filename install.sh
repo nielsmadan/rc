@@ -98,6 +98,7 @@ link hammerspoon      hammerspoon      ~/.hammerspoon
 # symlink from the plain Scripts dir if a prior install left one there.
 rm -f "$HOME/Library/Application Support/iTerm2/Scripts/SaveWindowArrangement.py"
 link iterm2-savewindow iterm2/SaveWindowArrangement.py "$HOME/Library/Application Support/iTerm2/Scripts/AutoLaunch/SaveWindowArrangement.py"
+link iterm2-clonetab  iterm2/CloneRepoToTab.py        "$HOME/Library/Application Support/iTerm2/Scripts/AutoLaunch/CloneRepoToTab.py"
 link iterm2-profile   iterm2/dynamic-profile.json     "$HOME/Library/Application Support/iTerm2/DynamicProfiles/rc.json"
 
 # LaunchAgent: hidutil remap of Caps Lock → F18 (used by Hammerspoon as

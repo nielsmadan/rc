@@ -30,6 +30,11 @@
           "Action": 60,
           "Text": "save_window_arrangement()",
           "Label": "Save Window Arrangement"
+        },
+        "0x6e-0x140000-0x2d": {
+          "Action": 60,
+          "Text": "clone_repo_to_tab()",
+          "Label": "Clone Repo to New Tab"
         }
       },
       "Ansi 0 Color": {
