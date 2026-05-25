@@ -2,6 +2,7 @@ creation_rules:
   - path_regex: secrets/secrets\.ya?ml$
     age: >-
       age1g22zadurycv2jl0a4pl8ye53rqpxxktnscmgmhxwpk90kaf5qsystgmq39,
-      age15cwvfwf2z878szwt0q42e73mfcefh96mnylewhh5u5gmlvst45pqvus373
+      age15cwvfwf2z878szwt0q42e73mfcefh96mnylewhh5u5gmlvst45pqvus373,
+      age1hkdzwlcdfweyrqhy4xt94mg2rgzyds4ur30phyjnn24yy7zuz35qv3yazu
   - path_regex: secrets/secrets-mini\.ya?ml$
     age: age15cwvfwf2z878szwt0q42e73mfcefh96mnylewhh5u5gmlvst45pqvus373
