@@ -240,6 +240,20 @@
         "Green Component": 0.77888023853302,
         "Red Component": 0.6319507956504822
       }
+    },
+    {
+      "Name": "ssh: mini",
+      "Guid": "rc-ssh-mini",
+      "Dynamic Profile Parent Name": "rc",
+      "Custom Command": "Yes",
+      "Command": "ssh mini"
+    },
+    {
+      "Name": "ssh: barney",
+      "Guid": "rc-ssh-barney",
+      "Dynamic Profile Parent Name": "rc",
+      "Custom Command": "Yes",
+      "Command": "ssh barney"
     }
   ]
 }

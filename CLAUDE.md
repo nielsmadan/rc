@@ -109,6 +109,7 @@ Why this setup: API keys must not sit in long-lived shell env, because Claude Co
 Architecture:
 - **`.sops.yaml`** (repo root) — SOPS creation rules. Lists allowed age recipients (public keys, one per Mac). Plaintext, committed.
 - **`secrets/secrets.yaml`** (repo) — encrypted YAML. Variable names are visible (diff-friendly); values are AES-256-GCM ciphertext, decryptable only by listed recipients. Committed.
+- **`secrets/secrets-mini.yaml`** (repo) — encrypted YAML scoped to the Mac mini only (its recipient list in `.sops.yaml` is deliberately limited to the mini's age key). Holds secrets that should not exist on any other machine. When adding a new Mac to `.sops.yaml`, **do not** add it as a recipient of `secrets-mini.yaml` — leave that file's recipient list alone.
 - **`SOPS_AGE_KEY_FILE`** — env var set in `.zshrc` to `~/.config/sops/age/keys.txt`. macOS' default location for SOPS is `~/Library/Application Support/sops/age/keys.txt` (path with spaces); we use the cleaner XDG location.
 - **CLI wrappers** in `.zshrc` (`claude`, `codex`, `gemini`) invoke each tool via `sops exec-env "$SOPS_SECRETS" --` so keys land only in that subprocess.
 - **HTTP-based MCP servers** (e.g. Jina, Todoist) in `~/.claude.json` use `${ENV_VAR}` headers; Claude Code interpolates those at startup. Since our `claude` wrapper goes through `sops exec-env`, Claude Code receives the env var. The parent shell does not.
