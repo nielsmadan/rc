@@ -21,6 +21,7 @@ lefthook = "latest"
 "npm:firebase-tools" = "latest"
 "npm:rn-logs-cli" = "latest"
 "npm:wrangler" = "latest"
+"github:stripe/stripe-cli" = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
