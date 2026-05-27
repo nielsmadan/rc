@@ -109,5 +109,57 @@ class TestComputeDestination(unittest.TestCase):
         )
 
 
+def touch(path: str):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w"):
+        pass
+
+
+class TestFindEnvFiles(unittest.TestCase):
+    def test_empty_repo_returns_empty_list(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(lib.find_env_files(d), [])
+
+    def test_root_env_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, ".env"))
+            self.assertEqual(lib.find_env_files(d), [".env"])
+
+    def test_nested_env_files_sorted(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, ".env"))
+            touch(os.path.join(d, "server", ".env"))
+            touch(os.path.join(d, "apps", "web", ".env"))
+            self.assertEqual(
+                lib.find_env_files(d),
+                [".env", "apps/web/.env", "server/.env"],
+            )
+
+    def test_skips_git_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, ".git", ".env"))
+            touch(os.path.join(d, ".env"))
+            self.assertEqual(lib.find_env_files(d), [".env"])
+
+    def test_skips_node_modules(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, "node_modules", "pkg", ".env"))
+            touch(os.path.join(d, "server", ".env"))
+            self.assertEqual(lib.find_env_files(d), ["server/.env"])
+
+    def test_skips_virtualenvs_and_pycache(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, ".venv", ".env"))
+            touch(os.path.join(d, "venv", ".env"))
+            touch(os.path.join(d, "__pycache__", ".env"))
+            self.assertEqual(lib.find_env_files(d), [])
+
+    def test_does_not_match_env_prefix_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, ".env.local"))
+            touch(os.path.join(d, ".envrc"))
+            self.assertEqual(lib.find_env_files(d), [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3,11 +3,12 @@
 
 Runs as an AutoLaunch script. Registers `clone_repo_to_tab`, bound to
 Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: prompt for a name,
-`git clone <origin>` to a sibling of the repo root, copy `.env` if present,
-open a new tab right of the current one with the original tab's split
+`git clone <origin>` to a sibling of the repo root, copy any `.env`
+files (root and subdirectories, mirroring their relative paths), open
+a new tab right of the current one with the original tab's split
 structure, every pane sitting in the clone root.
 
-Pure helpers (path math, git wrappers, the `.env` copy) live in
+Pure helpers (path math, git wrappers, `.env` discovery) live in
 `clone_repo_lib.py` so they can be unit-tested outside iTerm2.
 """
 
@@ -162,17 +163,28 @@ async def _do_clone_to_tab(window, tab, session):
         await new_tab.async_select()
         await root_session.async_activate()
 
-        # Shell command: clone in the visible pane, then `mise trust` and an
-        # optional `.env` copy. Chained with `&&` so each step requires the
-        # prior. `|| true` keeps the shell's exit code clean when the source
-        # has no `.env`. Tiny sleep first so the shell has finished starting
-        # before we type into it.
-        src_env = os.path.join(repo_root, ".env")
+        # Shell command: clone in the visible pane, then `mise trust`, then
+        # copy each `.env` file we found in the source repo (root and
+        # subdirectories), mirroring relative paths via `mkdir -p`. Chained
+        # with `&&` so clone/trust must succeed first. Tiny sleep so the
+        # shell has finished starting before we type into it.
+        env_files = await asyncio.to_thread(lib.find_env_files, repo_root)
+        copy_cmds = []
+        for rel in env_files:
+            src = os.path.join(repo_root, rel)
+            subdir = os.path.dirname(rel)
+            if subdir:
+                copy_cmds.append(
+                    f"mkdir -p {shlex.quote(subdir)} "
+                    f"&& cp {shlex.quote(src)} {shlex.quote(rel)}"
+                )
+            else:
+                copy_cmds.append(f"cp {shlex.quote(src)} .")
+        env_clause = (" && " + " && ".join(copy_cmds)) if copy_cmds else ""
         cmd = (
             f"git clone {shlex.quote(origin)} . "
-            f"&& mise trust . "
-            f"&& {{ [ -f {shlex.quote(src_env)} ] "
-            f"&& cp {shlex.quote(src_env)} . || true; }}"
+            f"&& mise trust ."
+            f"{env_clause}"
         )
         await asyncio.sleep(0.3)
         await root_session.async_send_text(cmd + "\n")

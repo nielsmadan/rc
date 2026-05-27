@@ -59,3 +59,22 @@ def resolve_origin_url(repo_root: str) -> "str | None":
 def compute_destination(repo_root: str, name: str) -> str:
     """Where the new clone goes: sibling of `repo_root` named `name`."""
     return os.path.join(os.path.dirname(repo_root.rstrip("/")), name)
+
+
+_ENV_SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__"}
+
+
+def find_env_files(repo_root: str) -> list:
+    """Return relative paths of every `.env` file under `repo_root`.
+
+    Walks the tree, pruning common bulky/irrelevant directories. Returned
+    paths are POSIX-relative to `repo_root` (e.g. `".env"`, `"server/.env"`),
+    sorted for stable output.
+    """
+    out = []
+    for dirpath, dirnames, filenames in os.walk(repo_root):
+        dirnames[:] = [d for d in dirnames if d not in _ENV_SKIP_DIRS]
+        if ".env" in filenames:
+            rel = os.path.relpath(dirpath, repo_root)
+            out.append(".env" if rel == "." else os.path.join(rel, ".env"))
+    return sorted(out)
