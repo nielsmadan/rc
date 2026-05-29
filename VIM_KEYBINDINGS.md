@@ -173,7 +173,8 @@ Note: `<space>` is literal space, not leader.
 | `<M-p>2` | n | `:diffput 2` |
 | `<M-p>3` | n | `:diffput 3` |
 | `<M-p><M-p>` | n | `:diffput` |
-| `<leader><C-i>` | n | `:wqall!` (force close readonly difftool) |
+| `<leader><C-i>` | n | `:wqall!` (force close readonly difftool, saving) |
+| `<leader><C-u>` | n | `:qall!` (force close readonly difftool, discarding) |
 
 ## Syntax debugging
 
