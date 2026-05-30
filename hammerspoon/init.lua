@@ -209,6 +209,11 @@ local function rightHalf(sf)
   return { x = sf.x + sf.w / 2, y = sf.y, w = sf.w / 2, h = sf.h }
 end
 
+-- Fullscreen — fills the whole screen frame.
+local function fill(sf)
+  return { x = sf.x, y = sf.y, w = sf.w, h = sf.h }
+end
+
 -- Load ~/.hammerspoon/local.lua for per-machine MAIN_SCREEN_NAME,
 -- APP_PLACEMENTS and WINDOW_RULES. Missing file = empty config, no
 -- auto-placement (modal still works). See local.lua.example for the API.
@@ -239,6 +244,7 @@ local localCfg = loadLocalConfig({
   bottomHalf         = bottomHalf,
   leftHalf           = leftHalf,
   rightHalf          = rightHalf,
+  fill               = fill,
 })
 
 local MAIN_SCREEN_NAME = localCfg.main_screen     or ""
@@ -261,18 +267,43 @@ end
 -- re-home.
 local FOCUS_TO_PLACE = { Neovide = true }
 
--- Resolve which (screen, placement) to use for a given window — first
--- matching WINDOW_RULES wins; otherwise fall back to APP_PLACEMENTS on
--- MAIN_SCREEN_NAME. Returns nil if nothing matches.
-local function resolvePlacement(win)
+-- Build the ordered candidate list {screen=name, placement=fn} for a
+-- window from its first matching WINDOW_RULE, else its APP_PLACEMENTS
+-- entry. Each config form normalizes to a list: a window_rule supplies
+-- either a `placements` list or a single screen+placement; an app entry
+-- is either a bare function (single candidate on MAIN_SCREEN_NAME) or an
+-- already-built candidate list.
+local function candidatesFor(win)
   for _, rule in ipairs(WINDOW_RULES) do
     if ruleMatches(rule, win) then
-      return findScreen(rule.screen), rule.placement
+      return rule.placements
+        or { { screen = rule.screen, placement = rule.placement } }
     end
   end
   local app = win:application()
-  local placement = app and APP_PLACEMENTS[app:name()]
-  if placement then return findScreen(MAIN_SCREEN_NAME), placement end
+  local entry = app and APP_PLACEMENTS[app:name()]
+  if not entry then return {} end
+  if type(entry) == "function" then
+    return { { screen = MAIN_SCREEN_NAME, placement = entry } }
+  end
+  return entry  -- already a candidate list
+end
+
+-- Resolve which (screen, placement) to use for a given window: the first
+-- candidate whose target screen is connected wins. A candidate with its
+-- screen omitted/"" resolves to the primary screen (always connected), so
+-- a trailing { placement = fill } acts as a catch-all fallback. Returns
+-- nil if no candidate's screen is connected.
+local function resolvePlacement(win)
+  for _, c in ipairs(candidatesFor(win)) do
+    local screen
+    if c.screen and c.screen ~= "" then
+      screen = findScreen(c.screen)        -- nil if monitor absent → try next
+    else
+      screen = hs.screen.primaryScreen()   -- catch-all
+    end
+    if screen and c.placement then return screen, c.placement end
+  end
   return nil, nil
 end
 

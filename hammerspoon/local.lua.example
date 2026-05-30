@@ -15,6 +15,7 @@
 --   h.topThird / middleThird / bottomThird — full width, 1/3 height
 --   h.topHalf / bottomHalf                 — full width, 1/2 height
 --   h.leftHalf / rightHalf                 — 1/2 width, full height
+--   h.fill                                 — fullscreen (fills the screen)
 --
 -- You can also write your own placement functions inline; each takes
 -- the target screen's frame `sf = {x, y, w, h}` (which already excludes
@@ -30,26 +31,46 @@ return function(h)
     -- per-app homing entirely.
     main_screen = "LG HDR 5K",
 
-    -- App name → placement function. Each app's windows get placed on
-    -- main_screen using the function whenever the homing pass runs.
+    -- App name → placement. Two forms:
+    --   • a bare function — placed on main_screen (the simple case).
+    --   • an ordered list of { screen, placement } candidates — the first
+    --     candidate whose monitor is connected wins. A candidate with its
+    --     screen omitted or "" targets the primary screen (always
+    --     connected), so a trailing { placement = h.fill } is a catch-all
+    --     fallback. Use this for "external monitor if present, else
+    --     fullscreen on the built-in display".
     app_placements = {
-      Neovide = h.centeredWithMargin,
       MacVim  = h.centeredWithMargin,
       Code    = h.centeredWithMargin,
       Juggler = h.leftDock(480),
+      Neovide = {
+        { screen = "LG HDR 5K", placement = h.centeredWithMargin },
+        { screen = "",          placement = h.fill },  -- "" = primary screen
+      },
     },
 
     -- Per-window rules — checked first, first match wins. Each rule:
     --   app          = exact app name
     --   titlePattern = optional Lua pattern matched against win:title()
+    -- then EITHER a single placement:
     --   screen       = exact monitor name (can differ from main_screen)
     --   placement    = function(sf) → frame
+    -- OR an ordered candidate list (same semantics as app_placements):
+    --   placements   = { { screen = …, placement = … }, … }
     window_rules = {
       {
         app          = "iTerm2",
         titlePattern = "^config",
         screen       = "LG Ultra HD",
         placement    = h.bottomThird,
+      },
+      {
+        app          = "iTerm2",
+        titlePattern = "^scratch",
+        placements   = {
+          { screen = "LG Ultra HD", placement = h.topThird },
+          { screen = "",            placement = h.fill },  -- fallback: primary
+        },
       },
     },
   }
