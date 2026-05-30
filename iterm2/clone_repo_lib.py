@@ -12,24 +12,17 @@ import subprocess
 _TRAILING_DIGITS = re.compile(r"(\d+)$")
 
 
-def _increment(name: str) -> str:
-    """Increment the trailing digit run; append '2' if there isn't one."""
-    m = _TRAILING_DIGITS.search(name)
-    if m:
-        return name[: m.start()] + str(int(m.group()) + 1)
-    return name + "2"
+def next_sibling_name(basename: str) -> str:
+    """Deterministic next sibling name: increment the trailing digit run,
+    or append '2' if there isn't one (e.g. `dev2` -> `dev3`, `rc` -> `rc2`).
 
-
-def suggest_name(basename: str, sibling_dir: str) -> str:
-    """Default name for the prompt: increment basename, skip existing siblings.
-
-    `basename` is the repo root's folder name. `sibling_dir` is the directory
-    in which the new clone will live (i.e. dirname(repo_root)).
+    Does NOT skip existing siblings — the caller decides what to do based on
+    whether the target already exists (clone into it vs. open it).
     """
-    candidate = _increment(basename)
-    while os.path.exists(os.path.join(sibling_dir, candidate)):
-        candidate = _increment(candidate)
-    return candidate
+    m = _TRAILING_DIGITS.search(basename)
+    if m:
+        return basename[: m.start()] + str(int(m.group()) + 1)
+    return basename + "2"
 
 
 def resolve_repo_root(path: str) -> "str | None":

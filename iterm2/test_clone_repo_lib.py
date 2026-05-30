@@ -31,34 +31,15 @@ def make_repo(parent: str, name: str, with_origin: bool = True) -> str:
     return path
 
 
-class TestSuggestName(unittest.TestCase):
+class TestNextSiblingName(unittest.TestCase):
     def test_no_trailing_number_appends_2(self):
-        with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(lib.suggest_name("rc", d), "rc2")
+        self.assertEqual(lib.next_sibling_name("rc"), "rc2")
 
     def test_trailing_number_increments(self):
-        with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(lib.suggest_name("app3", d), "app4")
+        self.assertEqual(lib.next_sibling_name("app3"), "app4")
 
     def test_multidigit_trailing_number_increments(self):
-        with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(lib.suggest_name("app10", d), "app11")
-
-    def test_skips_existing_sibling(self):
-        with tempfile.TemporaryDirectory() as d:
-            os.makedirs(os.path.join(d, "rc2"))
-            self.assertEqual(lib.suggest_name("rc", d), "rc3")
-
-    def test_skips_multiple_existing_siblings(self):
-        with tempfile.TemporaryDirectory() as d:
-            os.makedirs(os.path.join(d, "rc2"))
-            os.makedirs(os.path.join(d, "rc3"))
-            self.assertEqual(lib.suggest_name("rc", d), "rc4")
-
-    def test_skips_existing_when_basename_has_number(self):
-        with tempfile.TemporaryDirectory() as d:
-            os.makedirs(os.path.join(d, "app4"))
-            self.assertEqual(lib.suggest_name("app3", d), "app5")
+        self.assertEqual(lib.next_sibling_name("app10"), "app11")
 
 
 class TestResolveRepoRoot(unittest.TestCase):

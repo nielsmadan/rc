@@ -2,11 +2,12 @@
 """iTerm2 clone-repo-to-tab daemon.
 
 Runs as an AutoLaunch script. Registers `clone_repo_to_tab`, bound to
-Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: prompt for a name,
-`git clone <origin>` to a sibling of the repo root, copy any `.env`
+Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: auto-pick the next
+sibling name (current dir name + 1), confirm via an OK/Cancel dialog,
+`git clone <origin>` to that sibling of the repo root, copy any `.env`
 files (root and subdirectories, mirroring their relative paths), open
 a new tab right of the current one with the original tab's split
-structure, every pane sitting in the clone root. If the named sibling
+structure, every pane sitting in the clone root. If the sibling
 directory already exists, the clone is skipped entirely — the tab just
 opens pointed at the existing directory.
 
@@ -87,12 +88,24 @@ async def _alert(message: str):
     await iterm2.Alert("Clone repo to new tab", message).async_run(connection)
 
 
+async def _confirm(message: str) -> bool:
+    """Show an OK/Cancel modal; return True iff OK was clicked.
+
+    `Alert.async_run` returns the selected button's index + 1000, so the first
+    button ("OK") is 1000. OK is the default (Enter); Cancel maps to Esc.
+    """
+    alert = iterm2.Alert("Clone repo to new tab", message)
+    alert.add_button("OK")
+    alert.add_button("Cancel")
+    return await alert.async_run(connection) == 1000
+
+
 async def _do_clone_to_tab(window, tab, session):
     """The actual work — runs as a background task so the RPC can return fast.
 
-    iTerm2's RPC dispatcher has a short timeout; the prompt + git clone easily
-    exceed it, which shows the user a "Timeout" error even though the function
-    is still doing useful work. Decoupling fixes that.
+    iTerm2's RPC dispatcher has a short timeout; the confirm dialog + git clone
+    easily exceed it, which shows the user a "Timeout" error even though the
+    function is still doing useful work. Decoupling fixes that.
 
     The clone runs inside the new tab's main pane (typed as a shell command)
     rather than as a subprocess in this daemon, so the new tab + splits open
@@ -114,28 +127,27 @@ async def _do_clone_to_tab(window, tab, session):
             await _alert("Not a git repository.")
             return
 
-        origin = await asyncio.to_thread(lib.resolve_origin_url, repo_root)
-        if not origin:
-            await _alert("No 'origin' remote configured.")
-            return
-
-        sibling_dir = os.path.dirname(repo_root)
-        suggestion = lib.suggest_name(os.path.basename(repo_root), sibling_dir)
-
-        prompt = iterm2.TextInputAlert(
-            "Clone repo to new tab",
-            f"Clone {origin}\ninto {sibling_dir}/<name>",
-            "name",
-            suggestion,
-        )
-        name = await prompt.async_run(connection)
-        if not name:
-            return
-
+        # Auto-pick the next sibling name (current dir name + 1) — no prompt.
+        name = lib.next_sibling_name(os.path.basename(repo_root))
         dest = lib.compute_destination(repo_root, name)
         dest_exists = os.path.exists(dest)
         if dest_exists and not os.path.isdir(dest):
             await _alert(f"{name} exists at {dest} but isn't a directory.")
+            return
+
+        # Confirm via OK/Cancel, describing what will happen. An existing dir
+        # is just opened (no clone needed, so no `origin` required); a fresh
+        # name is cloned from `origin`.
+        if dest_exists:
+            origin = None
+            message = f"{dest} exists.\nOpen a new tab there (no clone)?"
+        else:
+            origin = await asyncio.to_thread(lib.resolve_origin_url, repo_root)
+            if not origin:
+                await _alert("No 'origin' remote configured.")
+                return
+            message = f"Clone {origin}\ninto {dest}"
+        if not await _confirm(message):
             return
 
         # Snapshot the original tab's layout BEFORE we touch anything.
