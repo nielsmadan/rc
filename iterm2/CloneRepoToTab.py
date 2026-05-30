@@ -6,7 +6,9 @@ Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: prompt for a name,
 `git clone <origin>` to a sibling of the repo root, copy any `.env`
 files (root and subdirectories, mirroring their relative paths), open
 a new tab right of the current one with the original tab's split
-structure, every pane sitting in the clone root.
+structure, every pane sitting in the clone root. If the named sibling
+directory already exists, the clone is skipped entirely — the tab just
+opens pointed at the existing directory.
 
 Pure helpers (path math, git wrappers, `.env` discovery) live in
 `clone_repo_lib.py` so they can be unit-tested outside iTerm2.
@@ -96,6 +98,10 @@ async def _do_clone_to_tab(window, tab, session):
     rather than as a subprocess in this daemon, so the new tab + splits open
     immediately and the user can watch clone progress. `mise trust` and the
     `.env` copy are chained after the clone so they only run on success.
+
+    When the destination directory already exists, no shell command is sent:
+    the tab opens pointed at the existing directory and nothing is cloned,
+    trusted, or copied.
     """
     try:
         path = await session.async_get_variable("path")
@@ -127,22 +133,27 @@ async def _do_clone_to_tab(window, tab, session):
             return
 
         dest = lib.compute_destination(repo_root, name)
-        if os.path.exists(dest):
-            await _alert(f"{name} already exists at {dest}.")
+        dest_exists = os.path.exists(dest)
+        if dest_exists and not os.path.isdir(dest):
+            await _alert(f"{name} exists at {dest} but isn't a directory.")
             return
 
         # Snapshot the original tab's layout BEFORE we touch anything.
         snapshot = _snapshot_tab(tab)
 
-        # Pre-create the empty dest directory so every pane's shell can cd
-        # into it via the profile customization below. Without this, the
-        # cd-on-startup would fail and shells would fall back to $HOME — the
-        # `git clone . ` typed below would then clone into the wrong place.
-        try:
-            await asyncio.to_thread(os.makedirs, dest)
-        except OSError as exc:
-            await _alert(f"Couldn't create {dest}: {exc}")
-            return
+        # For a fresh destination, pre-create the empty dir so every pane's
+        # shell can cd into it via the profile customization below. Without
+        # this, the cd-on-startup would fail and shells would fall back to
+        # $HOME — the `git clone . ` typed below would then clone into the
+        # wrong place. An already-existing dir (e.g. a sibling checkout `dev3`
+        # opened from `dev2`) is reused as-is — we skip both creation and the
+        # clone, and just open a tab pointed at it.
+        if not dest_exists:
+            try:
+                await asyncio.to_thread(os.makedirs, dest)
+            except OSError as exc:
+                await _alert(f"Couldn't create {dest}: {exc}")
+                return
 
         profile = iterm2.LocalWriteOnlyProfile()
         profile.set_custom_directory(dest)
@@ -163,31 +174,35 @@ async def _do_clone_to_tab(window, tab, session):
         await new_tab.async_select()
         await root_session.async_activate()
 
-        # Shell command: clone in the visible pane, then `mise trust`, then
-        # copy each `.env` file we found in the source repo (root and
-        # subdirectories), mirroring relative paths via `mkdir -p`. Chained
-        # with `&&` so clone/trust must succeed first. Tiny sleep so the
-        # shell has finished starting before we type into it.
-        env_files = await asyncio.to_thread(lib.find_env_files, repo_root)
-        copy_cmds = []
-        for rel in env_files:
-            src = os.path.join(repo_root, rel)
-            subdir = os.path.dirname(rel)
-            if subdir:
-                copy_cmds.append(
-                    f"mkdir -p {shlex.quote(subdir)} "
-                    f"&& cp {shlex.quote(src)} {shlex.quote(rel)}"
-                )
-            else:
-                copy_cmds.append(f"cp {shlex.quote(src)} .")
-        env_clause = (" && " + " && ".join(copy_cmds)) if copy_cmds else ""
-        cmd = (
-            f"git clone {shlex.quote(origin)} . "
-            f"&& mise trust ."
-            f"{env_clause}"
-        )
-        await asyncio.sleep(0.3)
-        await root_session.async_send_text(cmd + "\n")
+        # Only clone into a freshly-created directory. An existing dir is
+        # assumed to be a working checkout already, so we send no command —
+        # the tab just opens pointed at it.
+        if not dest_exists:
+            # Shell command: clone in the visible pane, then `mise trust`, then
+            # copy each `.env` file we found in the source repo (root and
+            # subdirectories), mirroring relative paths via `mkdir -p`. Chained
+            # with `&&` so clone/trust must succeed first. Tiny sleep so the
+            # shell has finished starting before we type into it.
+            env_files = await asyncio.to_thread(lib.find_env_files, repo_root)
+            copy_cmds = []
+            for rel in env_files:
+                src = os.path.join(repo_root, rel)
+                subdir = os.path.dirname(rel)
+                if subdir:
+                    copy_cmds.append(
+                        f"mkdir -p {shlex.quote(subdir)} "
+                        f"&& cp {shlex.quote(src)} {shlex.quote(rel)}"
+                    )
+                else:
+                    copy_cmds.append(f"cp {shlex.quote(src)} .")
+            env_clause = (" && " + " && ".join(copy_cmds)) if copy_cmds else ""
+            cmd = (
+                f"git clone {shlex.quote(origin)} . "
+                f"&& mise trust ."
+                f"{env_clause}"
+            )
+            await asyncio.sleep(0.3)
+            await root_session.async_send_text(cmd + "\n")
     except Exception as exc:
         print(f"clone_repo_to_tab error: {exc}")
 
