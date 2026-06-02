@@ -1,6 +1,7 @@
 **/.claude/settings.local.json
 **/.claude/scheduled_tasks.lock
 **/docs/superpowers/
+**/.superpowers
 **/.antigravitycli/ 
 **/.aiconf
 .DS_Store
