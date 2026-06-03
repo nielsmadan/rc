@@ -19,14 +19,13 @@ hs.window.setFrameCorrectness = true
 -- running hidutil at login (see launchd/com.nielsmadan.hidutil-...).
 -- On the Moonlander, assign any free key to F18 in Oryx.
 --
--- Sequence: F18+W → window mode, then:
---   f       = fullscreen (fill screen)
+-- Hold F18 and tap a key (chord):
+--   f       = toggle fill (press again to restore previous frame)
 --   1 / 2 / 3 = top / middle / bottom third (vertical = stacked rows)
 --   q / w   = top / bottom half (vertical = stacked rows)
 --   a / s   = left / right half (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
 --   esc     = abort
--- After F18+W the chord is released; subsequent keys are pressed plain.
 -- F18 itself is consumed (apps never see it as a literal F18 keypress).
 
 local function place(fx, fy, fw, fh)
@@ -46,16 +45,43 @@ local function place(fx, fy, fw, fh)
   end
 end
 
-local hyper      = hs.hotkey.modal.new()
-local windowMode = hs.hotkey.modal.new()
+-- F18 f toggles fill: fill the screen, or — if the window is already filled
+-- — restore whatever frame it had before. preFillFrame remembers that frame
+-- per window id. "Already filled" = within FILL_SLOP of the screen frame
+-- (iTerm2 snaps to char cells, so a filled window never lands exact), so if
+-- you've since moved the window elsewhere, f fills again instead of restoring.
+local preFillFrame = {}
+local FILL_SLOP = 20
 
--- Forward-declared so the F18+W+H binding below can call it; the actual
+local function toggleFill()
+  local win = hs.window.focusedWindow()
+  if not win or not win:isStandard() then return end
+  local id = win:id()
+  local target, f = win:screen():frame(), win:frame()
+  local filled = math.abs(f.x - target.x) <= FILL_SLOP
+     and math.abs(f.y - target.y) <= FILL_SLOP
+     and math.abs(f.w - target.w) <= FILL_SLOP
+     and math.abs(f.h - target.h) <= FILL_SLOP
+  local prev = hs.window.setFrameCorrectness
+  hs.window.setFrameCorrectness = false
+  if filled and id and preFillFrame[id] then
+    win:setFrame(preFillFrame[id], 0)
+    preFillFrame[id] = nil
+  else
+    if id then preFillFrame[id] = f end
+    win:setFrame(target, 0)
+  end
+  hs.window.setFrameCorrectness = prev
+end
+
+local hyper = hs.hotkey.modal.new()
+
+-- Forward-declared so the F18+H binding below can call it; the actual
 -- definition lives further down with the rest of the placement code.
 local homeAllManagedWindows
 
-local hint            -- current hs.alert handle (or nil)
-local hyperActive    -- true while F18 is held; guards double-enter
-local hyperConsumed  -- did the user transition to a submode while F18 held?
+local hint          -- current hs.alert handle (or nil)
+local hyperActive   -- true while F18 is held; guards double-enter
 
 -- pcall'd close — alert handles can go stale (auto-dismiss, internal
 -- close, etc.). An exception inside a hotkey callback is logged but
@@ -75,7 +101,7 @@ local function clearHint()
 end
 
 local function leaveAll()
-  hyper:exit(); windowMode:exit()
+  hyper:exit()
   clearHint()
   hyperActive = false
 end
@@ -86,45 +112,35 @@ end
 hs.hotkey.bind({}, "f18",
   function()  -- pressed
     if hyperActive then return end
-    leaveAll()  -- always start clean — clears any stale submode state
+    leaveAll()  -- always start clean
     hyperActive = true
-    hyperConsumed = false
     hyper:enter()
-    showHint("hyper: w=window  esc=cancel")
+    showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  h=home  esc=cancel")
   end,
   function()  -- released
     if not hyperActive then return end
     hyperActive = false
     hyper:exit()
-    if not hyperConsumed then clearHint() end
+    clearHint()
   end
 )
 
-hyper:bind({}, "escape",      leaveAll)
-windowMode:bind({}, "escape", leaveAll)
+hyper:bind({}, "escape", leaveAll)
 
--- hyper + W → enter window mode (and exit hyper so F18-up is harmless).
-hyper:bind({}, "w", function()
-  hyperConsumed = true
-  hyper:exit()
-  windowMode:enter()
-  showHint("window: f=fill  1/2/3=thirds  q/w=rows  a/s=cols  h=home  esc=cancel")
-end)
+hyper:bind({}, "f", function() leaveAll(); toggleFill() end)
 
-windowMode:bind({}, "f", function() leaveAll(); place(0, 0, 1, 1)() end)
+hyper:bind({}, "1", function() leaveAll(); place(0, 0,     1, 1 / 3)() end)
+hyper:bind({}, "2", function() leaveAll(); place(0, 1 / 3, 1, 1 / 3)() end)
+hyper:bind({}, "3", function() leaveAll(); place(0, 2 / 3, 1, 1 / 3)() end)
 
-windowMode:bind({}, "1", function() leaveAll(); place(0, 0,     1, 1 / 3)() end)
-windowMode:bind({}, "2", function() leaveAll(); place(0, 1 / 3, 1, 1 / 3)() end)
-windowMode:bind({}, "3", function() leaveAll(); place(0, 2 / 3, 1, 1 / 3)() end)
+hyper:bind({}, "q", function() leaveAll(); place(0, 0,     1, 1 / 2)() end)
+hyper:bind({}, "w", function() leaveAll(); place(0, 1 / 2, 1, 1 / 2)() end)
 
-windowMode:bind({}, "q", function() leaveAll(); place(0, 0,     1, 1 / 2)() end)
-windowMode:bind({}, "w", function() leaveAll(); place(0, 1 / 2, 1, 1 / 2)() end)
-
-windowMode:bind({}, "a", function() leaveAll(); place(0,     0, 1 / 2, 1)() end)
-windowMode:bind({}, "s", function() leaveAll(); place(1 / 2, 0, 1 / 2, 1)() end)
+hyper:bind({}, "a", function() leaveAll(); place(0,     0, 1 / 2, 1)() end)
+hyper:bind({}, "s", function() leaveAll(); place(1 / 2, 0, 1 / 2, 1)() end)
 
 -- Manual re-home: same placement pass that fires on screen change / wake.
-windowMode:bind({}, "h", function() leaveAll(); homeAllManagedWindows() end)
+hyper:bind({}, "h", function() leaveAll(); homeAllManagedWindows() end)
 -- ──────────────────────────────────────────────────────────────────────
 
 -- Reload on save of any .lua under ~/.hammerspoon.
