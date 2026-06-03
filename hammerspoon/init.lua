@@ -80,13 +80,9 @@ local function leaveAll()
   hyperActive = false
 end
 
--- F18 down/up via hs.hotkey.bind (Carbon RegisterEventHotKey) rather
--- than hs.eventtap. CGEventTaps are silently disabled by macOS on
--- timeout / Lua exception / Secure Input latching after sleep/wake,
--- with no exposed auto-recovery; that's what was making the modal
--- "stop working" mid-session. RegisterEventHotKey doesn't have that
--- failure mode and it's the pattern the Hammerspoon community uses
--- for Caps-Lock-as-Hyper (evantravers, kalis.me).
+-- F18 via hs.hotkey.bind (RegisterEventHotKey), not hs.eventtap: macOS
+-- silently disables CGEventTaps on timeout / Lua exception / Secure Input
+-- after sleep, with no auto-recovery. RegisterEventHotKey has no such mode.
 hs.hotkey.bind({}, "f18",
   function()  -- pressed
     if hyperActive then return end
@@ -104,7 +100,6 @@ hs.hotkey.bind({}, "f18",
   end
 )
 
--- Esc cancels from any mode.
 hyper:bind({}, "escape",      leaveAll)
 windowMode:bind({}, "escape", leaveAll)
 
@@ -116,24 +111,19 @@ hyper:bind({}, "w", function()
   showHint("window: f=fill  1/2/3=thirds  q/w=rows  a/s=cols  h=home  esc=cancel")
 end)
 
--- window mode terminals.
 windowMode:bind({}, "f", function() leaveAll(); place(0, 0, 1, 1)() end)
 
--- Vertical thirds (rows) — full width, 1/3 height.
 windowMode:bind({}, "1", function() leaveAll(); place(0, 0,     1, 1 / 3)() end)
 windowMode:bind({}, "2", function() leaveAll(); place(0, 1 / 3, 1, 1 / 3)() end)
 windowMode:bind({}, "3", function() leaveAll(); place(0, 2 / 3, 1, 1 / 3)() end)
 
--- Vertical halves (rows) — full width, 1/2 height.
 windowMode:bind({}, "q", function() leaveAll(); place(0, 0,     1, 1 / 2)() end)
 windowMode:bind({}, "w", function() leaveAll(); place(0, 1 / 2, 1, 1 / 2)() end)
 
--- Horizontal halves (cols) — 1/2 width, full height.
 windowMode:bind({}, "a", function() leaveAll(); place(0,     0, 1 / 2, 1)() end)
 windowMode:bind({}, "s", function() leaveAll(); place(1 / 2, 0, 1 / 2, 1)() end)
 
--- Manual re-home: re-runs the placement pass over all managed windows.
--- Same code path that fires on screen-config change / system wake.
+-- Manual re-home: same placement pass that fires on screen change / wake.
 windowMode:bind({}, "h", function() leaveAll(); homeAllManagedWindows() end)
 -- ──────────────────────────────────────────────────────────────────────
 
@@ -178,7 +168,6 @@ local function rightOf(width)
   end
 end
 
--- Vertical thirds (stacked rows) — full width, 1/3 height.
 local function topThird(sf)
   return { x = sf.x, y = sf.y, w = sf.w, h = sf.h / 3 }
 end
@@ -191,7 +180,6 @@ local function bottomThird(sf)
   return { x = sf.x, y = sf.y + sf.h * 2 / 3, w = sf.w, h = sf.h / 3 }
 end
 
--- Vertical halves (stacked rows) — full width, 1/2 height.
 local function topHalf(sf)
   return { x = sf.x, y = sf.y, w = sf.w, h = sf.h / 2 }
 end
@@ -200,7 +188,6 @@ local function bottomHalf(sf)
   return { x = sf.x, y = sf.y + sf.h / 2, w = sf.w, h = sf.h / 2 }
 end
 
--- Horizontal halves (side-by-side cols) — 1/2 width, full height.
 local function leftHalf(sf)
   return { x = sf.x, y = sf.y, w = sf.w / 2, h = sf.h }
 end
@@ -209,7 +196,6 @@ local function rightHalf(sf)
   return { x = sf.x + sf.w / 2, y = sf.y, w = sf.w / 2, h = sf.h }
 end
 
--- Fullscreen — fills the whole screen frame.
 local function fill(sf)
   return { x = sf.x, y = sf.y, w = sf.w, h = sf.h }
 end
@@ -321,6 +307,11 @@ do
   end
 end
 
+-- Ids of windows already auto-placed, so the per-window path places each
+-- once and leaves manual resizes / title changes alone. Bulk passes ignore
+-- this (always re-home) but refresh it. Cleared on windowDestroyed.
+local placedWindows = {}
+
 -- Re-home every managed window in two phases:
 --   1. Native apps — placed instantly and in parallel in one synchronous
 --      pass (no focus, no per-window timers). setFrameCorrectness off +
@@ -359,6 +350,8 @@ function homeAllManagedWindows()
       if screen and placement then
         local frame = placement(screen:frame())
         local app = win:application()
+        local id = win:id()
+        if id then placedWindows[id] = true end
         if app and FOCUS_TO_PLACE[app:name()] then
           deferred[#deferred + 1] = { win = win, frame = frame }
         else
@@ -391,15 +384,38 @@ function homeAllManagedWindows()
   step(1)
 end
 
--- Placement runs only on three triggers — we deliberately do NOT
--- subscribe to per-window events:
---   1. The 0.5s post-load timer below (initial pass after Hammerspoon
---      starts).
+-- Place a managed window once, then never again (placedWindows). Placing
+-- once is what tames the old iTerm2 feedback loop (setFrame → char-grid snap
+-- → redraw → title change → re-place → …): the re-fired event finds the
+-- window already placed and returns. No id = untrackable, so leave it alone.
+local function placeWindow(win)
+  if not win or not win:isStandard() then return end
+  local id = win:id()
+  if not id or placedWindows[id] then return end
+  local screen, placement = resolvePlacement(win)
+  if not (screen and placement) then return end
+  placedWindows[id] = true
+  local frame = placement(screen:frame())
+  local app = win:application()
+  if app and FOCUS_TO_PLACE[app:name()] then
+    win:focus()
+    hs.timer.doAfter(0.05, function()
+      if win:isStandard() then win:setFrame(frame, 0) end
+    end)
+  else
+    local correctness = hs.window.setFrameCorrectness
+    hs.window.setFrameCorrectness = false
+    win:setFrame(frame, 0)
+    hs.window.setFrameCorrectness = correctness
+  end
+end
+
+-- Bulk placement (every managed window at once) runs on three triggers:
+--   1. The 0.5s post-load timer below (initial pass).
 --   2. screen.watcher (monitor connected/disconnected/reconfigured).
 --   3. caffeinate.watcher systemDidWake (after sleep).
--- Subscribing to windowCreated/windowTitleChanged caused a feedback loop
--- with iTerm2: setFrame → iTerm2 snaps to char grid → prompt redraws →
--- OSC title escape → windowTitleChanged → setFrame → ... ad infinitum.
+-- Per-window placement (placeWindow) additionally runs as windows appear
+-- and get titled, via the window filter further below.
 local wakeWatcher = hs.caffeinate.watcher.new(function(event)
   if event == hs.caffeinate.watcher.systemDidWake then
     homeAllManagedWindows()
@@ -416,6 +432,22 @@ local screenWatcher = hs.screen.watcher.new(function()
   hs.alert.show("screens: " .. joined, 3)
   homeAllManagedWindows()
 end):start()
+
+-- Place windows as they appear. Also on titleChanged: title-pattern rules
+-- only match after iTerm2 sets the title (post-windowCreated). placeWindow's
+-- once-only guard keeps these frequent events from re-homing resized windows.
+-- Local to avoid GC, like the watchers. No config → no filter.
+local managedFilter
+if #managedAppNames > 0 then
+  managedFilter = hs.window.filter.new(managedAppNames)
+  local function onManagedWindow(win) placeWindow(win) end
+  managedFilter:subscribe(hs.window.filter.windowCreated,      onManagedWindow)
+  managedFilter:subscribe(hs.window.filter.windowTitleChanged, onManagedWindow)
+  managedFilter:subscribe(hs.window.filter.windowDestroyed, function(win)
+    local id = win and win:id()
+    if id then placedWindows[id] = nil end
+  end)
+end
 
 -- Defer initial pass so hs.application's registry is fully populated.
 hs.timer.doAfter(0.5, homeAllManagedWindows)
