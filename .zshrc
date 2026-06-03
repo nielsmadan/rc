@@ -13,11 +13,13 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 # Keep brew auto-update, but silence the env-hint footer it prints
 export HOMEBREW_NO_ENV_HINTS=1
 
-# Add various tools to the PATH
-export PATH="$PATH:$ANDROID_HOME/emulator"
-export PATH="$PATH:$ANDROID_HOME/tools"
-export PATH="$PATH:$ANDROID_HOME/tools/bin"
-export PATH="$PATH:$ANDROID_HOME/platform-tools"
+# Android SDK tools (only when the SDK is actually present)
+if [[ -d "$ANDROID_HOME" ]]; then
+  export PATH="$PATH:$ANDROID_HOME/emulator"
+  export PATH="$PATH:$ANDROID_HOME/tools"
+  export PATH="$PATH:$ANDROID_HOME/tools/bin"
+  export PATH="$PATH:$ANDROID_HOME/platform-tools"
+fi
 export PATH="$HOME/development/flutter/bin:$HOME/.local/bin:$PATH"
 
 # ---------------------------------------------------------------------------
@@ -36,8 +38,6 @@ plugins=(
   eza
   git
   history
-  macos
-  macports
   node
   npm
   mise
@@ -48,6 +48,9 @@ plugins=(
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
+
+# macOS-only oh-my-zsh plugins (avoid "plugin not found" on other OSes)
+[[ "$OSTYPE" == darwin* ]] && plugins+=(macos macports)
 
 # Oh My Zsh settings
 zstyle ':omz:update' mode auto
@@ -78,8 +81,10 @@ export PATH="$PATH":"$HOME/.pub-cache/bin"
 # Preferred editor for local and remote sessions
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='vim'
-else
+elif command -v mvim >/dev/null 2>&1; then
   export EDITOR='mvim'
+else
+  export EDITOR='vim'
 fi
 
 unsetopt correct_all
@@ -110,8 +115,14 @@ bindkey '^R' fzf-global-history-widget
 
 alias j="z"
 
-alias m="mvim"
 alias n="neovide &"
+
+# MacVim-only. `mvim` is the MacVim GUI launcher; also prefer MacVim's
+# full-featured CLI vim for the terminal (Apple's /usr/bin/vim is stripped).
+if [[ "$OSTYPE" == darwin* && -x /Applications/MacVim.app/Contents/bin/vim ]]; then
+  alias vim="/Applications/MacVim.app/Contents/bin/vim"
+  alias m="mvim"
+fi
 
 loadenv() {
   local envfile="${1:-.env}"
@@ -207,7 +218,8 @@ if [ -f "$HOME/google-cloud-sdk/path.zsh.inc" ]; then . "$HOME/google-cloud-sdk/
 # The next line enables shell command completion for gcloud.
 if [ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/google-cloud-sdk/completion.zsh.inc"; fi
 
-export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+# Apple-Silicon Homebrew keg-only libpq (path only exists on such machines)
+[[ -d /opt/homebrew/opt/libpq/bin ]] && export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
 
 # increase resources for reliable watchman
 ulimit -n 65536
