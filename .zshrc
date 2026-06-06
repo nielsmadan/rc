@@ -91,6 +91,7 @@ unsetopt correct_all
 setopt correct
 
 setopt no_share_history
+setopt inc_append_history
 setopt append_history
 setopt HIST_IGNORE_ALL_DUPS
 setopt HIST_IGNORE_SPACE
@@ -102,10 +103,15 @@ setopt AUTO_PUSHD
 setopt PUSHD_IGNORE_DUPS
 setopt PUSHD_SILENT
 
-# Custom function to search global history with fzf
+# Custom function to search global history with fzf.
 fzf-global-history-widget() {
     local selected
-    selected=$(fc -l 1 | fzf --tac --no-sort --exact | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//')
+    [[ -r $HISTFILE ]] || return
+    selected=$(
+        sed 's/^: [0-9]*:[0-9]*;//' "$HISTFILE" \
+            | awk '{ l[NR]=$0 } END { for (i=NR;i>=1;i--) if (!seen[l[i]]++) print l[i] }' \
+            | fzf --no-sort --exact
+    )
     BUFFER=$selected
     zle end-of-line
 }
