@@ -142,5 +142,41 @@ class TestFindEnvFiles(unittest.TestCase):
             self.assertEqual(lib.find_env_files(d), [])
 
 
+class TestLefthookInstallClause(unittest.TestCase):
+    def test_runs_install_when_config_present(self):
+        # Drop a config file, run the snippet in a shell, assert it fires.
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, "lefthook.yml"))
+            clause = lib.lefthook_install_clause()
+            # Replace the real `lefthook` with a marker so the test needs no
+            # lefthook binary and stays hermetic.
+            script = "true" + clause.replace("lefthook install", "echo INSTALLED")
+            out = subprocess.run(
+                ["sh", "-c", script], cwd=d, capture_output=True, text=True
+            )
+            self.assertIn("INSTALLED", out.stdout)
+
+    def test_noop_when_no_config(self):
+        with tempfile.TemporaryDirectory() as d:
+            clause = lib.lefthook_install_clause()
+            script = "true" + clause.replace("lefthook install", "echo INSTALLED")
+            out = subprocess.run(
+                ["sh", "-c", script], cwd=d, capture_output=True, text=True
+            )
+            self.assertNotIn("INSTALLED", out.stdout)
+            self.assertEqual(out.returncode, 0)
+
+    def test_detects_each_config_name(self):
+        clause = lib.lefthook_install_clause()
+        for name in lib.LEFTHOOK_CONFIG_NAMES:
+            with tempfile.TemporaryDirectory() as d:
+                touch(os.path.join(d, name))
+                script = "true" + clause.replace("lefthook install", "echo INSTALLED")
+                out = subprocess.run(
+                    ["sh", "-c", script], cwd=d, capture_output=True, text=True
+                )
+                self.assertIn("INSTALLED", out.stdout, f"missed {name}")
+
+
 if __name__ == "__main__":
     unittest.main()

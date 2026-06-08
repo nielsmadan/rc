@@ -5,7 +5,8 @@ Runs as an AutoLaunch script. Registers `clone_repo_to_tab`, bound to
 Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: auto-pick the next
 sibling name (current dir name + 1), confirm via an OK/Cancel dialog,
 `git clone <origin>` to that sibling of the repo root, copy any `.env`
-files (root and subdirectories, mirroring their relative paths), open
+files (root and subdirectories, mirroring their relative paths), run
+`lefthook install` if the clone has a lefthook config, open
 a new tab right of the current one with the original tab's split
 structure, every pane sitting in the clone root. If the sibling
 directory already exists, the clone is skipped entirely — the tab just
@@ -193,8 +194,10 @@ async def _do_clone_to_tab(window, tab, session):
             # Shell command: clone in the visible pane, then `mise trust`, then
             # copy each `.env` file we found in the source repo (root and
             # subdirectories), mirroring relative paths via `mkdir -p`. Chained
-            # with `&&` so clone/trust must succeed first. Tiny sleep so the
-            # shell has finished starting before we type into it.
+            # with `&&` so clone/trust must succeed first. A trailing
+            # `lefthook install` runs as its own statement, self-gated on the
+            # clone having a lefthook config. Tiny sleep so the shell has
+            # finished starting before we type into it.
             env_files = await asyncio.to_thread(lib.find_env_files, repo_root)
             copy_cmds = []
             for rel in env_files:
@@ -212,6 +215,7 @@ async def _do_clone_to_tab(window, tab, session):
                 f"git clone {shlex.quote(origin)} . "
                 f"&& mise trust ."
                 f"{env_clause}"
+                f"{lib.lefthook_install_clause()}"
             )
             await asyncio.sleep(0.3)
             await root_session.async_send_text(cmd + "\n")

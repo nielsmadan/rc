@@ -71,3 +71,27 @@ def find_env_files(repo_root: str) -> list:
             rel = os.path.relpath(dirpath, repo_root)
             out.append(".env" if rel == "." else os.path.join(rel, ".env"))
     return sorted(out)
+
+
+# Repo-root config filenames lefthook recognises (name × extension).
+LEFTHOOK_CONFIG_NAMES = (
+    "lefthook.yml",
+    "lefthook.yaml",
+    ".lefthook.yml",
+    ".lefthook.yaml",
+    "lefthook.toml",
+    "lefthook.json",
+)
+
+
+def lefthook_install_clause() -> str:
+    """Shell snippet that runs `lefthook install` iff a lefthook config exists.
+
+    The clone dir doesn't exist when the command is assembled, so detection
+    has to happen at runtime in the typed shell command. Built as its own
+    statement (leading `; `) that self-gates on a config file being present in
+    the freshly-cloned cwd — a non-lefthook repo (or a failed clone, which
+    leaves an empty dir) simply skips it without leaving a non-zero exit.
+    """
+    test = " || ".join(f"[ -f {name} ]" for name in LEFTHOOK_CONFIG_NAMES)
+    return f"; if {test}; then lefthook install; fi"
