@@ -157,6 +157,12 @@ elif [[ "$LC_TERMINAL" == "iTerm2" ]] && command -v it2ssh >/dev/null 2>&1; then
   alias ssh="it2ssh"
 fi
 
+# iTerm2 shell integration: lets the shell report cwd + host to iTerm2 so
+# "reuse previous session's directory" works over SSH — split panes inherit the
+# remote dir instead of trying to cd into a local-only path. Per-machine: only
+# loads where the script has been fetched into $HOME. Harmless in other terminals.
+[[ -e "${HOME}/.iterm2_shell_integration.zsh" ]] && source "${HOME}/.iterm2_shell_integration.zsh"
+
 # AI tools (Claude, etc.) — legacy plain-env source. Migrate each key into
 # secrets/secrets.yaml (via `sops edit`), then remove the corresponding
 # `export` line from ~/.airc so it's not also in shell env.

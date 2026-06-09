@@ -245,15 +245,15 @@
       "Name": "ssh: mini",
       "Guid": "rc-ssh-mini",
       "Dynamic Profile Parent Name": "rc",
-      "Custom Command": "Yes",
-      "Command": "ssh mini"
+      "Custom Command": "SSH",
+      "Command": "mini"
     },
     {
       "Name": "ssh: barney",
       "Guid": "rc-ssh-barney",
       "Dynamic Profile Parent Name": "rc",
-      "Custom Command": "Yes",
-      "Command": "ssh barney"
+      "Custom Command": "SSH",
+      "Command": "barney"
     }
   ]
 }
