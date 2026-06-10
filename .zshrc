@@ -4,9 +4,6 @@
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
-# Path to your oh-my-zsh installation.
-export ZSH="$HOME/.oh-my-zsh"
-
 # Path for Android SDK
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 
@@ -23,47 +20,75 @@ fi
 export PATH="$HOME/development/flutter/bin:$HOME/.local/bin:$PATH"
 
 # ---------------------------------------------------------------------------
-#  Oh My Zsh Configuration
+#  Completions, plugins & shell sugar (framework-free — no oh-my-zsh)
 # ---------------------------------------------------------------------------
 
-# Set name of the theme to load.
-ZSH_THEME=""
+# Homebrew's completion functions, on fpath before compinit. Paths are
+# hardcoded (Apple-Silicon / Intel) to avoid forking `brew --prefix` at startup.
+for _d in /opt/homebrew/share/zsh/site-functions /usr/local/share/zsh/site-functions; do
+  [[ -d $_d ]] && fpath=("$_d" $fpath)
+done
+unset _d
 
-# Oh My Zsh plugins.
-plugins=(
-  brew
-  docker
-  docker-compose
-  extract
-  eza
-  git
-  history
-  node
-  npm
-  mise
-  vi-mode
-  vscode
-  yarn
-  zoxide
-  zsh-autosuggestions
-  zsh-syntax-highlighting
-)
-
-# macOS-only oh-my-zsh plugins (avoid "plugin not found" on other OSes)
-[[ "$OSTYPE" == darwin* ]] && plugins+=(macos macports)
-
-# Oh My Zsh settings
-zstyle ':omz:update' mode auto
-ENABLE_CORRECTION="true"
-
-# Load Oh My Zsh. This MUST come after the settings above.
-source "$ZSH/oh-my-zsh.sh"
-
-# Completion styling
+# Completion styling (set before compinit)
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 zstyle ':completion:*' menu select
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path ~/.zsh/cache
+
+# compinit, but skip the slow security audit when the dump is fresh (<24h).
+# The glob qualifier (#qNmh-24) = "exists and modified within the last 24 hours".
+autoload -Uz compinit
+if [[ -n ~/.zcompdump(#qNmh-24) ]]; then
+  compinit -C
+else
+  compinit
+fi
+# Byte-compile the dump so future startups load the compiled .zwc instead of
+# re-parsing ~51k of text. Done in a disowned background job so it never blocks
+# the prompt; zsh auto-prefers the .zwc on the next shell once it's newer.
+if [[ -s ~/.zcompdump && (! -s ~/.zcompdump.zwc || ~/.zcompdump -nt ~/.zcompdump.zwc) ]]; then
+  { zcompile ~/.zcompdump } &!
+fi
+
+# git: `g` is the one oh-my-zsh git alias worth keeping; the rest of the git
+# shortcuts (ca, co, ci, po, d, ...) live in ~/.gitconfig.
+alias g='git'
+
+# eza (ls replacement)
+alias ls='eza -g'
+alias ll='eza -gl'
+alias la='eza -gla'
+alias l='ls -lah'
+
+# zoxide (smarter cd); the `j` alias for `z` is defined further down.
+eval "$(zoxide init zsh)"
+
+# extract <archive> ... — unpack common archive formats. Compact replacement
+# for oh-my-zsh's extract plugin (which we no longer load).
+extract() {
+  setopt localoptions noautopushd
+  (( $# )) || { echo "usage: extract <archive> [...]" >&2; return 1; }
+  local f
+  for f in "$@"; do
+    [[ -f $f ]] || { echo "extract: '$f' is not a file" >&2; continue; }
+    case "${f:l}" in
+      *.tar.gz|*.tgz)         tar xzvf "$f" ;;
+      *.tar.bz2|*.tbz|*.tbz2) tar xjvf "$f" ;;
+      *.tar.xz|*.txz)         tar xJvf "$f" ;;
+      *.tar.zst|*.tzst)       tar --zstd -xvf "$f" ;;
+      *.tar)                  tar xvf "$f" ;;
+      *.gz)                   gunzip -k "$f" ;;
+      *.bz2)                  bunzip2 -k "$f" ;;
+      *.xz)                   unxz -k "$f" ;;
+      *.zst)                  unzstd -k "$f" ;;
+      *.zip|*.jar|*.war)      unzip "$f" ;;
+      *.rar)                  unrar x "$f" ;;
+      *.7z)                   7z x "$f" ;;
+      *) echo "extract: don't know how to extract '$f'" >&2 ;;
+    esac
+  done
+}
 
 # ---------------------------------------------------------------------------
 #  Tool & Language Version Managers (mise)
@@ -269,3 +294,12 @@ export PATH="$HOME/.opencode/bin:$PATH"
 
 # Added by Antigravity CLI installer
 export PATH="$HOME/.local/bin:$PATH"
+
+# ---------------------------------------------------------------------------
+#  zsh-autosuggestions + zsh-syntax-highlighting
+# ---------------------------------------------------------------------------
+# Sourced directly (no plugin framework). These MUST come last — after every
+# custom ZLE widget and bindkey above — so syntax-highlighting can wrap them
+# all. autosuggestions is sourced before syntax-highlighting.
+source "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
+source "$HOME/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"

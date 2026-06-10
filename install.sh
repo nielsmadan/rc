@@ -80,6 +80,23 @@ else
   echo "skip pure-prompt (already installed)"
 fi
 
+# Install zsh-autosuggestions + zsh-syntax-highlighting if not present. .zshrc
+# sources both from $HOME/.zsh/ directly (no plugin framework — we dropped
+# oh-my-zsh); without them the trailing `source` lines error on a fresh box.
+if [ ! -d "$HOME/.zsh/zsh-autosuggestions" ]; then
+  git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git "$HOME/.zsh/zsh-autosuggestions"
+  echo "installed zsh-autosuggestions"
+else
+  echo "skip zsh-autosuggestions (already installed)"
+fi
+
+if [ ! -d "$HOME/.zsh/zsh-syntax-highlighting" ]; then
+  git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.zsh/zsh-syntax-highlighting"
+  echo "installed zsh-syntax-highlighting"
+else
+  echo "skip zsh-syntax-highlighting (already installed)"
+fi
+
 link vimrc            .vimrc           ~/.vimrc
 link gvimrc           .gvimrc          ~/.gvimrc
 link vim              .vim             ~/.vim

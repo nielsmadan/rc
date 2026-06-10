@@ -96,6 +96,14 @@ Or `launchctl kickstart gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18`.
 
 `.zshrc` puts `~/.zsh/pure` on `fpath` and runs `prompt pure`. If the directory is missing, `prompt pure` fails silently and zsh falls back to its default `%m%#` prompt — `install.sh` clones `sindresorhus/pure` into `~/.zsh/pure` to prevent that.
 
+## Zsh: no framework
+
+`.zshrc` has no oh-my-zsh or plugin manager — don't add one. The pieces that replace it:
+
+- `zsh-autosuggestions` and `zsh-syntax-highlighting` are `source`d directly from `~/.zsh/` (cloned there by `install.sh`, same pattern as pure). Their `source` lines must stay at the **very end** of `.zshrc`, after all custom `zle -N`/`bindkey`, with autosuggestions before syntax-highlighting.
+- `compinit` uses the cached `-C` fast path (gated on a 24h-fresh `~/.zcompdump`). Keep that guard — don't replace it with a bare `compinit`.
+- The rest is plain aliases/functions: `g=git` (other git shortcuts are `.gitconfig` aliases), the eza `ls`/`ll`/`la`/`l` aliases, `zoxide init`, and an `extract` function. mise is activated once via its own `eval` — don't add an oh-my-zsh mise plugin on top (double-activates).
+
 ## Tool versions
 
 `mise/config.toml` (symlinked to `~/.config/mise/config.toml`) pins node/ruby/python/java/bun/go/fzf/pnpm/sops/age. `mise activate` is hooked in `.zshrc`.
