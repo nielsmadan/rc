@@ -131,8 +131,31 @@ set guifont=Monaco:h12
 "--->MAPPINGS
 let mapleader = ","
 
-map <Leader>fu <Esc>:set guifont=Monaco:h16<CR>
-map <Leader>fd <Esc>:set guifont=Monaco:h12<CR>
+let s:FontSize = 12
+map <Leader>fu :call IncreaseFontSize()<CR>
+map <Leader>fd :call DecreaseFontSize()<CR>
+map <Leader>f1 :call SetFontSize(12)<CR>
+map <Leader>f2 :call SetFontSize(18)<CR>
+
+" guifont is a no-op in terminal Vim; these take effect in MacVim.
+function! SetFontSize(size)
+  let s:FontSize = a:size
+  if has("gui_gtk2")
+    exe "set guifont=Inconsolata\\ " . s:FontSize
+  elseif has("gui_win32")
+    exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
+  elseif has("gui_macvim")
+    exe "set guifont=Monaco:h" . s:FontSize
+  endif
+endfunction
+
+function! IncreaseFontSize()
+  call SetFontSize(s:FontSize + 1)
+endfunction
+
+function! DecreaseFontSize()
+  call SetFontSize(s:FontSize - 1)
+endfunction
 
 
 "use :W to write file.

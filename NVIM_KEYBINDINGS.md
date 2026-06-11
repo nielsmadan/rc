@@ -8,6 +8,15 @@ Leader is `,`. Only **custom** bindings are listed here — core vim defaults ar
 |---|---|---|---|
 | `<leader>q` | n | Print syntax group under cursor | `nvim/lua/config/cmd.lua` |
 
+## Font (GUI only — Neovide)
+
+| Key | Mode | Action | Source |
+|---|---|---|---|
+| `<Leader>fu` | n (map) | Bump guifont +1pt | `nvim/vimrc.vim` |
+| `<Leader>fd` | n (map) | Drop guifont -1pt | `nvim/vimrc.vim` |
+| `<Leader>f1` | n (map) | Set guifont to Monaco:h12 (regular / code) | `nvim/vimrc.vim` |
+| `<Leader>f2` | n (map) | Set guifont to Monaco:h18 (large / docs) | `nvim/vimrc.vim` |
+
 ## Completion — blink.cmp
 
 Active in insert mode while the completion menu is visible (falls through otherwise).

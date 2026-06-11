@@ -1,41 +1,5 @@
-"set font
-if has("gui_running")
-  if has("gui_gtk2")
-    let s:FontSize = 10
-    exe "set guifont=Inconsolata\\ " . s:FontSize
-  elseif has("gui_win32")
-    let s:FontSize = 12
-    exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
-  elseif has("gui_macvim")
-    let s:FontSize = 12
-    exe "set guifont=Monaco:h" . s:FontSize
-  endif
-endif
-
-map <leader>fu :call IncreaseFontSize()<CR>
-map <leader>fd :call DecreaseFontSize()<CR>
-
-function! IncreaseFontSize()
-    let s:FontSize = s:FontSize + 1
-    if has("gui_gtk2")
-        exe "set guifont=Inconsolata\\ " . s:FontSize
-    elseif has("gui_win32")
-        exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
-    elseif has("gui_macvim")
-        exe "set guifont=Monaco:h" . s:FontSize
-    endif
-endfunction
-
-function! DecreaseFontSize()
-    let s:FontSize = s:FontSize - 1
-    if has("gui_gtk2")
-        exe "set guifont=Inconsolata\\ " . s:FontSize
-    elseif has("gui_win32")
-        exe "set guifont=Consolas:h" . s:FontSize . ":cANSI"
-    elseif has("gui_macvim")
-        exe "set guifont=Monaco:h" . s:FontSize
-    endif
-endfunction
+" Font setup and <leader>fu/fd/f1/f2 mappings live in .vimrc (loaded before
+" this file in MacVim) so terminal Vim and MacVim share one definition.
 
 set guioptions-=m  "remove menu bar
 set guioptions-=T  "remove toolbar

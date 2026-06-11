@@ -11,8 +11,25 @@ set guifont=Monaco:h12
 "--->MAPPINGS
 let mapleader = ","
 
-map <Leader>fu <Esc>:set guifont=Monaco:h16<CR>
-map <Leader>fd <Esc>:set guifont=Monaco:h12<CR>
+let s:FontSize = 12
+map <Leader>fu :call IncreaseFontSize()<CR>
+map <Leader>fd :call DecreaseFontSize()<CR>
+map <Leader>f1 :call SetFontSize(12)<CR>
+map <Leader>f2 :call SetFontSize(18)<CR>
+
+" guifont takes effect in Neovide; it is a no-op in terminal Neovim.
+function! SetFontSize(size)
+  let s:FontSize = a:size
+  exe "set guifont=Monaco:h" . s:FontSize
+endfunction
+
+function! IncreaseFontSize()
+  call SetFontSize(s:FontSize + 1)
+endfunction
+
+function! DecreaseFontSize()
+  call SetFontSize(s:FontSize - 1)
+endfunction
 
 "use :W to write file.
 cnoreabbrev <expr> W ((getcmdtype() is# ':' && getcmdline() is# 'W')?('w'):('W'))

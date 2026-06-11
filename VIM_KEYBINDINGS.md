@@ -48,8 +48,10 @@ Leader is `,`. All bindings live in `.vimrc`.
 
 | Key | Mode | Action |
 |---|---|---|
-| `<Leader>fu` | n (map) | Set guifont to Monaco:h16 |
-| `<Leader>fd` | n (map) | Set guifont to Monaco:h12 |
+| `<Leader>fu` | n (map) | Bump guifont +1pt (GUI only) |
+| `<Leader>fd` | n (map) | Drop guifont -1pt (GUI only) |
+| `<Leader>f1` | n (map) | Set guifont to Monaco:h12 (regular / code) |
+| `<Leader>f2` | n (map) | Set guifont to Monaco:h18 (large / docs) |
 
 ## fzf
 
