@@ -30,6 +30,40 @@ for _d in /opt/homebrew/share/zsh/site-functions /usr/local/share/zsh/site-funct
 done
 unset _d
 
+# Completion functions for CLIs that ship their own zsh completion generator but
+# install via mise — so they have no Homebrew site-functions/_<tool> file the way
+# git/docker/npm do. Each is generated once into a cache dir on fpath. The
+# generators run ONLY when a file is missing, so a normal startup forks nothing.
+# Cobra/clap scripts bake in the tool's subcommands/flags, so after a major
+# upgrade `rm ~/.zsh/completions/_<tool>` (or the whole dir) to refresh them.
+_zcompcache=~/.zsh/completions
+typeset -A _zcompgen=(
+  just     'just --completions zsh'
+  gh       'gh completion -s zsh'
+  glab     'glab completion -s zsh'
+  kubectl  'kubectl completion zsh'
+  pnpm     'pnpm completion zsh'
+  bun      'bun completions'
+  lefthook 'lefthook completion zsh'
+  railway  'railway completion zsh'
+  sops     'sops completion zsh'
+  rustup   'rustup completions zsh'
+  cargo    'rustup completions zsh cargo'
+)
+for _t in "${(@k)_zcompgen}"; do
+  [[ -e $_zcompcache/_$_t ]] && continue
+  command -v "$_t" >/dev/null 2>&1 || continue
+  mkdir -p $_zcompcache
+  # Strip leading blank lines so the `#compdef` tag lands on line 1 (sops emits a
+  # blank first line otherwise, which makes compinit skip it). Drop empties so a
+  # failed generation retries next startup instead of caching a broken file.
+  eval "${_zcompgen[$_t]}" 2>/dev/null | sed '/./,$!d' >| "$_zcompcache/_$_t"
+  [[ -s $_zcompcache/_$_t ]] || rm -f "$_zcompcache/_$_t"
+done
+unset _t _zcompgen
+[[ -d $_zcompcache ]] && fpath=("$_zcompcache" $fpath)
+unset _zcompcache
+
 # Completion styling (set before compinit)
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 zstyle ':completion:*' menu select
@@ -310,3 +344,6 @@ export PATH="$HOME/.local/bin:$PATH"
 # all. autosuggestions is sourced before syntax-highlighting.
 source "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
 source "$HOME/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+
+autoload -U +X bashcompinit && bashcompinit
+complete -o nospace -C /Users/nielsmadan/.local/share/mise/installs/aqua-hashicorp-vault/2.0.2/vault vault
