@@ -55,6 +55,13 @@ fi
 # shortcuts (ca, co, ci, po, d, ...) live in ~/.gitconfig.
 alias g='git'
 
+# up N directories: `..` is built into zsh's cd, these add deeper hops
+# (replaces oh-my-zsh's lost `...`/`....`/`.....` aliases).
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+
 # eza (ls replacement)
 alias ls='eza -g'
 alias ll='eza -gl'
