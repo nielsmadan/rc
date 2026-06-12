@@ -23,6 +23,7 @@ lefthook = "latest"
 "npm:wrangler" = "latest"
 "github:stripe/stripe-cli" = "latest"
 "aqua:hashicorp/vault" = "2.0.2"
+railway = { version = "latest", exe = "railway" }
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
