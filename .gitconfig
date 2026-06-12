@@ -38,6 +38,8 @@
     rba = rebase --abort
 
     rhom = reset --hard origin/main
+    rs1 = reset --soft HEAD~1
+    rsu = reset --soft @{upstream}
 
     fom = fetch origin main
     pr = pull --rebase
