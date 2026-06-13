@@ -19,7 +19,8 @@ hs.window.setFrameCorrectness = true
 -- running hidutil at login (see launchd/com.nielsmadan.hidutil-...).
 -- On the Moonlander, assign any free key to F18 in Oryx.
 --
--- Hold F18 and tap a key (chord):
+-- Hold F18 and tap a key (chord). The modal stays open while F18 is held,
+-- so you can tap several keys in a row without re-pressing F18:
 --   f       = toggle fill (press again to restore previous frame)
 --   1 / 2 / 3 = top / middle / bottom third (vertical = stacked rows)
 --   q / w   = top / bottom half (vertical = stacked rows)
@@ -125,22 +126,26 @@ hs.hotkey.bind({}, "f18",
   end
 )
 
+-- Action bindings stay in the modal: they perform the action but DON'T
+-- exit, so you can hold F18 and tap several keys in a row (e.g. 1 then 2).
+-- The modal exits only when F18 is physically released (the release
+-- handler above) or escape aborts it.
 hyper:bind({}, "escape", leaveAll)
 
-hyper:bind({}, "f", function() leaveAll(); toggleFill() end)
+hyper:bind({}, "f", toggleFill)
 
-hyper:bind({}, "1", function() leaveAll(); place(0, 0,     1, 1 / 3)() end)
-hyper:bind({}, "2", function() leaveAll(); place(0, 1 / 3, 1, 1 / 3)() end)
-hyper:bind({}, "3", function() leaveAll(); place(0, 2 / 3, 1, 1 / 3)() end)
+hyper:bind({}, "1", place(0, 0,     1, 1 / 3))
+hyper:bind({}, "2", place(0, 1 / 3, 1, 1 / 3))
+hyper:bind({}, "3", place(0, 2 / 3, 1, 1 / 3))
 
-hyper:bind({}, "q", function() leaveAll(); place(0, 0,     1, 1 / 2)() end)
-hyper:bind({}, "w", function() leaveAll(); place(0, 1 / 2, 1, 1 / 2)() end)
+hyper:bind({}, "q", place(0, 0,     1, 1 / 2))
+hyper:bind({}, "w", place(0, 1 / 2, 1, 1 / 2))
 
-hyper:bind({}, "a", function() leaveAll(); place(0,     0, 1 / 2, 1)() end)
-hyper:bind({}, "s", function() leaveAll(); place(1 / 2, 0, 1 / 2, 1)() end)
+hyper:bind({}, "a", place(0,     0, 1 / 2, 1))
+hyper:bind({}, "s", place(1 / 2, 0, 1 / 2, 1))
 
 -- Manual re-home: same placement pass that fires on screen change / wake.
-hyper:bind({}, "h", function() leaveAll(); homeAllManagedWindows() end)
+hyper:bind({}, "h", function() homeAllManagedWindows() end)
 -- ──────────────────────────────────────────────────────────────────────
 
 -- Reload on save of any .lua under ~/.hammerspoon.
