@@ -1,5 +1,7 @@
 # Development helper functions
 
+export REACT_TERMINAL=Terminal
+
 # Create iOS simulator named after current directory
 # Usage: mksim [device] [ios_version]
 # Examples:
