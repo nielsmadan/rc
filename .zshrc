@@ -191,9 +191,17 @@ alias n="neovide &"
 
 # MacVim-only. `mvim` is the MacVim GUI launcher; also prefer MacVim's
 # full-featured CLI vim for the terminal (Apple's /usr/bin/vim is stripped).
-if [[ "$OSTYPE" == darwin* && -x /Applications/MacVim.app/Contents/bin/vim ]]; then
-  alias vim="/Applications/MacVim.app/Contents/bin/vim"
-  alias m="mvim"
+# MacVim ships either as a .app bundle (cask) under /Applications or as a
+# Homebrew formula on PATH — handle both, else the `m` alias silently vanishes.
+if [[ "$OSTYPE" == darwin* ]]; then
+  if [[ -x /Applications/MacVim.app/Contents/bin/vim ]]; then
+    alias vim="/Applications/MacVim.app/Contents/bin/vim"
+    alias m="mvim"
+  elif command -v mvim >/dev/null; then
+    # Homebrew formula: mvim/vim are on PATH, but /usr/bin may shadow vim.
+    [[ -x /opt/homebrew/bin/vim ]] && alias vim="/opt/homebrew/bin/vim"
+    alias m="mvim"
+  fi
 fi
 
 loadenv() {
