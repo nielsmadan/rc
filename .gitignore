@@ -6,5 +6,6 @@
 .claude/settings.local.json
 nvim/lazy-lock.json
 hammerspoon/local.lua
+launchd/hidutil.local.sh
 install.local
 __pycache__/

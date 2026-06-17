@@ -1,0 +1,27 @@
+# Per-machine hidutil remaps — EXAMPLE.
+#
+# Copy the bits you need into launchd/hidutil.local.sh (gitignored, created by
+# install.sh as an empty stub). That file is sourced by the LaunchAgent at
+# login and by install.sh, AFTER the universal Caps Lock -> F18 remap, so
+# anything here can override the universal mapping on this machine only.
+#
+# HID usage codes are 0x7000000NN, from the HID Usage Tables (keyboard page
+# 0x07). Useful ones: 0x39 Caps Lock, 0x6D F18, 0x35 grave/tilde, 0x64 Non-US
+# backslash, 0x29 Escape, 0x31 backslash. List devices with `hidutil list`.
+
+# --- ISO/international built-in keyboard: section sign -> backtick ----------
+# On a Mac ISO keyboard the key below Esc emits HID 0x35, which the macOS
+# layout renders as the (useless) section sign  § / ±.  Remapping its *source*
+# to 0x64 (Non-US backslash) makes it produce  ` / ~  like a US/ANSI layout.
+# The extra ISO key between Left-Shift and Z already emits 0x64 -> `/~ and is
+# left alone, so you end up with two backtick keys.
+#
+# Scoped via --matching to the built-in keyboard so external keyboards (e.g. a
+# Moonlander on USB) keep a normal backtick — a global 0x35 remap would break
+# it. Because `hidutil --set` REPLACES a matched device's whole mapping, the
+# built-in set must also re-include Caps Lock -> F18 (0x39 -> 0x6D), otherwise
+# scoping this mapping would knock out Caps -> F18 on the built-in keyboard.
+#
+# Uncomment to enable:
+#
+# hidutil property --matching '{"Product":"Apple Internal Keyboard / Trackpad"}' --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x70000006D},{"HIDKeyboardModifierMappingSrc":0x700000035,"HIDKeyboardModifierMappingDst":0x700000064}]}'

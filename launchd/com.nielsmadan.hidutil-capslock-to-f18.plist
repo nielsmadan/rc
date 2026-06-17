@@ -6,21 +6,31 @@
     <string>com.nielsmadan.hidutil-capslock-to-f18</string>
 
     <!--
-      Remap Caps Lock (HID 0x700000039) to F18 (HID 0x70000006D) at the
-      HID-driver level. F18 is then picked up by Hammerspoon as the
-      modal-entry trigger for the window-management leader sequence.
+      hidutil key remaps, re-applied at every login (RunAtLoad) because
+      hidutil's UserKeyMapping is session-scoped (lost across reboot and full
+      logout). Symlinked into ~/Library/LaunchAgents/ by install.sh.
 
-      hidutil's UserKeyMapping is session-scoped (lost across reboot
-      and across full logouts), so this LaunchAgent re-applies it at
-      every login via RunAtLoad. Symlinked into ~/Library/LaunchAgents/
-      by install.sh.
+      Two layers, mirroring the hammerspoon init.lua / local.lua split:
+
+        1. Universal (this plist): Caps Lock (0x700000039) -> F18 (0x70000006D),
+           the Hammerspoon modal-entry trigger. Applied to every keyboard.
+
+        2. Per-machine: source ~/.config/hidutil/local.sh if present. That path
+           is a fixed-location symlink (created by install.sh) to the gitignored
+           launchd/hidutil.local.sh in whichever repo checkout was installed
+           last — the same trick hammerspoon uses by symlinking its dir to a
+           fixed ~/.hammerspoon/. The local file holds remaps specific to this
+           machine (e.g. an ISO keyboard's section-sign key -> backtick) and is
+           sourced AFTER the universal set so it can override per device. This
+           plist stays machine-agnostic, so it can be a committed symlink with
+           no per-machine path baked in. See launchd/hidutil.local.sh.example.
     -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/hidutil</string>
-        <string>property</string>
-        <string>--set</string>
-        <string>{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x70000006D}]}</string>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x70000006D}]}'
+if [ -r "$HOME/.config/hidutil/local.sh" ]; then . "$HOME/.config/hidutil/local.sh"; fi</string>
     </array>
 
     <key>RunAtLoad</key>

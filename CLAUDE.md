@@ -6,6 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Personal dotfiles for macOS. `install.sh` symlinks files from this repo into `$HOME` (and a few other places like `~/.config/nvim`, `~/.config/kitty`, iTerm2's scripts dir). Editing a file here = editing the live config. Re-running `install.sh` is idempotent.
 
+## Commit messages
+
+**This repo overrides the global `feat`/`fix`/`chore` commit policy** (from `~/.claude/CLAUDE.md`) — that policy does **not** apply here. Instead, commits use a `scope: subject` style where the scope is the area or tool touched, and the subject is a lowercase, imperative one-liner:
+
+```
+hammerspoon: add fullscreen toggle
+zsh: gate setup by OS
+mise: add vault
+iterm2: clone repo to new tab
+```
+
+Common scopes in use: `zsh`, `mise`, `iterm2`, `hammerspoon`, `git`, `sops`, `vim`, `nvim`, `kitty`. Pick the scope matching the files changed; use a new one when none fits. Keep changes to a single scope per commit where practical.
+
 ## Per-machine install skip list (`install.local`)
 
 Every `link` call in `install.sh` carries a short **alias** as its first argument (`gitignore`, `zshrc`, `nvim`, …). `install.local` (repo root, **gitignored**, one alias per line) is a per-machine opt-out: an uncommented alias means `install.sh` skips that target — it won't re-link it, and if the destination is currently a symlink into this repo it's **detached** into a real machine-local copy (`cp -R`) so it can be edited without affecting the repo. Re-comment the line to hand the target back to the repo symlink on the next run.
@@ -70,17 +83,28 @@ Adding a managed window in `local.lua`:
 
 App names are matched exactly via `app:name()` (no Xcode-vs-Code fuzzy collisions). Screen names need exact matches too — every screen-config change posts an `hs.alert` listing connected screen names so you can copy the right one in. Project convention: "vertical" = stacked rows, "horizontal" = side-by-side columns (opposite of CSS/Moom).
 
-### hidutil remap (Caps Lock → F18)
+### hidutil remaps (Caps Lock → F18, + per-machine local config)
 
-F18 is produced by `hidutil` remapping Caps Lock to it; the launchd plist `launchd/com.nielsmadan.hidutil-capslock-to-f18.plist` re-applies this at every login because `hidutil`'s mapping is **session-scoped** (lost across reboot and full logout). `install.sh` also runs hidutil directly during install so the mapping is live without a logout. The Moonlander should also be configured (via Oryx) to send F18 from a free key.
+`hidutil` key remaps are applied in **two layers**, mirroring the hammerspoon `init.lua` / `local.lua` split:
 
-If the remap stops working after a sleep/wake cycle:
+1. **Universal** (committed) — Caps Lock (`0x700000039`) → F18 (`0x70000006D`), the Hammerspoon modal-entry trigger. Lives in the launchd plist `launchd/com.nielsmadan.hidutil-capslock-to-f18.plist` **and** in `install.sh`. The Moonlander should also be configured (via Oryx) to send F18 from a free key.
+2. **Per-machine** (gitignored) — `launchd/hidutil.local.sh`, a shell snippet of extra `hidutil` calls for *this machine only*. Sourced **after** the universal set, so it can override per device. `install.sh` writes an empty stub if missing and symlinks it to the fixed path `~/.config/hidutil/local.sh`; the plist sources that fixed path at login (the same fixed-location trick hammerspoon uses, since a committed/symlinked plist can't know the repo's path). Committed template: `launchd/hidutil.local.sh.example`.
+
+Both the plist (at login) and `install.sh` (immediately, so it's live without a logout) apply the universal remap, then source `~/.config/hidutil/local.sh` if present. Because `hidutil --set` **replaces** a matched device's entire `UserKeyMapping`, a scoped per-machine `--set` that should coexist with Caps→F18 on that device must re-include the Caps→F18 entry.
+
+Example per-machine use (this is what the ISO-keyboard machine's `hidutil.local.sh` does): remap the key below Esc, which on a Mac ISO/international keyboard emits `0x35` and renders as the useless section sign (`§`/`±`), so its *source* becomes `0x64` (Non-US `\`) — producing `` ` ``/`~` like US/ANSI. It's scoped via `--matching '{"Product":"Apple Internal Keyboard / Trackpad"}'` so external keyboards keep a normal backtick. **Caveat:** `VendorID`/`ProductID` `0x0`/`0x0` is a `hidutil` *wildcard* (matches every HID service), so the built-in keyboard must be matched by its `Product` string, not by ID.
+
+If a remap stops working after a sleep/wake cycle, re-run the LaunchAgent (re-applies the universal set + sources the local file):
+
+```sh
+launchctl kickstart gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18
+```
+
+Or just the universal Caps Lock → F18 directly:
 
 ```sh
 hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x70000006D}]}'
 ```
-
-Or `launchctl kickstart gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18`.
 
 ## iTerm2
 
