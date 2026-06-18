@@ -25,6 +25,7 @@ hs.window.setFrameCorrectness = true
 --   1 / 2 / 3 = top / middle / bottom third (vertical = stacked rows)
 --   q / w   = top / bottom half (vertical = stacked rows)
 --   a / s   = left / right half (horizontal = side-by-side cols)
+--   z / x   = left / right two-thirds (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
 --   esc     = abort
 -- F18 itself is consumed (apps never see it as a literal F18 keypress).
@@ -116,7 +117,7 @@ hs.hotkey.bind({}, "f18",
     leaveAll()  -- always start clean
     hyperActive = true
     hyper:enter()
-    showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  h=home  esc=cancel")
+    showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  z/x=⅔cols  h=home  esc=cancel")
   end,
   function()  -- released
     if not hyperActive then return end
@@ -143,6 +144,9 @@ hyper:bind({}, "w", place(0, 1 / 2, 1, 1 / 2))
 
 hyper:bind({}, "a", place(0,     0, 1 / 2, 1))
 hyper:bind({}, "s", place(1 / 2, 0, 1 / 2, 1))
+
+hyper:bind({}, "z", place(0,     0, 2 / 3, 1))
+hyper:bind({}, "x", place(1 / 3, 0, 2 / 3, 1))
 
 -- Manual re-home: same placement pass that fires on screen change / wake.
 hyper:bind({}, "h", function() homeAllManagedWindows() end)
