@@ -246,14 +246,16 @@
       "Guid": "rc-ssh-mini",
       "Dynamic Profile Parent Name": "rc",
       "Custom Command": "SSH",
-      "Command": "mini"
+      "Command": "mini",
+      "Load Shell Integration Automatically": true
     },
     {
       "Name": "ssh: barney",
       "Guid": "rc-ssh-barney",
       "Dynamic Profile Parent Name": "rc",
       "Custom Command": "SSH",
-      "Command": "barney"
+      "Command": "barney",
+      "Load Shell Integration Automatically": true
     }
   ]
 }
