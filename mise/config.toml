@@ -24,6 +24,7 @@ lefthook = "latest"
 "github:stripe/stripe-cli" = "latest"
 "aqua:hashicorp/vault" = "2.0.2"
 railway = { version = "latest", exe = "railway" }
+"npm:typescript-language-server" = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
