@@ -52,7 +52,9 @@ The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` refe
 
 ## Git integration
 
-`.gitconfig` wires Neovide as both `diff.tool` and `merge.tool`. The custom `git d` / `git d1` / `git dc` aliases launch `neovide --no-fork -c DiffviewOpen ...` for whole-repo diffs (no args) or fall through to per-file `git difftool` (with args). Editor for commit messages is `mvim -f`.
+`.gitconfig` wires Neovide as both `diff.tool` and `merge.tool`. The custom `git nd` / `git ndc` aliases launch `neovide --fork -c DiffviewOpen ...` for whole-repo diffs (no args) or fall through to per-file `git difftool -t neovide` (with file paths/refs). The plain `git d` / `git dc` aliases are the same idea against the default mvim difftool. Editor for commit messages is `mvim -f`.
+
+Several aliases take a **bare number** as shorthand for `HEAD~N` via a smart shell function: `d N`, `nd N`, `rbi N`, `rs N` expand to `difftool HEAD~N` / diffview at `HEAD~N` / `rebase -i HEAD~N` / `reset --soft HEAD~N`. A single numeric arg triggers the expansion; anything else (a file path, a ref like `origin/main`, `--root`, or zero args) passes straight through to the underlying git command. The `d`/`nd` functions `cd "./$GIT_PREFIX"` first, since `!` shell aliases run from the repo root and would otherwise mis-resolve relative file paths given from a subdirectory. When changing this scheme, keep the numeric-detection `case` and the `GIT_PREFIX` guard intact.
 
 The global gitignore lives at `git/ignore` in this repo, symlinked to `~/.config/git/ignore` (git's XDG default — no `core.excludesfile` setting is needed in `.gitconfig`). It's the *global* excludes file, applied to every repo on this machine. **Distinct from the repo's own `.gitignore`** at the root, which only ignores machine-local files within this repo (vim plugins, `hammerspoon/local.lua`, etc.). Don't conflate them — a prior misstep (commit `0c39b43`) symlinked the repo's `.gitignore` to `~/.gitignore` and had to be reverted.
 

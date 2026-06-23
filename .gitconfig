@@ -32,13 +32,15 @@
     wtp = worktree prune
 
     r = rebase
-    rbi = rebase --interactive
+    ; `rbi N` -> rebase -i HEAD~N (bare number); anything else passes through (e.g. `rbi origin/main`, `rbi --root`).
+    rbi = "!f() { if [ $# -eq 1 ]; then case \"$1\" in ''|*[!0-9]*) git rebase --interactive \"$@\";; *) git rebase --interactive \"HEAD~$1\";; esac; else git rebase --interactive \"$@\"; fi; }; f"
     rbm = rebase main
     rbc = rebase --continue
     rba = rebase --abort
 
     rhom = reset --hard origin/main
-    rs1 = reset --soft HEAD~1
+    ; `rs N` -> reset --soft HEAD~N (bare number); anything else passes through.
+    rs = "!f() { if [ $# -eq 1 ]; then case \"$1\" in ''|*[!0-9]*) git reset --soft \"$@\";; *) git reset --soft \"HEAD~$1\";; esac; else git reset --soft \"$@\"; fi; }; f"
     rsu = reset --soft @{upstream}
 
     fom = fetch origin main
@@ -53,19 +55,16 @@
     pof = push origin -f
     puoh = push -u origin HEAD
 
-    ; mvim difftool (default tool, see [diff] below).
-    d = difftool
-    d1 = difftool HEAD~1
-    d2 = difftool HEAD~2
-    d3 = difftool HEAD~3
+    ; mvim difftool (default tool, see [diff] below). `d N` -> difftool HEAD~N (bare number); file paths/refs pass through.
+    ; `cd` into GIT_PREFIX because `!` aliases run from the repo root, so relative file paths would otherwise break.
+    d = "!f() { cd \"./${GIT_PREFIX:-}\" && if [ $# -eq 1 ]; then case \"$1\" in ''|*[!0-9]*) git difftool \"$@\";; *) git difftool \"HEAD~$1\";; esac; else git difftool \"$@\"; fi; }; f"
     dc = difftool --cached
 
-    ; Neovide + diffview.nvim. No args -> diffview (full repo view, detached via --fork). With args (file paths, revs) -> per-file neovide difftool (stays attached so git can clean up temp files).
+    ; Neovide + diffview.nvim. No args -> diffview (full repo view, detached via --fork). `nd N` -> diffview at HEAD~N.
+    ; With file paths/refs -> per-file neovide difftool (stays attached so git can clean up temp files).
     ; --chdir tells neovide which dir to launch in; --fork detaches from the terminal. Needs neovide >= 0.16.
-    nd = "!f() { if [ $# -eq 0 ]; then neovide --fork --chdir \"$PWD\" -- -c DiffviewOpen; else git difftool -t neovide \"$@\"; fi; }; f"
-    nd1 = "!f() { if [ $# -eq 0 ]; then neovide --fork --chdir \"$PWD\" -- -c 'DiffviewOpen HEAD~1'; else git difftool -t neovide HEAD~1 \"$@\"; fi; }; f"
-    nd2 = "!f() { if [ $# -eq 0 ]; then neovide --fork --chdir \"$PWD\" -- -c 'DiffviewOpen HEAD~2'; else git difftool -t neovide HEAD~2 \"$@\"; fi; }; f"
-    nd3 = "!f() { if [ $# -eq 0 ]; then neovide --fork --chdir \"$PWD\" -- -c 'DiffviewOpen HEAD~3'; else git difftool -t neovide HEAD~3 \"$@\"; fi; }; f"
+    ; `cd` into GIT_PREFIX because `!` aliases run from the repo root, so relative file paths would otherwise break.
+    nd = "!f() { cd \"./${GIT_PREFIX:-}\" && if [ $# -eq 0 ]; then neovide --fork --chdir \"$PWD\" -- -c DiffviewOpen; elif [ $# -eq 1 ]; then case \"$1\" in ''|*[!0-9]*) git difftool -t neovide \"$@\";; *) neovide --fork --chdir \"$PWD\" -- -c \"DiffviewOpen HEAD~$1\";; esac; else git difftool -t neovide \"$@\"; fi; }; f"
     ndc = "!f() { if [ $# -eq 0 ]; then neovide --fork --chdir \"$PWD\" -- -c 'DiffviewOpen --cached'; else git difftool -t neovide --cached \"$@\"; fi; }; f"
     dns = diff --name-status
     outgoing = log origin..main
