@@ -7,5 +7,6 @@
 nvim/lazy-lock.json
 hammerspoon/local.lua
 launchd/hidutil.local.sh
+finicky/finicky.local.ts
 install.local
 __pycache__/

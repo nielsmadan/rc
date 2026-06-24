@@ -110,6 +110,7 @@ link mise             mise/config.toml ~/.config/mise/config.toml
 link gitignore        git/ignore       ~/.config/git/ignore
 link secrets          secrets/secrets.yaml ~/.config/sops/secrets.yaml
 link hammerspoon      hammerspoon      ~/.hammerspoon
+link finicky          finicky/finicky.ts ~/.finicky.ts
 # SaveWindowArrangement.py runs as an AutoLaunch daemon (auto-saves window
 # arrangements + registers the Cmd+S RPC). Drop the pre-daemon manual-script
 # symlink from the plain Scripts dir if a prior install left one there.
@@ -223,6 +224,20 @@ EOF
   echo "created hammerspoon/local.lua"
 else
   echo "skip hammerspoon/local.lua (already exists)"
+fi
+
+# Per-machine Finicky container routing (gitignored). finicky.ts imports LOCAL
+# from here; an empty stub keeps the import valid on a fresh machine (no
+# container routing until customized). See finicky/finicky.local.ts.example.
+if [ ! -f "$DOTFILES_DIR/finicky/finicky.local.ts" ]; then
+  cat > "$DOTFILES_DIR/finicky/finicky.local.ts" <<'EOF'
+// finicky.local.ts — GITIGNORED per-machine container routing. Imported by
+// finicky.ts. See finicky.local.ts.example for the format.
+export const LOCAL = [];
+EOF
+  echo "created finicky/finicky.local.ts"
+else
+  echo "skip finicky/finicky.local.ts (already exists)"
 fi
 
 # Per-machine install.sh skip list (gitignored). Generated here, after every

@@ -1,0 +1,22 @@
+// finicky.local.ts.example — template for the gitignored finicky.local.ts.
+//
+// Copy to finicky.local.ts and fill in your confidential container routing.
+// install.sh writes an empty stub (export const LOCAL = []) if the real
+// file is missing, so finicky.ts always imports successfully.
+//
+// Each entry routes its URLs into a named LibreWolf container (create them
+// via Multi-Account Containers → Manage Containers; names are case-sensitive).
+// `match` patterns use "*" wildcards, tested case-insensitively anywhere in
+// the full URL. Scope shared services (GitHub, AWS, App Store Connect, …) by
+// the path/ID/org/region that identifies the entry so they don't collide.
+
+export const LOCAL = [
+  // {
+  //   container: "Acme",
+  //   match: [
+  //     "*acme.com/*",
+  //     "*github.com/acme-org*",
+  //     "*appstoreconnect.apple.com/apps/1234567890*",
+  //   ],
+  // },
+];
