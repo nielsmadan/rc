@@ -97,6 +97,20 @@ else
   echo "skip zsh-syntax-highlighting (already installed)"
 fi
 
+# Install Syncthing (menu-bar app) if not present. It's the login daemon that
+# syncs the KeePass vaults in ~/syncthing/; pairing/folder setup stays manual.
+# Cask, not mise — it's a long-lived daemon, not a per-shell dev tool.
+if [ ! -d "/Applications/Syncthing.app" ]; then
+  if command -v brew >/dev/null 2>&1; then
+    brew install --cask syncthing
+    echo "installed syncthing"
+  else
+    echo "skip syncthing (brew not on PATH)"
+  fi
+else
+  echo "skip syncthing (already installed)"
+fi
+
 link vimrc            .vimrc           ~/.vimrc
 link gvimrc           .gvimrc          ~/.gvimrc
 link vim              .vim             ~/.vim
