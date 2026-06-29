@@ -114,8 +114,13 @@ end
 hs.hotkey.bind({}, "f18",
   function()  -- pressed
     if hyperActive then return end
-    leaveAll()  -- always start clean
     hyperActive = true
+    -- Clear any stale hint, but do NOT exit the modal here: a synchronous
+    -- hyper:exit() immediately followed by hyper:enter() unregisters then
+    -- re-registers the same Carbon hotkeys in one tick, which intermittently
+    -- leaves them unregistered for the whole session (overlay shows but no
+    -- key fires). enter() on an already-exited modal is enough.
+    clearHint()
     hyper:enter()
     showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  z/x=⅔cols  h=home  esc=cancel")
   end,
