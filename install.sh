@@ -117,6 +117,7 @@ link vim              .vim             ~/.vim
 link gitconfig        .gitconfig       ~/.gitconfig
 link zshrc            .zshrc           ~/.zshrc
 link devrc            .devrc           ~/.devrc
+link tmux             tmux/tmux.conf   ~/.tmux.conf
 link kitty            kitty/kitty.conf ~/.config/kitty/kitty.conf
 link wezterm          wezterm/wezterm.lua ~/.config/wezterm/wezterm.lua
 link nvim             nvim             ~/.config/nvim

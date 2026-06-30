@@ -245,17 +245,15 @@
       "Name": "ssh: mini",
       "Guid": "rc-ssh-mini",
       "Dynamic Profile Parent Name": "rc",
-      "Custom Command": "SSH",
-      "Command": "mini",
-      "Load Shell Integration Automatically": true
+      "Custom Command": "Yes",
+      "Command": "ssh -t mini tmux -CC new -A -s main"
     },
     {
       "Name": "ssh: barney",
       "Guid": "rc-ssh-barney",
       "Dynamic Profile Parent Name": "rc",
-      "Custom Command": "SSH",
-      "Command": "barney",
-      "Load Shell Integration Automatically": true
+      "Custom Command": "Yes",
+      "Command": "ssh -t barney tmux -CC new -A -s main"
     }
   ]
 }
