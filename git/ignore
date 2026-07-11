@@ -5,3 +5,5 @@
 **/.antigravitycli/ 
 **/.aiconf
 .DS_Store
+
+**/.claude/.cc-writes/
