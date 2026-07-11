@@ -108,6 +108,17 @@ local function leaveAll()
   hyperActive = false
 end
 
+-- Detects macOS "Secure Input" (anti-keylogging) being active. Some apps —
+-- notably Steam's Friends/login password field — turn it on and never release
+-- it; while stuck it silently blocks text-key hotkeys (the placement keys)
+-- even though function-key hotkeys like F18 still fire. Cheap ioreg probe, run
+-- only on F18 press (interactive), so its ~tens-of-ms cost is imperceptible.
+local function secureInputActive()
+  local out = hs.execute([[ioreg -l -w 0 | grep -m1 -o 'kCGSSessionSecureInputPID"=[0-9]*']])
+  local pid = out and out:match("=(%d+)")
+  return pid ~= nil and pid ~= "0"
+end
+
 -- F18 via hs.hotkey.bind (RegisterEventHotKey), not hs.eventtap: macOS
 -- silently disables CGEventTaps on timeout / Lua exception / Secure Input
 -- after sleep, with no auto-recovery. RegisterEventHotKey has no such mode.
@@ -122,7 +133,14 @@ hs.hotkey.bind({}, "f18",
     -- key fires). enter() on an already-exited modal is enough.
     clearHint()
     hyper:enter()
-    showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  z/x=⅔cols  h=home  esc=cancel")
+    -- If Secure Input is stuck ON (usually Steam), the placement keys below are
+    -- silently blocked while this overlay still shows. Say so, don't fail mute.
+    if secureInputActive() then
+      showHint("⚠︎ Secure Input is ON — placement keys are blocked.\n" ..
+               "Quit the app holding it (usually Steam) or log out, then retry.")
+    else
+      showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  z/x=⅔cols  h=home  esc=cancel")
+    end
   end,
   function()  -- released
     if not hyperActive then return end
