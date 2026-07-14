@@ -14,6 +14,12 @@ local MARGIN_FRAC = 0.1
 -- apps like Neovide that ignore the first AX position-set.
 hs.window.setFrameCorrectness = true
 
+-- Load the IPC message port so the `hs` command-line tool can query and drive
+-- this running config from a shell (e.g. `hs -c "return hs.accessibilityState()"`,
+-- inspect screens, trigger a homing pass). Without it the CLI can't attach —
+-- which made "placement silently does nothing" much harder to diagnose.
+require("hs.ipc")
+
 -- ─── Window-management modal system ──────────────────────────────────
 -- Entry: F18 (held). Caps Lock is remapped to F18 by a launchd plist
 -- running hidutil at login (see launchd/com.nielsmadan.hidutil-...).
@@ -108,17 +114,6 @@ local function leaveAll()
   hyperActive = false
 end
 
--- Detects macOS "Secure Input" (anti-keylogging) being active. Some apps —
--- notably Steam's Friends/login password field — turn it on and never release
--- it; while stuck it silently blocks text-key hotkeys (the placement keys)
--- even though function-key hotkeys like F18 still fire. Cheap ioreg probe, run
--- only on F18 press (interactive), so its ~tens-of-ms cost is imperceptible.
-local function secureInputActive()
-  local out = hs.execute([[ioreg -l -w 0 | grep -m1 -o 'kCGSSessionSecureInputPID"=[0-9]*']])
-  local pid = out and out:match("=(%d+)")
-  return pid ~= nil and pid ~= "0"
-end
-
 -- F18 via hs.hotkey.bind (RegisterEventHotKey), not hs.eventtap: macOS
 -- silently disables CGEventTaps on timeout / Lua exception / Secure Input
 -- after sleep, with no auto-recovery. RegisterEventHotKey has no such mode.
@@ -133,11 +128,15 @@ hs.hotkey.bind({}, "f18",
     -- key fires). enter() on an already-exited modal is enough.
     clearHint()
     hyper:enter()
-    -- If Secure Input is stuck ON (usually Steam), the placement keys below are
-    -- silently blocked while this overlay still shows. Say so, don't fail mute.
-    if secureInputActive() then
-      showHint("⚠︎ Secure Input is ON — placement keys are blocked.\n" ..
-               "Quit the app holding it (usually Steam) or log out, then retry.")
+    -- Placement goes through AX setFrame, which silently no-ops without the
+    -- Accessibility permission — the keys still FIRE, the windows just don't
+    -- move, which reads identically to "keys are dead". Surface that real
+    -- failure mode instead of failing mute. (Secure Input is NOT checked here:
+    -- it doesn't block RegisterEventHotKey hotkeys, so it never blocks these
+    -- keys — an earlier version blamed it and misled diagnosis.)
+    if not hs.accessibilityState() then
+      showHint("⚠︎ Accessibility is OFF — window placement won't work.\n" ..
+               "System Settings ▸ Privacy & Security ▸ Accessibility ▸ enable Hammerspoon.")
     else
       showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  z/x=⅔cols  h=home  esc=cancel")
     end
@@ -500,4 +499,14 @@ end
 -- Defer initial pass so hs.application's registry is fully populated.
 hs.timer.doAfter(0.5, homeAllManagedWindows)
 
-hs.alert.show("Hammerspoon loaded")
+-- Placement is all AX setFrame, which silently no-ops without the Accessibility
+-- permission — a common post-update / post-reboot regression where hotkeys keep
+-- firing but nothing moves. Announce it on load instead of failing mute; this
+-- (not Secure Input) is the actual "auto-layout stopped working" cause. Plain
+-- hs.accessibilityState() only reads the state — it does not prompt.
+if not hs.accessibilityState() then
+  hs.alert.show("⚠︎ Hammerspoon lacks Accessibility — window placement disabled.\n" ..
+                "System Settings ▸ Privacy & Security ▸ Accessibility ▸ enable Hammerspoon.", 6)
+else
+  hs.alert.show("Hammerspoon loaded")
+end

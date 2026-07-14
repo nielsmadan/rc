@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Personal dotfiles for macOS. `install.sh` symlinks files from this repo into `$HOME` (and a few other places like `~/.config/nvim`, `~/.config/kitty`, iTerm2's scripts dir). Editing a file here = editing the live config. Re-running `install.sh` is idempotent.
 
+Each app's config lives in its **own subdir** (`hammerspoon/`, `iterm2/`, `nvim/`, `kitty/`, `wezterm/`, …); `install.sh` maps each to its target. After moving a config into a subdir, re-run `install.sh` so the symlink follows — the old symlink otherwise still points at the pre-move path.
+
 ## Commit messages
 
 **This repo overrides the global `feat`/`fix`/`chore` commit policy** (from `~/.claude/CLAUDE.md`) — that policy does **not** apply here. Instead, commits use a `scope: subject` style where the scope is the area or tool touched, and the subject is a lowercase, imperative one-liner:
@@ -149,6 +151,10 @@ Routing mechanics: a single guarded `rewrite` rule turns a matched URL into the 
 `mise/config.toml` (symlinked to `~/.config/mise/config.toml`) pins node/ruby/python/java/bun/go/fzf/pnpm/sops/age. `mise activate` is hooked in `.zshrc`.
 
 Global npm CLIs are managed through mise's `npm:` backend (`npm:wrangler`, `npm:firebase-tools`, `npm:agent-browser`, `npm:@agentclientprotocol/claude-agent-acp`) so they survive `node` version bumps and stay reproducible. Add new ones with `mise use -g npm:<pkg>` rather than `npm install -g`. `claude-agent-acp` is load-bearing — it's the ACP bridge `nvim/lua/plugins/ai.lua`'s CodeCompanion `claude_code` adapter spawns.
+
+**mise vs brew.** Default to **mise** for standalone dev CLIs and language-ecosystem tools — version-pinned in `mise/config.toml` and auto-replicated across machines. Use **brew** for GUI casks (`.app`s like Finicky), long-running daemons/services, C libraries, and tools needing a launchd unit or absolute path. When moving a tool brew→mise, `brew uninstall` it first so the mise shim wins on `PATH`.
+
+**Vault via mise/aqua:** install with an explicit pin (`aqua:hashicorp/vault@<version>`), **not** `@latest` — aqua's resolver picks bad tags (e.g. `2.0.1` has no darwin build and 404s). Pinning also sidesteps the BSL-relicense tap churn.
 
 ## Secrets management
 
