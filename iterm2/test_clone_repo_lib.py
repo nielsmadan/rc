@@ -42,6 +42,81 @@ class TestNextSiblingName(unittest.TestCase):
         self.assertEqual(lib.next_sibling_name("app10"), "app11")
 
 
+class TestSiblingBase(unittest.TestCase):
+    def test_strips_trailing_digits(self):
+        self.assertEqual(lib.sibling_base("project2"), "project")
+
+    def test_strips_multidigit(self):
+        self.assertEqual(lib.sibling_base("app10"), "app")
+
+    def test_no_digits_unchanged(self):
+        self.assertEqual(lib.sibling_base("rc"), "rc")
+
+
+class TestSiblingNumber(unittest.TestCase):
+    def test_trailing_digits(self):
+        self.assertEqual(lib.sibling_number("project2"), 2)
+
+    def test_multidigit(self):
+        self.assertEqual(lib.sibling_number("app10"), 10)
+
+    def test_no_digits_is_zero(self):
+        self.assertEqual(lib.sibling_number("rc"), 0)
+
+
+class TestIsSibling(unittest.TestCase):
+    def test_same_parent_same_base(self):
+        self.assertTrue(lib.is_sibling("/w/project", "/w/project2"))
+        self.assertTrue(lib.is_sibling("/w/dev2", "/w/dev3"))
+
+    def test_different_base(self):
+        self.assertFalse(lib.is_sibling("/w/project2", "/w/foo3"))
+
+    def test_different_parent(self):
+        self.assertFalse(lib.is_sibling("/w/a/project", "/w/b/project2"))
+
+    def test_ignores_trailing_slash(self):
+        self.assertTrue(lib.is_sibling("/w/project/", "/w/project2"))
+
+
+class TestSelectHighestSibling(unittest.TestCase):
+    def test_picks_highest_open(self):
+        self.assertEqual(
+            lib.select_highest_sibling(
+                "/w/project1", ["/w/project1", "/w/project2"]
+            ),
+            "/w/project2",
+        )
+
+    def test_current_is_highest_returns_current(self):
+        self.assertEqual(
+            lib.select_highest_sibling(
+                "/w/project2", ["/w/project1", "/w/project2"]
+            ),
+            "/w/project2",
+        )
+
+    def test_bare_name_with_numbered_siblings(self):
+        self.assertEqual(
+            lib.select_highest_sibling("/w/rc", ["/w/rc", "/w/rc2", "/w/rc3"]),
+            "/w/rc3",
+        )
+
+    def test_multidigit_ordering(self):
+        self.assertEqual(
+            lib.select_highest_sibling("/w/app2", ["/w/app2", "/w/app10"]),
+            "/w/app10",
+        )
+
+    def test_ignores_non_family_candidates(self):
+        self.assertEqual(
+            lib.select_highest_sibling(
+                "/w/project1", ["/w/foo9", "/w/other/project5", "/w/project2"]
+            ),
+            "/w/project2",
+        )
+
+
 class TestResolveRepoRoot(unittest.TestCase):
     def test_root_returns_self(self):
         with tempfile.TemporaryDirectory() as d:

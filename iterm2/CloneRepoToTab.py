@@ -3,12 +3,13 @@
 
 Runs as an AutoLaunch script. Registers `clone_repo_to_tab`, bound to
 Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: auto-pick the next
-sibling name (current dir name + 1), confirm via an OK/Cancel dialog,
+sibling name off the highest-numbered sibling checkout OPEN in this
+window (its name + 1), confirm via an OK/Cancel dialog,
 `git clone <origin>` to that sibling of the repo root, copy any `.env`
 files (root and subdirectories, mirroring their relative paths), run
 `lefthook install` if the clone has a lefthook config, open
-a new tab right of the current one with the original tab's split
-structure, every pane sitting in the clone root. If the sibling
+a new tab right of that highest sibling's tab with the original tab's
+split structure, every pane sitting in the clone root. If the sibling
 directory already exists, the clone is skipped entirely — the tab just
 opens pointed at the existing directory.
 
@@ -128,8 +129,24 @@ async def _do_clone_to_tab(window, tab, session):
             await _alert("Not a git repository.")
             return
 
-        # Auto-pick the next sibling name (current dir name + 1) — no prompt.
-        name = lib.next_sibling_name(os.path.basename(repo_root))
+        # Auto-pick the next sibling name off the highest-numbered sibling
+        # checkout OPEN in this window (not just the triggering tab). Enumerate
+        # the window's tabs, resolve each one's repo root, then name = that
+        # max + 1 and anchor the new tab right of it. Falls back to the current
+        # tab when it's already the highest.
+        pairs = []  # [(repo_root, tab), ...] for tabs sitting in a git repo
+        for t in window.tabs:
+            t_path = await t.current_session.async_get_variable("path")
+            if not t_path:
+                continue
+            t_root = await asyncio.to_thread(lib.resolve_repo_root, t_path)
+            if t_root:
+                pairs.append((t_root, t))
+
+        chosen_root = lib.select_highest_sibling(repo_root, [rr for rr, _ in pairs])
+        anchor_tab = next((t for rr, t in pairs if rr == chosen_root), tab)
+
+        name = lib.next_sibling_name(os.path.basename(chosen_root))
         dest = lib.compute_destination(repo_root, name)
         dest_exists = os.path.exists(dest)
         if dest_exists and not os.path.isdir(dest):
@@ -174,7 +191,7 @@ async def _do_clone_to_tab(window, tab, session):
             iterm2.InitialWorkingDirectory.INITIAL_WORKING_DIRECTORY_CUSTOM
         )
 
-        new_tab_index = window.tabs.index(tab) + 1
+        new_tab_index = window.tabs.index(anchor_tab) + 1
         new_tab = await window.async_create_tab(
             profile_customizations=profile,
             index=new_tab_index,
