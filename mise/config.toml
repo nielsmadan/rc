@@ -25,6 +25,7 @@ lefthook = "latest"
 "aqua:hashicorp/vault" = "2.0.2"
 railway = { version = "latest", exe = "railway" }
 "npm:typescript-language-server" = "latest"
+"npm:agent-device" = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
