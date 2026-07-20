@@ -339,6 +339,19 @@ set_tab_title() {
 
 precmd_functions+=(set_tab_title)
 
+# In tmux, a shell can outlive the ssh connection whose forwarded agent socket
+# it captured, leaving SSH_AUTH_SOCK dead. Repull tmux's value, but only when the
+# current socket is dead — avoids needless forks and won't clobber a live agent.
+if [[ -n "$TMUX" ]]; then
+  refresh_ssh_auth_sock() {
+    [[ -S "$SSH_AUTH_SOCK" ]] && return  # current socket alive -> leave it
+    local line
+    line=$(tmux show-environment SSH_AUTH_SOCK 2>/dev/null) || return
+    [[ "$line" == SSH_AUTH_SOCK=/* ]] && export SSH_AUTH_SOCK="${line#SSH_AUTH_SOCK=}"
+  }
+  precmd_functions+=(refresh_ssh_auth_sock)
+fi
+
 
 # opencode
 export PATH="$HOME/.opencode/bin:$PATH"
