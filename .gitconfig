@@ -100,6 +100,7 @@
 [user]
 	name = Niels Madan
 	email = nielsmadan@quantumcraft.io
+	signingkey = /Users/nielsmadan/.ssh/id_ed25519.pub
 
 [push]
 	default = simple
@@ -119,3 +120,11 @@
 
 [rebase]
 	autoStash = true
+[gpg]
+	format = ssh
+[commit]
+	gpgsign = true
+[tag]
+	gpgsign = true
+[gpg "ssh"]
+	allowedSignersFile = /Users/nielsmadan/.ssh/allowed_signers
