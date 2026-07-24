@@ -31,17 +31,6 @@ def make_repo(parent: str, name: str, with_origin: bool = True) -> str:
     return path
 
 
-class TestNextSiblingName(unittest.TestCase):
-    def test_no_trailing_number_appends_2(self):
-        self.assertEqual(lib.next_sibling_name("rc"), "rc2")
-
-    def test_trailing_number_increments(self):
-        self.assertEqual(lib.next_sibling_name("app3"), "app4")
-
-    def test_multidigit_trailing_number_increments(self):
-        self.assertEqual(lib.next_sibling_name("app10"), "app11")
-
-
 class TestSiblingBase(unittest.TestCase):
     def test_strips_trailing_digits(self):
         self.assertEqual(lib.sibling_base("project2"), "project")
@@ -79,41 +68,83 @@ class TestIsSibling(unittest.TestCase):
         self.assertTrue(lib.is_sibling("/w/project/", "/w/project2"))
 
 
-class TestSelectHighestSibling(unittest.TestCase):
-    def test_picks_highest_open(self):
+class TestSelectSiblingSlot(unittest.TestCase):
+    def test_no_gap_appends_next(self):
+        # Contiguous 1,2,3 -> foo4, right of foo3.
         self.assertEqual(
-            lib.select_highest_sibling(
-                "/w/project1", ["/w/project1", "/w/project2"]
+            lib.select_sibling_slot(
+                "/w/foo1", ["/w/foo1", "/w/foo2", "/w/foo3"]
             ),
-            "/w/project2",
+            ("foo4", "/w/foo3", "right"),
         )
 
-    def test_current_is_highest_returns_current(self):
+    def test_fills_interior_gap(self):
+        # foo1, foo3, foo4 -> foo2, right of foo1.
         self.assertEqual(
-            lib.select_highest_sibling(
-                "/w/project2", ["/w/project1", "/w/project2"]
+            lib.select_sibling_slot(
+                "/w/foo1", ["/w/foo1", "/w/foo3", "/w/foo4"]
             ),
-            "/w/project2",
+            ("foo2", "/w/foo1", "right"),
         )
 
-    def test_bare_name_with_numbered_siblings(self):
+    def test_fills_gap_below_minimum(self):
+        # foo2, foo3 (no foo1) -> foo1, left of foo2.
         self.assertEqual(
-            lib.select_highest_sibling("/w/rc", ["/w/rc", "/w/rc2", "/w/rc3"]),
-            "/w/rc3",
+            lib.select_sibling_slot("/w/foo2", ["/w/foo2", "/w/foo3"]),
+            ("foo1", "/w/foo2", "left"),
+        )
+
+    def test_deterministic_regardless_of_trigger(self):
+        # Same result whether triggered from foo3 or foo4.
+        cands = ["/w/foo1", "/w/foo3", "/w/foo4"]
+        self.assertEqual(
+            lib.select_sibling_slot("/w/foo4", cands),
+            lib.select_sibling_slot("/w/foo3", cands),
+        )
+
+    def test_bare_name_counts_as_slot_one(self):
+        # Bare foo is "the first" -> foo + foo2 + foo3 is contiguous -> foo4.
+        self.assertEqual(
+            lib.select_sibling_slot(
+                "/w/foo", ["/w/foo", "/w/foo2", "/w/foo3"]
+            ),
+            ("foo4", "/w/foo3", "right"),
+        )
+
+    def test_bare_name_alone_appends_2(self):
+        # Only bare foo open -> foo2 (slot 1 taken, next is 2).
+        self.assertEqual(
+            lib.select_sibling_slot("/w/rc", ["/w/rc"]),
+            ("rc2", "/w/rc", "right"),
+        )
+
+    def test_bare_name_with_gap_above(self):
+        # foo (slot 1), foo3 -> gap at 2, filled right of bare foo.
+        self.assertEqual(
+            lib.select_sibling_slot("/w/foo", ["/w/foo", "/w/foo3"]),
+            ("foo2", "/w/foo", "right"),
         )
 
     def test_multidigit_ordering(self):
+        # app2, app10 open -> lowest gap is app1, left of app2.
         self.assertEqual(
-            lib.select_highest_sibling("/w/app2", ["/w/app2", "/w/app10"]),
-            "/w/app10",
+            lib.select_sibling_slot("/w/app2", ["/w/app2", "/w/app10"]),
+            ("app1", "/w/app2", "left"),
         )
 
     def test_ignores_non_family_candidates(self):
         self.assertEqual(
-            lib.select_highest_sibling(
-                "/w/project1", ["/w/foo9", "/w/other/project5", "/w/project2"]
+            lib.select_sibling_slot(
+                "/w/foo2", ["/w/bar9", "/w/other/foo5", "/w/foo2", "/w/foo3"]
             ),
-            "/w/project2",
+            ("foo1", "/w/foo2", "left"),
+        )
+
+    def test_tolerates_trailing_slash_on_candidate(self):
+        # A candidate with a trailing slash is still matched as a sibling.
+        self.assertEqual(
+            lib.select_sibling_slot("/w/foo1", ["/w/foo1", "/w/foo3/"]),
+            ("foo2", "/w/foo1", "right"),
         )
 
 

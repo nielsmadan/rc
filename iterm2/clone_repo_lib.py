@@ -12,19 +12,6 @@ import subprocess
 _TRAILING_DIGITS = re.compile(r"(\d+)$")
 
 
-def next_sibling_name(basename: str) -> str:
-    """Deterministic next sibling name: increment the trailing digit run,
-    or append '2' if there isn't one (e.g. `dev2` -> `dev3`, `rc` -> `rc2`).
-
-    Does NOT skip existing siblings — the caller decides what to do based on
-    whether the target already exists (clone into it vs. open it).
-    """
-    m = _TRAILING_DIGITS.search(basename)
-    if m:
-        return basename[: m.start()] + str(int(m.group()) + 1)
-    return basename + "2"
-
-
 def sibling_base(basename: str) -> str:
     """The family base name: `basename` with its trailing digit-run stripped
     (`"project2" -> "project"`, `"rc" -> "rc"`)."""
@@ -48,22 +35,58 @@ def is_sibling(repo_root_a: str, repo_root_b: str) -> bool:
     return sibling_base(os.path.basename(a)) == sibling_base(os.path.basename(b))
 
 
-def select_highest_sibling(current_repo_root: str, candidate_repo_roots: list) -> str:
-    """Return the repo root of the highest-numbered member of
-    `current_repo_root`'s family, considering it plus `candidate_repo_roots`.
+def _sibling_slot(basename: str) -> int:
+    """The family *slot* a member occupies: its trailing number, but a bare
+    name (no digits, so `sibling_number` == 0) counts as slot 1 — the first
+    checkout is "the first" whether it's named `foo` or `foo1`."""
+    n = sibling_number(basename)
+    return n if n >= 1 else 1
 
-    Returns `current_repo_root` when nothing in the candidates outranks it, so
-    the caller falls back to the triggering checkout's own +1.
+
+def select_sibling_slot(current_repo_root: str, candidate_repo_roots: list):
+    """Pick the target checkout, filling the lowest gap in the open family.
+
+    Considers `current_repo_root` plus every sibling in `candidate_repo_roots`
+    (same parent dir + same base name), maps each to a *slot* (its trailing
+    number; a bare name is slot 1), then targets the smallest slot >= 1 that
+    is unoccupied. With no gap this is just highest-slot + 1 (the old
+    behaviour); with a hole — e.g. `foo1, foo3, foo4` — it fills it (`foo2`).
+
+    Returns `(name, anchor_repo_root, side)` where `name` is the target folder
+    name (`base` + slot number), `anchor_repo_root` is the open sibling to
+    position the new tab against, and `side` is "right" (place just after the
+    anchor — the highest open sibling *below* the gap) or "left" (place just
+    before it — used when filling below the lowest open sibling, e.g.
+    `foo2, foo3` -> `foo1` left of `foo2`). Deterministic: independent of which
+    sibling triggered it.
     """
-    best = current_repo_root
-    best_n = sibling_number(os.path.basename(current_repo_root.rstrip("/")))
-    for rr in candidate_repo_roots:
-        if not is_sibling(current_repo_root, rr):
+    base = sibling_base(os.path.basename(current_repo_root.rstrip("/")))
+
+    members = []  # [(slot, repo_root), ...] for the open family
+    seen = set()
+    for rr in [current_repo_root, *candidate_repo_roots]:
+        key = rr.rstrip("/")
+        if key in seen:
             continue
-        n = sibling_number(os.path.basename(rr.rstrip("/")))
-        if n > best_n:
-            best, best_n = rr, n
-    return best
+        if key != current_repo_root.rstrip("/") and not is_sibling(current_repo_root, rr):
+            continue
+        seen.add(key)
+        members.append((_sibling_slot(os.path.basename(key)), rr))
+
+    occupied = {slot for slot, _ in members}
+    target = 1
+    while target in occupied:
+        target += 1
+    name = base + str(target)
+
+    below = [m for m in members if m[0] < target]
+    if below:
+        anchor = max(below, key=lambda m: m[0])[1]
+        side = "right"
+    else:
+        anchor = min(members, key=lambda m: m[0])[1]
+        side = "left"
+    return name, anchor, side
 
 
 def resolve_repo_root(path: str) -> "str | None":

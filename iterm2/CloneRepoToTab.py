@@ -2,16 +2,18 @@
 """iTerm2 clone-repo-to-tab daemon.
 
 Runs as an AutoLaunch script. Registers `clone_repo_to_tab`, bound to
-Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: auto-pick the next
-sibling name off the highest-numbered sibling checkout OPEN in this
-window (its name + 1), confirm via an OK/Cancel dialog,
-`git clone <origin>` to that sibling of the repo root, copy any `.env`
-files (root and subdirectories, mirroring their relative paths), run
-`lefthook install` if the clone has a lefthook config, open
-a new tab right of that highest sibling's tab with the original tab's
-split structure, every pane sitting in the clone root. If the sibling
-directory already exists, the clone is skipped entirely — the tab just
-opens pointed at the existing directory.
+Cmd+Ctrl+N in the `rc` dynamic profile. On trigger: auto-pick the target
+sibling name by filling the lowest gap in the family of sibling checkouts
+OPEN in this window (e.g. `foo1, foo3, foo4` -> `foo2`; contiguous ->
+highest + 1), confirm via an OK/Cancel dialog, `git clone <origin>` to
+that sibling of the repo root, copy any `.env` files (root and
+subdirectories, mirroring their relative paths), run `lefthook install`
+if the clone has a lefthook config, open a new tab next to the gap's
+neighbour (right of the sibling below the gap, or left of the lowest open
+sibling when filling below it) with the original tab's split structure,
+every pane sitting in the clone root. If the sibling directory already
+exists, the clone is skipped entirely — the tab just opens pointed at the
+existing directory.
 
 Pure helpers (path math, git wrappers, `.env` discovery) live in
 `clone_repo_lib.py` so they can be unit-tested outside iTerm2.
@@ -129,11 +131,14 @@ async def _do_clone_to_tab(window, tab, session):
             await _alert("Not a git repository.")
             return
 
-        # Auto-pick the next sibling name off the highest-numbered sibling
-        # checkout OPEN in this window (not just the triggering tab). Enumerate
-        # the window's tabs, resolve each one's repo root, then name = that
-        # max + 1 and anchor the new tab right of it. Falls back to the current
-        # tab when it's already the highest.
+        # Auto-pick the target sibling name, filling the lowest gap in the
+        # family of checkouts OPEN in this window (not just the triggering tab).
+        # Enumerate the window's tabs, resolve each one's repo root, then pick
+        # the lowest unoccupied slot and the tab to anchor the new one against.
+        # With no gap this is highest-slot + 1; a hole (e.g. foo1, foo3) fills
+        # it (foo2). `side` says whether to place the new tab just right of the
+        # anchor (the sibling below the gap) or left of it (filling below the
+        # lowest open sibling).
         pairs = []  # [(repo_root, tab), ...] for tabs sitting in a git repo
         for t in window.tabs:
             t_path = await t.current_session.async_get_variable("path")
@@ -143,10 +148,10 @@ async def _do_clone_to_tab(window, tab, session):
             if t_root:
                 pairs.append((t_root, t))
 
-        chosen_root = lib.select_highest_sibling(repo_root, [rr for rr, _ in pairs])
-        anchor_tab = next((t for rr, t in pairs if rr == chosen_root), tab)
-
-        name = lib.next_sibling_name(os.path.basename(chosen_root))
+        name, anchor_root, side = lib.select_sibling_slot(
+            repo_root, [rr for rr, _ in pairs]
+        )
+        anchor_tab = next((t for rr, t in pairs if rr == anchor_root), tab)
         dest = lib.compute_destination(repo_root, name)
         dest_exists = os.path.exists(dest)
         if dest_exists and not os.path.isdir(dest):
@@ -191,7 +196,8 @@ async def _do_clone_to_tab(window, tab, session):
             iterm2.InitialWorkingDirectory.INITIAL_WORKING_DIRECTORY_CUSTOM
         )
 
-        new_tab_index = window.tabs.index(anchor_tab) + 1
+        anchor_index = window.tabs.index(anchor_tab)
+        new_tab_index = anchor_index + 1 if side == "right" else anchor_index
         new_tab = await window.async_create_tab(
             profile_customizations=profile,
             index=new_tab_index,
