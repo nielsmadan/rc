@@ -27,6 +27,7 @@ railway = { version = "latest", exe = "railway" }
 "npm:typescript-language-server" = "latest"
 "npm:agent-device" = "latest"
 "npm:@earendil-works/pi-coding-agent" = "latest"
+"aqua:charmbracelet/vhs" = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
