@@ -23,6 +23,7 @@ const DEV_MATCHERS = [
   "0.0.0.0*",
   "*.local/*",
   "*.test/*",
+  "news.ycombinator.com*",
   // Add your dev/staging hosts here, e.g.:
   // "staging.example.com/*",
 ];
