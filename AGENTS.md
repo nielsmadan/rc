@@ -4,7 +4,7 @@ This file provides guidance to coding agents when working with code in this repo
 
 ## Repository purpose
 
-Personal dotfiles for macOS. `install.sh` symlinks files from this repo into `$HOME` (and a few other places like `~/.config/nvim`, `~/.config/kitty`, iTerm2's scripts dir). Editing a file here = editing the live config. Re-running `install.sh` is idempotent.
+Personal dotfiles for macOS. `install.sh` symlinks files from this repo into `$HOME` (and a few other places like `~/.config/nvim`, `~/.config/kitty`, iTerm2's scripts dir). Editing a file here = editing the live config. Re-running `install.sh` is idempotent — in steady state every step short-circuits and `--quiet` prints nothing at all.
 
 Each app's config lives in its **own subdir** (`hammerspoon/`, `iterm2/`, `nvim/`, `kitty/`, `wezterm/`, …); `install.sh` maps each to its target. After moving a config into a subdir, re-run `install.sh` so the symlink follows — the old symlink otherwise still points at the pre-move path.
 
@@ -21,11 +21,30 @@ iterm2: clone repo to new tab
 
 Common scopes in use: `zsh`, `mise`, `iterm2`, `hammerspoon`, `git`, `sops`, `vim`, `nvim`, `kitty`. Pick the scope matching the files changed; use a new one when none fits. Keep changes to a single scope per commit where practical.
 
+## `install.sh --check` and the git hooks
+
+`install.sh` takes two flags:
+
+- **`--check`** — dry run. Reports each pending change as a `would …` line, performs none of them, and exits **1** if anything is pending (0 when clean). Every side-effecting step in the script is gated behind the `pending()` helper, which counts the change and, under `--check`, prints it and returns non-zero so the caller skips the real work.
+- **`--quiet`** — suppress the routine `skip …` chatter (via the `say()` helper); only lines for things that actually changed are printed.
+
+Two steps are deliberately **excluded** from the pending count: the `hidutil property --set` re-apply and the iTerm2 `defaults write`. Both rewrite the same values every run (hidutil's `UserKeyMapping` is session-scoped and must be re-applied), so counting them would leave `--check` permanently dirty and the hook nag permanently on. `--check` skips both outright rather than reporting them.
+
+`--check` also names what the `rm -rf "$dest"` inside `link()` would destroy — `(REPLACES EXISTING FILE)`, `(REPLACES EXISTING DIRECTORY)`, or the old target of a foreign symlink. That case only arises when a link target *moves*, which is exactly what a pull can do, so the warning is the point.
+
+**Hooks** live in the committed `githooks/` dir, wired up by `install.sh` setting `core.hooksPath` (that setting lives in `.git/config`, which is machine-local and never committed, so it has to be re-set per clone rather than shipped in the repo). `post-merge`, `post-rewrite` (covers `pull --rebase`, which `post-merge` misses) and `post-checkout` (gated on `$3 = 1`, a branch checkout) all `exec` the shared `githooks/_nudge.sh`.
+
+The hooks **only ever run `install.sh --check`** — they never re-link anything behind your back, and they always `exit 0` so a stale symlink can't fail the git operation that triggered it. A pull that leaves nothing stale prints nothing. Skip the whole mechanism on a machine by uncommenting `githooks` in `install.local`, which also unsets `core.hooksPath` if it currently points here.
+
+The one step the hooks can't keep current is the Obsidian vimrc: it's the script's only interactive step, and it's now gated on a tty (and off under `--check`) so non-interactive runs don't die on EOF reading the prompt. The vault path isn't recorded anywhere, so a non-interactive run always skips it. That's harmless in practice — the existing symlink points into the repo, so content changes flow through automatically; only a *move* of `.obsidian.vimrc` would need an interactive re-run.
+
 ## Per-machine install skip list (`install.local`)
 
 Every `link` call in `install.sh` carries a short **alias** as its first argument (`gitignore`, `zshrc`, `nvim`, …). `install.local` (repo root, **gitignored**, one alias per line) is a per-machine opt-out: an uncommented alias means `install.sh` skips that target — it won't re-link it, and if the destination is currently a symlink into this repo it's **detached** into a real machine-local copy (`cp -R`) so it can be edited without affecting the repo. Re-comment the line to hand the target back to the repo symlink on the next run.
 
-`install.sh` generates `install.local` on first run (at the end, after every `link` call) with all aliases listed but commented out, so the default file skips nothing. The alias list is single-sourced: `link()` appends each alias to a `SEEN_KEYS` array, and the stub is built from that — no separate hardcoded list to keep in sync. **When adding or removing a `link` call, just give it an alias; the stub updates itself.**
+`install.sh` generates `install.local` on first run (at the end, after every `link` call) with all aliases listed but commented out, so the default file skips nothing. The alias list is single-sourced: `link()` calls `seen_key` to append each alias to a `SEEN_KEYS` array, and the stub is built from that — no separate hardcoded list to keep in sync. **When adding or removing a `link` call, just give it an alias; the file keeps itself current.**
+
+An *existing* `install.local` is **merged, not left alone**: aliases added since it was written get appended (commented out, so behaviour is unchanged), and aliases it lists that match no `link` call are flagged with a `warn:` line. Before this merge existed, adding a `link` call left every already-installed machine's file silently stale — the new alias was simply absent, and you cannot skip a target you cannot see. Aliases that aren't plain `link` calls (`obsidian-vimrc`, `githooks`) call `seen_key` directly so they appear in the list too.
 
 ## Two editor configs coexist
 
