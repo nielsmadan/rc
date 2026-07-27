@@ -174,6 +174,37 @@ The config is **split** to keep client identities out of the repo, mirroring the
 
 Routing mechanics: a single guarded `rewrite` rule turns a matched URL into the `ext+container:name=<container>&url=<href>` scheme (read by LibreWolf's [Open external links in a container](https://addons.mozilla.org/firefox/addon/open-url-in-container/) add-on), and a handler sends `ext+container:*` to LibreWolf. The rewrite is guarded against re-rewriting an already-rewritten URL so rules can't chain; `containerFor()` returns the first matching entry. Shared services (GitHub, App Store Connect, AWS, Firebase, …) are scoped by path/ID/org/region so they don't collide across containers or hijack personal browsing. **Container names are case-sensitive** and must match those created in LibreWolf exactly.
 
+## `bin/` — standalone scripts on PATH
+
+`bin/` holds self-contained helper scripts, each symlinked individually into `~/.local/bin` (already on `PATH` from `.zshrc`) by its own `link` call in `install.sh` — **not** a directory symlink, since `~/.local/bin` also holds unrelated machine-local binaries. Adding a script means adding a `link <alias> bin/<name> ~/.local/bin/<name>` line; the `install.local` skip list keeps itself current from the alias.
+
+The current set turns media into something an agent can actually read — text or a single image. The first two were ported out of a Claude skill's `scripts/` dir and generalized. All self-document via `--help`, which prints their own leading comment block, so that block *is* the documentation — keep it accurate when changing behaviour.
+
+- **`yt-transcript <url> [--lang xx] [--timestamps]`** — prints a `METADATA:` line (`id | upload_date | uploader | title`) and the path to a cleaned, de-duplicated transcript in `TMPDIR`. Prefers manual captions over auto-generated. Exits **0** with a `NO_CAPTIONS:` line when there are none, so a caller can fall back to the title/description (or to `transcribe`) instead of treating it as an error.
+- **`transcribe <src> [--model N] [--timestamps]`** — local Whisper speech-to-text for anything without captions: podcasts, Twitch VODs, meeting/screen recordings, voice memos. Covers exactly the hole `yt-transcript` leaves.
+- **`video-frames`** — `--sheet` (contact sheet, 1 thumb/60s, keyframe-only decode so long videos sample fast), `--scan <start> <end>` (frame-difference motion profile over a window, proposing the last still frame before sustained motion starts), bare `<src> <ts> <out>` (one high-quality frame, max 1920px), and `--clean`. Intended flow: sheet → scan → extract → look at the frame.
+- **`img-sheet <out.jpg> <image|dir>...`** — tiles images into one labelled contact sheet so a pile of screenshots costs one look instead of twenty. Cells are sized by **width only**, so rows pack tightly for uniform-aspect inputs; mixing portrait and landscape leaves padding.
+
+`<src>` for `video-frames` and `transcribe` is a **local file path or any yt-dlp-supported URL**; remote sources download once into `TMPDIR` and are reused across calls, so a sheet/scan/extract sequence costs one download. `video-frames` keys its cache on video id (a URL hash for non-YouTube links, so `youtu.be/X` and `watch?v=X` share an entry); `transcribe` keys on source **plus model** (a different model is a different transcript) and caches the finished VTT, so a re-run is ~0.1s instead of a full pass. Both take `--clean`.
+
+**`--timestamps`** on `yt-transcript` and `transcribe` prefixes each line `[M:SS]` (~60s buckets, `--bucket` to change) instead of emitting one flat paragraph. That's what makes the pair compose: locate a moment in the text, hand the timestamp to `video-frames` to see it. Both go through the shared **`bin/lib/vtt_to_text.py`** — YouTube captions and Whisper output are both VTT, so there's one parser, not two that drift. The scripts locate it via `os.path.realpath("$0")`, which resolves the `~/.local/bin` symlink back into the repo; `install.sh` links only the commands, and the lib rides along in the repo.
+
+### Whisper engine and models
+
+`transcribe` runs a **local** model — nothing is uploaded, and it works offline once weights are cached (this is the point for client recordings). Engine resolution: `mlx_whisper` on `PATH`, else `mise exec -- mlx_whisper` (mise-installed CLIs are absent from `PATH` in a shell that never activated mise — a cron job, an editor subprocess), else `whisper-cli` from whisper.cpp with `$WHISPER_CPP_MODEL`. The mlx path is pinned as `pipx:mlx-whisper` in `mise/config.toml`; **MLX is Apple-Silicon-only**, so that pin can't install on an Intel Mac — the whisper.cpp fallback exists for exactly that case, and the engine detection degrades to a clear install message rather than a stack trace.
+
+Weights land in `~/.cache/huggingface/hub/` (**not** managed by mise — mise installs the CLI, the model is a separate first-run download). Measured: `whisper-large-v3-turbo` **1.5G**, `whisper-tiny` **71M**; `small.en` sits around 0.5G. The default is turbo via `$TRANSCRIBE_MODEL`, because tiny is visibly wrong on real audio (it produced "long prompts" where turbo got the sentence right). Drop to a smaller model with `--model` when speed or disk matters more than accuracy.
+
+### Gotchas baked into these scripts, don't undo them
+
+- **macOS ships bash 3.2**, where a bare `"${arr[@]}"` on an *empty* array trips `set -u` and aborts. Every optional-args array uses `${arr[@]+"${arr[@]}"}`. This is a live path, not theory: it's hit by `img-sheet --no-labels`, by `transcribe` without `--lang`, and by `video-frames` on any machine without node.
+- Every ffmpeg output chain ends in `format=yuvj420p`; without it the mjpeg encoder refuses non-full-range YUV and writes **nothing while still exiting 0**. Both output paths therefore run ffmpeg with `|| true` and gate on `[ -s "$out" ]`, so "no frame written" is a real error rather than a silent success.
+- `--scan`'s backward walk from the motion onset is bounds-checked: when motion starts at the very start of the window there is no still frame before it, and an unguarded `rows[onset-1]` wraps to the *end* of the list and confidently reports a bogus timestamp.
+- YouTube only exposes formats above 360p to a client with a **JS runtime**, hence `--js-runtimes node` — passed only when both `node` and that (newer) yt-dlp flag exist, so an older yt-dlp doesn't hard-fail on an unknown option.
+- `yt-dlp` is **not pinned in `mise/config.toml`** — it's a pip install inside the mise python, so a python version bump loses it. `ffmpeg`/`ffprobe` and ImageMagick come from brew, per the mise-vs-brew rule.
+
+`ffmpeg`/`ffprobe` come from brew (C libs, per the mise-vs-brew rule); `yt-dlp` is **not currently pinned in `mise/config.toml`** — it's a pip install inside the mise python, so a python version bump loses it.
+
 ## Shell prompt
 
 `.zshrc` puts `~/.zsh/pure` on `fpath` and runs `prompt pure`. If the directory is missing, `prompt pure` fails silently and zsh falls back to its default `%m%#` prompt — `install.sh` clones `sindresorhus/pure` into `~/.zsh/pure` to prevent that.

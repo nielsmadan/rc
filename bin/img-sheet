@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+#
+# img-sheet - tile a pile of images into one labelled contact sheet.
+#
+# Usage:
+#   img-sheet <out.jpg> <image|dir> [more...]   # explicit files and/or directories
+#   img-sheet <out.jpg> <dir> --cols 4 --width 2400 --no-labels
+#
+# Directories are expanded to the images directly inside them (not recursive),
+# sorted by name. The sheet is capped at --width pixels wide (default 2000) so
+# it stays readable, and each cell is captioned with its filename unless
+# --no-labels is passed.
+#
+# The point is one image instead of twenty: a whole run of screenshots becomes a
+# single thing to look at. Same idea as `video-frames --sheet`, different input.
+#
+# Cells are sized by width only, so rows pack tightly when the inputs share an
+# aspect ratio (the usual case: frames from one video, shots from one screen).
+# Mixing portrait and landscape leaves padding — split those into two sheets.
+# Requires: ImageMagick (montage, identify).
+
+set -uo pipefail
+
+OUT=""
+COLS=""
+WIDTH=2000
+LABELS=1
+INPUTS=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --cols) COLS="${2:?--cols needs a number}"; shift 2 ;;
+    --width) WIDTH="${2:?--width needs pixels}"; shift 2 ;;
+    --no-labels) LABELS=0; shift ;;
+    -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) if [ -z "$OUT" ]; then OUT="$1"; else INPUTS+=("$1"); fi; shift ;;
+  esac
+done
+
+[ -n "$OUT" ] || { echo "ERROR: no output path. Usage: img-sheet <out.jpg> <image|dir>..." >&2; exit 2; }
+[ ${#INPUTS[@]} -gt 0 ] || { echo "ERROR: no input images or directories given" >&2; exit 2; }
+command -v montage >/dev/null 2>&1 || { echo "ERROR: ImageMagick not installed (brew install imagemagick)" >&2; exit 3; }
+
+# Expand directories one level deep, keeping only things ImageMagick can read.
+FILES=()
+for item in "${INPUTS[@]}"; do
+  if [ -d "$item" ]; then
+    while IFS= read -r f; do
+      case "${f##*.}" in
+        jpg|jpeg|JPG|JPEG|png|PNG|gif|GIF|webp|WEBP|tif|tiff|TIF|TIFF|heic|HEIC|bmp|BMP) FILES+=("$f") ;;
+      esac
+    done < <(find "$item" -maxdepth 1 -type f | sort)
+  elif [ -f "$item" ]; then
+    FILES+=("$item")
+  else
+    echo "WARN: skipping $item (not a file or directory)" >&2
+  fi
+done
+
+N=${#FILES[@]}
+[ "$N" -gt 0 ] || { echo "ERROR: no images found in the given inputs" >&2; exit 4; }
+
+# Default to a roughly square grid, which reads better than a long strip.
+if [ -z "$COLS" ]; then
+  COLS=$(python3 -c "import math,sys; print(max(1, math.ceil(math.sqrt(int(sys.argv[1])))))" "$N" 2>/dev/null || echo 4)
+fi
+
+# Size each cell so the finished sheet lands near --width.
+CELL=$(( WIDTH / COLS ))
+[ "$CELL" -lt 120 ] && CELL=120
+
+# ${a[@]+"${a[@]}"} guards the empty case: macOS ships bash 3.2, where a bare
+# "${a[@]}" on an empty array trips `set -u`.
+label_args=(-label '%f')
+[ "$LABELS" = 0 ] && label_args=()
+
+montage ${label_args[@]+"${label_args[@]}"} "${FILES[@]}" \
+  -tile "${COLS}x" -geometry "${CELL}x+4+4" -background '#1a1a1a' -fill '#dddddd' \
+  -pointsize 13 "$OUT" || { echo "ERROR: montage failed" >&2; exit 4; }
+
+[ -s "$OUT" ] || { echo "ERROR: no sheet written" >&2; exit 4; }
+DIMS=$(identify -format '%wx%h' "$OUT" 2>/dev/null)
+echo "SHEET: $OUT  ($N images, ${COLS} cols, $DIMS)"

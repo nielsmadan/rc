@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+#
+# transcribe - local speech-to-text for any audio or video source.
+#
+# Usage:
+#   transcribe <src> [--model <name>] [--lang <code>] [--timestamps] [--bucket <s>]
+#   transcribe --clean <src>          # drop the cached audio + transcript
+#
+# <src> is a local audio/video file or any yt-dlp-supported URL. Prints the path
+# to a plain-text transcript. Use this when yt-transcript returns NO_CAPTIONS,
+# or for anything without captions at all: podcasts, Twitch VODs, meeting and
+# screen recordings, voice memos.
+#
+# --timestamps prefixes each line with [M:SS] (~60s buckets, --bucket to change),
+# so you can locate a moment and hand the timestamp to video-frames.
+#
+# Runs a local Whisper model — nothing is uploaded and it works offline once the
+# weights are cached. The first run with a given model downloads it (see --model
+# below). Both the extracted audio and the finished transcript are cached in
+# TMPDIR keyed by source + model, so a re-run is instant; --clean drops them.
+#
+# Engine: mlx_whisper (Apple Silicon, preferred) or whisper-cli from whisper.cpp
+# (portable fallback; set WHISPER_CPP_MODEL to a .bin path). Override the model
+# with --model or $TRANSCRIBE_MODEL; default is whisper-large-v3-turbo, which is
+# ~1.6GB on first use. Swap in mlx-community/whisper-small.en (~0.5GB) or
+# whisper-tiny (~0.1GB) if space or speed matters more than accuracy.
+# Requires: ffmpeg, python3; yt-dlp for URLs.
+
+set -uo pipefail
+
+HERE=$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0" 2>/dev/null)
+CACHE="${TMPDIR:-/tmp}"
+MODEL="${TRANSCRIBE_MODEL:-mlx-community/whisper-large-v3-turbo}"
+LANG_CODE=""
+MODE="plain"
+BUCKET="60"
+CLEAN=0
+SRC=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --model) MODEL="${2:?--model needs a name}"; shift 2 ;;
+    --lang) LANG_CODE="${2:?--lang needs a language code}"; shift 2 ;;
+    --timestamps|-t) MODE="ts"; shift ;;
+    --bucket) BUCKET="${2:?--bucket needs seconds}"; MODE="ts"; shift 2 ;;
+    --clean) CLEAN=1; shift ;;
+    -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) SRC="$1"; shift ;;
+  esac
+done
+
+[ -n "$SRC" ] || { echo "ERROR: no source given. Usage: transcribe <src> [--timestamps]" >&2; exit 2; }
+command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not installed" >&2; exit 3; }
+
+# Cache key: source identity + model, since a different model is a different
+# transcript. Local files key on realpath + mtime so an edited file re-transcribes.
+key_for() {
+  python3 - "$1" "$2" <<'PY'
+import hashlib, os, sys
+src, model = sys.argv[1], sys.argv[2]
+if os.path.isfile(src):
+    ident = f"{os.path.realpath(src)}:{os.path.getmtime(src)}"
+else:
+    ident = src
+print(hashlib.sha1(f"{ident}|{model}".encode()).hexdigest()[:16])
+PY
+}
+
+KEY=$(key_for "$SRC" "$MODEL")
+AUDIO_GLOB="$CACHE/transcribe_audio_$KEY"
+VTT="$CACHE/transcribe_$KEY.vtt"
+TXT="$CACHE/transcribe_$KEY.txt"
+
+if [ "$CLEAN" = 1 ]; then
+  rm -f "$AUDIO_GLOB".* "$VTT" "$TXT"
+  echo "cleaned cache for $SRC"
+  exit 0
+fi
+
+# Whisper reads video containers fine via ffmpeg, so only remote sources need
+# an extraction step.
+if [ -f "$SRC" ]; then
+  AUDIO="$SRC"
+else
+  command -v yt-dlp >/dev/null 2>&1 || { echo "ERROR: yt-dlp not installed (needed for URL sources)" >&2; exit 3; }
+  AUDIO=$(ls "$AUDIO_GLOB".* 2>/dev/null | grep -v '\.part$' | head -1 || true)
+  if [ -z "$AUDIO" ]; then
+    echo "Extracting audio ..." >&2
+    yt-dlp -x --audio-format mp3 -o "$AUDIO_GLOB.%(ext)s" "$SRC" >&2 || {
+      echo "ERROR: could not extract audio from $SRC" >&2; exit 4; }
+    AUDIO=$(ls "$AUDIO_GLOB".* 2>/dev/null | grep -v '\.part$' | head -1 || true)
+  fi
+  [ -n "$AUDIO" ] || { echo "ERROR: no audio extracted from $SRC" >&2; exit 4; }
+fi
+
+# mise-installed CLIs aren't on PATH in a shell that never activated mise (a
+# cron job, an editor subprocess), so fall back to `mise exec` before giving up.
+whisper_cmd() {
+  if command -v mlx_whisper >/dev/null 2>&1; then echo "mlx_whisper"
+  elif command -v mise >/dev/null 2>&1 && mise exec -- mlx_whisper --help >/dev/null 2>&1; then echo "mise exec -- mlx_whisper"
+  elif command -v whisper-cli >/dev/null 2>&1; then echo "whisper-cli"
+  else echo ""; fi
+}
+
+ENGINE=$(whisper_cmd)
+if [ -z "$ENGINE" ]; then
+  cat >&2 <<'EOF'
+ERROR: no Whisper engine found. Install one:
+  mise use -g pipx:mlx-whisper     # Apple Silicon, fastest
+  brew install whisper-cpp         # portable; also set WHISPER_CPP_MODEL=/path/to/ggml-*.bin
+EOF
+  exit 3
+fi
+
+if [ ! -s "$VTT" ]; then
+  echo "Transcribing with $MODEL (first run downloads the model) ..." >&2
+  if [ "$ENGINE" = "whisper-cli" ]; then
+    [ -n "${WHISPER_CPP_MODEL:-}" ] || { echo "ERROR: set WHISPER_CPP_MODEL to a ggml .bin model path" >&2; exit 3; }
+    command -v ffmpeg >/dev/null 2>&1 || { echo "ERROR: ffmpeg not installed" >&2; exit 3; }
+    wav="$CACHE/transcribe_wav_$KEY.wav"
+    ffmpeg -y -loglevel error -i "$AUDIO" -ar 16000 -ac 1 -c:a pcm_s16le "$wav" || {
+      echo "ERROR: could not convert audio to 16kHz mono wav" >&2; exit 4; }
+    # ${a[@]+"${a[@]}"} guards the empty case: macOS ships bash 3.2, where a bare
+    # "${a[@]}" on an empty array trips `set -u`.
+    lang_args=(); [ -n "$LANG_CODE" ] && lang_args=(-l "$LANG_CODE")
+    whisper-cli -m "$WHISPER_CPP_MODEL" -f "$wav" ${lang_args[@]+"${lang_args[@]}"} -ovtt -of "${VTT%.vtt}" >&2 || {
+      echo "ERROR: whisper-cli failed" >&2; exit 4; }
+    rm -f "$wav"
+  else
+    lang_args=(); [ -n "$LANG_CODE" ] && lang_args=(--language "$LANG_CODE")
+    # --output-name so the result lands on our cache key rather than the audio's name
+    $ENGINE "$AUDIO" --model "$MODEL" ${lang_args[@]+"${lang_args[@]}"} \
+      --output-dir "$CACHE" --output-name "transcribe_$KEY" --output-format vtt >&2 || {
+      echo "ERROR: transcription failed" >&2; exit 4; }
+  fi
+fi
+
+[ -s "$VTT" ] || { echo "ERROR: no transcript produced" >&2; exit 4; }
+python3 "$HERE/lib/vtt_to_text.py" "$VTT" "$TXT" "$MODE" "$BUCKET"

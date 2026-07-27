@@ -191,6 +191,11 @@ link gitignore        git/ignore       ~/.config/git/ignore
 link secrets          secrets/secrets.yaml ~/.config/sops/secrets.yaml
 link hammerspoon      hammerspoon      ~/.hammerspoon
 link finicky          finicky/finicky.ts ~/.finicky.ts
+# Standalone helper scripts. ~/.local/bin is already on PATH from .zshrc.
+link yt-transcript    bin/yt-transcript ~/.local/bin/yt-transcript
+link video-frames     bin/video-frames  ~/.local/bin/video-frames
+link transcribe       bin/transcribe    ~/.local/bin/transcribe
+link img-sheet        bin/img-sheet     ~/.local/bin/img-sheet
 # SaveWindowArrangement.py runs as an AutoLaunch daemon (auto-saves window
 # arrangements + registers the Cmd+S RPC). Drop the pre-daemon manual-script
 # symlink from the plain Scripts dir if a prior install left one there.

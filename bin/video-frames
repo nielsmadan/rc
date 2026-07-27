@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+#
+# video-frames - pull frames, contact sheets and motion profiles out of a video.
+#
+# Usage:
+#   video-frames --sheet <src> <out_sheet.jpg>            # contact sheet, 1 thumb/60s (find the moment)
+#   video-frames --scan <src> <start_s> <end_s> [fps]     # motion profile over a window
+#   video-frames <src> <timestamp> <out_frame.jpg>        # one frame (ts = SS | M:SS | H:MM:SS)
+#   video-frames --clean <src>                            # drop the cached download for that source
+#
+# <src> is a local file path or any URL yt-dlp can fetch. A remote source is
+# downloaded once (<=1080p) into TMPDIR, keyed by video id, and reused across
+# calls — build a sheet, scan, then extract frames without re-downloading.
+# Pass --lores before <src> to fetch <=720p instead (smaller).
+#
+# --scan graphs frame-to-frame motion across a window and proposes the last
+# static frame before motion picks up and stays high — for finding the instant
+# a scene starts moving (a cut, a transition, an action kicking off). Typical
+# flow: --sheet to locate the region, --scan a ~60s window around it, then
+# extract at the proposed timestamp and look at the frame to confirm.
+#
+# Frames are near-native (max 1920px wide) high-quality JPEGs. Run --clean when
+# done to drop the cached download.
+# Requires: ffmpeg, ffprobe, python3; yt-dlp and node for remote sources.
+
+set -euo pipefail
+CACHE="${TMPDIR:-/tmp}"
+MAXH=1080
+
+need() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: $1 not installed" >&2; exit 3; }; }
+
+if [ "${1:-}" = "--lores" ]; then MAXH=720; shift; fi
+
+# Cache key: the video id for the common URL shapes, else a hash of the URL.
+cache_key() {
+  local u="$1" id=""
+  id=$(printf '%s' "$u" | sed -nE 's#.*[?&]v=([A-Za-z0-9_-]{11}).*#\1#p')
+  [ -z "$id" ] && id=$(printf '%s' "$u" | sed -nE 's#.*youtu\.be/([A-Za-z0-9_-]{11}).*#\1#p')
+  [ -z "$id" ] && id=$(printf '%s' "$u" | sed -nE 's#.*/(shorts|embed)/([A-Za-z0-9_-]{11}).*#\2#p')
+  [ -z "$id" ] && id=$(printf '%s' "$u" | shasum | cut -c1-16)
+  printf '%s' "$id"
+}
+
+resolve_src() {
+  local src="$1" key path
+  if [ -f "$src" ]; then printf '%s' "$src"; return; fi
+  need yt-dlp
+  key=$(cache_key "$src")
+  path=$(ls "$CACHE"/vidframes_"$key".* 2>/dev/null | grep -v '\.part$' | head -1 || true)
+  if [ -z "$path" ]; then
+    echo "Downloading (<=${MAXH}p) $key ..." >&2
+    # YouTube only exposes formats above 360p (format 18) to a client with a JS
+    # runtime; --js-runtimes is a newer yt-dlp flag, so only pass it when both
+    # the flag and node exist. Frames only, so a video-only stream is fine.
+    local opts=()
+    if command -v node >/dev/null 2>&1 && yt-dlp --help 2>/dev/null | grep -q -- '--js-runtimes'; then
+      opts+=(--js-runtimes node)
+    fi
+    # ${a[@]+"${a[@]}"} guards the empty case (no node): macOS ships bash 3.2,
+    # where a bare "${a[@]}" on an empty array trips `set -u`.
+    yt-dlp ${opts[@]+"${opts[@]}"} \
+      -f "bv[height<=${MAXH}][vcodec^=av01]/bv[height<=${MAXH}][vcodec^=vp9]/bv[height<=${MAXH}]/b[height<=${MAXH}]/b" \
+      -o "$CACHE/vidframes_$key.%(ext)s" "$src" >&2
+    path=$(ls "$CACHE"/vidframes_"$key".* 2>/dev/null | grep -v '\.part$' | head -1)
+  fi
+  [ -z "$path" ] && { echo "ERROR: could not fetch $src" >&2; exit 3; }
+  printf '%s' "$path"
+}
+
+case "${1:-}" in
+  --clean)
+    src="${2:?need a source}"
+    if [ -f "$src" ]; then echo "nothing cached: $src is a local file"; exit 0; fi
+    key=$(cache_key "$src")
+    rm -f "$CACHE"/vidframes_"$key".* && echo "cleaned cache for $key"
+    ;;
+  --sheet)
+    need ffmpeg; need ffprobe; need python3
+    src="${2:?need a source}"; out="${3:?need output path}"
+    vid=$(resolve_src "$src")
+    dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$vid")
+    cols=6
+    rows=$(python3 -c "import math,sys; print(max(1, math.ceil(math.ceil(float(sys.argv[1])/60)/6)))" "$dur")
+    # keyframe-only decode (-skip_frame nokey) so a long 1080p video samples fast,
+    # then ~1 thumb/60s tiled into a grid. No time labels: cell r,c = (r*6+c) minutes.
+    ffmpeg -y -loglevel error -skip_frame nokey -i "$vid" \
+      -vf "fps=1/60,scale=360:-1,tile=${cols}x${rows},format=yuvj420p" -frames:v 1 -q:v 4 "$out" || true
+    [ -s "$out" ] || { echo "ERROR: no sheet written — the video is likely shorter than one 60s sample interval" >&2; exit 4; }
+    echo "SHEET: $out  (video ${dur%.*}s, ~1 thumb/60s, ${cols}x${rows} grid; cell r,c 0-indexed = (r*6+c) minutes)"
+    ;;
+  --scan)
+    # Frame-to-frame difference over a window. A sustained jump in the profile is
+    # motion starting; the last low-difference frame before it is the final still
+    # moment of whatever came before.
+    need ffmpeg; need python3
+    src="${2:?need a source}"; ds="${3:?need window start seconds}"; de="${4:?need window end seconds}"; df="${5:-2}"
+    vid=$(resolve_src "$src")
+    span=$(python3 -c "print(max(1,int(float('$de'))-int(float('$ds'))))")
+    tmp="$CACHE/vidframes_motion_$$.txt"
+    ffmpeg -hide_banner -ss "$ds" -t "$span" -i "$vid" \
+      -vf "fps=${df},tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=$tmp" \
+      -an -f null - >/dev/null 2>&1
+    python3 - "$tmp" "$ds" "$df" <<'PY'
+import re,sys
+path,base,fps=sys.argv[1],float(sys.argv[2]),float(sys.argv[3])
+t=None; rows=[]
+for line in open(path):
+    m=re.search(r'pts_time:([\d.]+)',line)
+    if m: t=float(m.group(1))
+    m=re.search(r'YAVG=([\d.]+)',line)
+    if m and t is not None: rows.append((base+t,float(m.group(1))))
+if not rows: print("no motion data (bad window?)"); sys.exit()
+ys=[y for _,y in rows]; mx=max(ys) or 1
+mv=[sum(ys[max(0,i-1):i+2])/len(ys[max(0,i-1):i+2]) for i in range(len(ys))]
+mmx=max(mv) or 1
+onset=None
+for i in range(len(mv)):
+    if mv[i] > 0.5*mmx:
+        tail=mv[i:i+4]
+        if sum(tail)/len(tail) > 0.35*mmx: onset=i; break
+for tm,y in rows:
+    print(f"{int(tm//60)}:{tm%60:04.1f}  {y:6.2f} {'#'*int(y/mx*40)}")
+def fmt(x): return f"{int(x//60)}:{x%60:04.1f} ({x:.1f}s)"
+if onset is not None:
+    bt=rows[onset][0]
+    # walk back from the onset to the last genuinely static frame (< 25% of peak motion)
+    lowthr=0.25*mx; j=onset-1
+    while j>0 and ys[j]>lowthr: j-=1
+    if j<0 or ys[j]>lowthr:
+        print(f"\nPROPOSED: sustained motion starts ~{fmt(bt)}, but nothing is still before it inside this window — start the window earlier.")
+    else:
+        print(f"\nPROPOSED: sustained motion starts ~{fmt(bt)}. Last still frame before it ~{fmt(rows[j][0])} — extract it and check the frame, nudging earlier if something is still mid-move.")
+else:
+    print("\nNo clear motion onset in this window; widen it or pick visually where the bars go from short to consistently long.")
+PY
+    rm -f "$tmp"
+    ;;
+  "" | -h | --help)
+    grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'
+    ;;
+  *)
+    need ffmpeg
+    src="$1"; ts="${2:?need timestamp}"; out="${3:?need output path}"
+    vid=$(resolve_src "$src")
+    ffmpeg -y -loglevel error -ss "$ts" -i "$vid" -frames:v 1 \
+      -vf "scale='min(1920,iw)':-1,format=yuvj420p" -q:v 2 "$out" || true
+    [ -s "$out" ] || { echo "ERROR: no frame written — is $ts past the end of the video?" >&2; exit 4; }
+    sz=$(( $(stat -f%z "$out" 2>/dev/null || stat -c%s "$out") / 1024 ))
+    echo "FRAME: $out  (@ $ts, ${sz}KB)"
+    ;;
+esac

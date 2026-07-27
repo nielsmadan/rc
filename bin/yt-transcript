@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# yt-transcript - fetch a video's metadata plus a cleaned plain-text transcript.
+#
+# Usage:
+#   yt-transcript <url> [--lang <code>] [--timestamps] [--bucket <seconds>]
+#
+# <url> is anything yt-dlp can handle (YouTube, Vimeo, ...). Prints a METADATA
+# line (id | upload_date | uploader | title) and the path to a de-duplicated
+# transcript. Manual captions are preferred over auto-generated ones.
+# Language defaults to en; --lang takes any yt-dlp sub-language code.
+#
+# --timestamps prefixes each line with [M:SS] instead of emitting one flat
+# paragraph, merging cues into ~60s buckets (--bucket to change). Use it to
+# find where something was said, then pass that timestamp to video-frames to
+# see the picture at that moment.
+#
+# Exits 0 with a NO_CAPTIONS line when the video has no captions in that
+# language — fall back to the title/description from METADATA, or run
+# `transcribe` on the same URL to generate one from the audio.
+# Requires: yt-dlp, python3.
+
+set -u
+
+HERE=$(python3 -c 'import os,sys; print(os.path.dirname(os.path.realpath(sys.argv[1])))' "$0" 2>/dev/null)
+URL=""
+LANG_CODE="en"
+MODE="plain"
+BUCKET="60"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --lang) LANG_CODE="${2:?--lang needs a language code}"; shift 2 ;;
+    --timestamps|-t) MODE="ts"; shift ;;
+    --bucket) BUCKET="${2:?--bucket needs seconds}"; MODE="ts"; shift 2 ;;
+    -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) URL="$1"; shift ;;
+  esac
+done
+
+if [ -z "$URL" ]; then
+  echo "ERROR: no URL given. Usage: yt-transcript <url> [--lang <code>] [--timestamps]" >&2
+  exit 2
+fi
+
+command -v yt-dlp >/dev/null 2>&1 || { echo "ERROR: yt-dlp not installed" >&2; exit 3; }
+command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not installed" >&2; exit 3; }
+
+META=$(yt-dlp --skip-download --print "%(id)s | %(upload_date)s | %(uploader)s | %(title)s" "$URL" 2>/dev/null)
+if [ -z "$META" ]; then
+  echo "ERROR: yt-dlp could not read metadata for $URL (unsupported site, private, or removed). For a plain web page, fetch it as HTML instead." >&2
+  exit 4
+fi
+echo "METADATA: $META"
+VID=$(printf '%s' "$META" | awk -F' \\| ' '{print $1}')
+
+OUTDIR="${TMPDIR:-/tmp}"
+RAW="$OUTDIR/yt_transcript_raw_${VID}"
+yt-dlp --skip-download --write-sub --write-auto-sub --sub-lang "$LANG_CODE" \
+  --sub-format vtt -o "${RAW}.%(ext)s" "$URL" >/dev/null 2>&1
+
+VTT=$(ls "${RAW}."*"${LANG_CODE}"*.vtt "${RAW}.${LANG_CODE}.vtt" 2>/dev/null | head -1)
+if [ -z "$VTT" ] || [ ! -f "$VTT" ]; then
+  echo "NO_CAPTIONS: no '$LANG_CODE' captions available. Fall back to the title/description from METADATA, or run: transcribe \"$URL\""
+  exit 0
+fi
+
+TXT="$OUTDIR/yt_transcript_${VID}.txt"
+python3 "$HERE/lib/vtt_to_text.py" "$VTT" "$TXT" "$MODE" "$BUCKET"
+rc=$?
+rm -f "${RAW}."*.vtt
+exit $rc
