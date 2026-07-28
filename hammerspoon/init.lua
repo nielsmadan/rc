@@ -359,14 +359,51 @@ end
 -- this (always re-home) but refresh it. Cleared on windowDestroyed.
 local placedWindows = {}
 
+-- Sequenced focus → setFrame for FOCUS_TO_PLACE windows, then hand focus
+-- back to `prev`. Async and one window at a time: focus() ends in an
+-- asynchronous app activation, so concurrent calls race and a setFrame
+-- fired in the same tick lands before the focus has taken effect. This is
+-- the only path that touches focus at all, so it's the only one that has
+-- anything to restore.
+local function placeViaFocus(items, prev)
+  local function step(i)
+    if i > #items then
+      if prev and prev:isStandard() then prev:focus() end
+      return
+    end
+    local it = items[i]
+    if not it.win:isStandard() then return step(i + 1) end
+    it.win:focus()
+    hs.timer.doAfter(0.05, function()
+      if it.win:isStandard() then it.win:setFrame(it.frame, 0) end
+      hs.timer.doAfter(0.05, function() step(i + 1) end)
+    end)
+  end
+  step(1)
+end
+
 -- Re-home every managed window in two phases:
---   1. Native apps — placed instantly and in parallel in one synchronous
---      pass (no focus, no per-window timers). setFrameCorrectness off +
---      0 duration = a single immediate AX set: no retry jitter, no slide.
+--   1. Native apps — placed, then raised, in two loops. setFrameCorrectness
+--      off + 0 duration = a single immediate AX set: no retry jitter, no
+--      slide. raise() is kAXRaiseAction on its own — it brings a window
+--      forward *without* activating its app, so focus normally stays put
+--      and there's nothing to put back. The one exception is a non-managed
+--      window holding focus, which raise() can't get past; see the comment
+--      at the raise call. Windows are raised in orderedWindows order so the
+--      last one ends up on top — but only approximately: each AXRaise is
+--      handled on its target app's own run loop, so a burst of them doesn't
+--      always settle in call order. Sequencing the raises on timers would
+--      make it exact, at the cost of a visibly slower pass.
 --   2. FOCUS_TO_PLACE apps — only honor setFrame on the focused window, so
---      these get focus → setFrame, sequenced (concurrent focus() calls
---      race) and async (so Phase 1 stays instant). Usually 0-1 windows.
+--      these go through placeViaFocus (sequenced, async, focus restored at
+--      the end). Usually 0-1 windows.
 function homeAllManagedWindows()
+  -- Read this FIRST, before any AX call: setFrame on an iTerm2 window can
+  -- make that window key all by itself (measured — focus moved from `notes`
+  -- to the first window the placement loop touched), so a focused window
+  -- read any later is already the wrong one.
+  local prev = hs.window.focusedWindow()
+
   -- Build a name → true set for O(1) exact matching. We can't use
   -- hs.application.get(name) here: it only takes one arg (the second,
   -- "exact", is silently dropped) and dispatches a substring search,
@@ -376,59 +413,133 @@ function homeAllManagedWindows()
   local wanted = {}
   for _, name in ipairs(managedAppNames) do wanted[name] = true end
 
-  local windows = {}
+  local allManaged, managedIds = {}, {}
   for _, app in ipairs(hs.application.runningApplications()) do
     local name = app:name()
     if name and wanted[name] then
       for _, win in ipairs(app:allWindows()) do
-        table.insert(windows, win)
+        local id = win:id()
+        if win:isStandard() and id then
+          table.insert(allManaged, win)
+          managedIds[id] = true
+        end
       end
     end
   end
 
-  -- Phase 1 — instant, parallel placement for everything that doesn't need
-  -- focus; FOCUS_TO_PLACE windows are deferred to Phase 2.
-  local deferred = {}
+  local orderedWindows = {}
+  local handled = {}
+
+  -- 1. Match WINDOW_RULES in specified rule order
+  for _, rule in ipairs(WINDOW_RULES) do
+    for _, win in ipairs(allManaged) do
+      local id = win:id()
+      if not handled[id] and ruleMatches(rule, win) then
+        handled[id] = true
+        table.insert(orderedWindows, win)
+      end
+    end
+  end
+
+  -- 2. Match APP_PLACEMENTS entries next
+  for name in pairs(APP_PLACEMENTS) do
+    for _, win in ipairs(allManaged) do
+      local id = win:id()
+      local app = win:application()
+      if not handled[id] and app and app:name() == name then
+        handled[id] = true
+        table.insert(orderedWindows, win)
+      end
+    end
+  end
+
+  -- 3. Any remaining managed windows
+  for _, win in ipairs(allManaged) do
+    local id = win:id()
+    if not handled[id] then
+      handled[id] = true
+      table.insert(orderedWindows, win)
+    end
+  end
+
+  -- Phase 1 — place everything, then raise in a second pass. The two loops
+  -- can't be merged: interleaving setFrame with raise scrambles the
+  -- resulting stack (measured), while a tight run of bare raises lands in
+  -- call order. FOCUS_TO_PLACE windows are deferred to Phase 2.
+  local deferred, raiseOrder = {}, {}
   local correctness = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
-  for _, win in ipairs(windows) do
-    if win:isStandard() then
-      local screen, placement = resolvePlacement(win)
-      if screen and placement then
-        local frame = placement(screen:frame())
-        local app = win:application()
-        local id = win:id()
-        if id then placedWindows[id] = true end
-        if app and FOCUS_TO_PLACE[app:name()] then
-          deferred[#deferred + 1] = { win = win, frame = frame }
-        else
-          win:setFrame(frame, 0)
-        end
+  for _, win in ipairs(orderedWindows) do
+    local screen, placement = resolvePlacement(win)
+    if screen and placement then
+      local frame = placement(screen:frame())
+      local id = win:id()
+      if id then placedWindows[id] = true end
+      local app = win:application()
+      if app and FOCUS_TO_PLACE[app:name()] then
+        deferred[#deferred + 1] = { win = win, frame = frame }
+      else
+        win:setFrame(frame, 0)
+        raiseOrder[#raiseOrder + 1] = win
       end
     end
   end
   hs.window.setFrameCorrectness = correctness
 
-  -- Phase 2 — focus → setFrame for winit-based apps, one window at a time.
-  if #deferred == 0 then return end
-  local prev = hs.window.focusedWindow()
-  local function step(i)
-    if i > #deferred then
-      if prev and prev:isStandard() then prev:focus() end
-      return
-    end
-    local d = deferred[i]
-    if d.win:isStandard() then
-      d.win:focus()
-      hs.timer.doAfter(0.05, function()
-        if d.win:isStandard() then d.win:setFrame(d.frame, 0) end
-        hs.timer.doAfter(0.05, function() step(i + 1) end)
-      end)
-    else
-      step(i + 1)
+  -- Where focus should end up: on the window that already had it if we
+  -- manage that window, otherwise on the top of the stack we're about to
+  -- build. The second case is a deliberate steal, and it's unavoidable:
+  -- raise() cannot lift a window above the focused one — macOS keeps the
+  -- frontmost app's key window on top, so a raised window lands directly
+  -- underneath it (measured; focus-everything-then-restore doesn't beat
+  -- this either, it just puts the blocker back on top). Leave focus on an
+  -- unmanaged window and it goes on covering the whole layout.
+  local keepFocus = prev and prev:id() and managedIds[prev:id()]
+  local target = keepFocus and prev or raiseOrder[#raiseOrder]
+
+  -- Raising a sibling window of the frontmost app hands key status to that
+  -- sibling — focus moves with nothing here ever calling focus(). Don't
+  -- fight that with a timer (a pin afterwards races the drift and loses
+  -- about half the time, measured); steer it instead, by raising the target
+  -- LAST so the window that ends up key is the one we wanted focused. It
+  -- ends up on top too, which is right: the focused window belongs there.
+  if target and target:id() then
+    for i, win in ipairs(raiseOrder) do
+      if win:id() == target:id() then
+        table.remove(raiseOrder, i)
+        raiseOrder[#raiseOrder + 1] = win
+        break
+      end
     end
   end
-  step(1)
+
+  local function pin()
+    if target and target:isStandard() then target:focus() end
+  end
+
+  local function raiseAll()
+    for _, win in ipairs(raiseOrder) do win:raise() end
+    -- Claim focus in the same tick as the raises, not from a timer: these
+    -- are all AX messages to the same app, so an in-tick focus is queued
+    -- behind the raises and wins. A timer instead races the drift and loses
+    -- about half the time (measured). The later pin is belt and braces for
+    -- when the drift lands even later, or when the last-raised app can't
+    -- take key status at all (Juggler doesn't).
+    pin()
+    hs.timer.doAfter(0.3, function()
+      pin()
+      if #deferred > 0 then placeViaFocus(deferred, target) end
+    end)
+  end
+
+  -- Clear the blocker first when there is one: the raises only outrank it
+  -- once its app has stopped being frontmost, and that activation is async.
+  if target and not keepFocus then
+    target:focus()
+    hs.timer.doAfter(0.1, raiseAll)
+  else
+    raiseAll()
+  end
 end
 
 -- Place a managed window once, then never again (placedWindows). Placing
@@ -445,16 +556,19 @@ local function placeWindow(win)
   local frame = placement(screen:frame())
   local app = win:application()
   if app and FOCUS_TO_PLACE[app:name()] then
-    win:focus()
-    hs.timer.doAfter(0.05, function()
-      if win:isStandard() then win:setFrame(frame, 0) end
-    end)
-  else
-    local correctness = hs.window.setFrameCorrectness
-    hs.window.setFrameCorrectness = false
-    win:setFrame(frame, 0)
-    hs.window.setFrameCorrectness = correctness
+    placeViaFocus({ { win = win, frame = frame } }, hs.window.focusedWindow())
+    return
   end
+  local correctness = hs.window.setFrameCorrectness
+  hs.window.setFrameCorrectness = false
+  win:setFrame(frame, 0)
+  hs.window.setFrameCorrectness = correctness
+  -- Deliberately no raise() here. A window that just appeared is already in
+  -- front, and this path also fires on the first title change of every
+  -- existing window (so: for all of them right after a reload) — raising
+  -- there hands key status to whichever window went last, which stole focus
+  -- out from under the bulk pass. Bringing the layout forward is the bulk
+  -- pass's job.
 end
 
 -- Bulk placement (every managed window at once) runs on three triggers:
@@ -497,6 +611,13 @@ if #managedAppNames > 0 then
 end
 
 -- Defer initial pass so hs.application's registry is fully populated.
+-- Exposed as a global for hs.ipc, so a re-home can be triggered from a
+-- shell (`hs -c "homeWindows()"`) without the F18 chord. Testing any of
+-- this through hs.reload() instead is misleading: a reload empties
+-- placedWindows, so every managed window re-places on its next title
+-- change, and that burst moves focus around before the bulk pass runs.
+_G.homeWindows = homeAllManagedWindows
+
 hs.timer.doAfter(0.5, homeAllManagedWindows)
 
 -- Placement is all AX setFrame, which silently no-ops without the Accessibility
