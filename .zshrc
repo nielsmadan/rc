@@ -44,6 +44,7 @@ typeset -A _zcompgen=(
   kubectl  'kubectl completion zsh'
   pnpm     'pnpm completion zsh'
   bun      'bun completions'
+  deno     'deno completions zsh'
   lefthook 'lefthook completion zsh'
   railway  'railway completion zsh'
   sops     'sops completion zsh'
