@@ -30,6 +30,7 @@ railway = { version = "latest", exe = "railway" }
 "npm:@earendil-works/pi-coding-agent" = "latest"
 "aqua:charmbracelet/vhs" = "latest"
 "pipx:mlx-whisper" = "latest"
+"pipx:llm" = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
