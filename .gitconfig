@@ -100,7 +100,10 @@
 [user]
 	name = Niels Madan
 	email = nielsmadan@quantumcraft.io
-	signingkey = /Users/nielsmadan/.ssh/id_ed25519.pub
+	# Literal key, not a path: over SSH with agent forwarding there is no private
+	# key on disk, and a .pub path would make ssh-keygen load a same-named local
+	# private key instead of asking the agent.
+	signingkey = key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXS8u2iVf8N7NP6UfeZ5DLD5Hckp8RAm99bPTrMatnS
 
 [push]
 	default = simple
@@ -127,4 +130,4 @@
 [tag]
 	gpgsign = true
 [gpg "ssh"]
-	allowedSignersFile = /Users/nielsmadan/.ssh/allowed_signers
+	allowedSignersFile = ~/.ssh/allowed_signers
