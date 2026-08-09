@@ -192,6 +192,48 @@ The config is **split** to keep client identities out of the repo, mirroring the
 
 Routing mechanics: a single guarded `rewrite` rule turns a matched URL into the `ext+container:name=<container>&url=<href>` scheme (read by LibreWolf's [Open external links in a container](https://addons.mozilla.org/firefox/addon/open-url-in-container/) add-on), and a handler sends `ext+container:*` to LibreWolf. The rewrite is guarded against re-rewriting an already-rewritten URL so rules can't chain; `containerFor()` returns the first matching entry. Shared services (GitHub, App Store Connect, AWS, Firebase, …) are scoped by path/ID/org/region so they don't collide across containers or hijack personal browsing. **Container names are case-sensitive** and must match those created in LibreWolf exactly.
 
+## Colima (container runtime — Docker Desktop is gone)
+
+Docker Desktop was removed in favour of [Colima](https://github.com/abiosoft/colima). Colima is **not** a Docker alternative: it runs upstream `dockerd` (moby) inside a Lima VM and points the stock `docker` CLI at it via a Docker context it registers itself (`autoActivate: true`). Same engine, same API, same BuildKit — what's gone is the Electron app, the extensions marketplace, Scout, and the root `com.docker.vmnetd` LaunchDaemon. There is no native macOS `dockerd` and never will be (Docker Engine needs a Linux kernel), so every option on this platform is a VM; this is the thinnest wrapper that still gives real dockerd.
+
+The CLI side comes from Homebrew, **not** from Colima — `colima` bundles no client. `brew install colima docker docker-compose docker-buildx docker-credential-helper`. Docker Desktop used to own `/usr/local/bin/docker*` as symlinks into the app bundle; those are gone, and `/opt/homebrew/bin` precedes `/usr/local/bin` on PATH anyway. `kubectl` also used to come from the app bundle — it now comes from mise.
+
+### `colima/colima.yaml` — the `mounts:` list is a security control
+
+`colima/colima.yaml` is committed and symlinked to `~/.colima/default/colima.yaml`. Only one block in it is load-bearing:
+
+```yaml
+mounts:
+  - location: /Users/nielsmadan/wrksp
+    writable: true
+  - location: /var/folders
+    writable: true
+```
+
+**This is the same control the Docker Desktop `filesharingDirectories` key used to provide, and it exists for the same reason.** Agents run inside a [nono](https://nono.sh) sandbox enforced by Seatbelt, but the container daemon is *outside* that boundary — so anything holding the socket can ask it to bind-mount a host path and write through it. Mounting `$HOME` would make `docker run -v /Users/nielsmadan:/h …` a one-line escape from every restriction, including the `~/.ssh` and `~/.zshrc` denies nono marks unremovable.
+
+Enforcement is **structural, not policy**: `dockerd` runs inside the VM, so a host path the VM never mounted does not exist in the daemon's namespace. An out-of-scope `-v` yields an empty directory and writes into the VM's own filesystem, never the host. Verify after any change:
+
+```bash
+colima ssh -- ls /Users/nielsmadan          # must print only: wrksp
+docker run --rm -v /Users/nielsmadan:/h alpine ls /h   # must NOT show real home contents
+docker run --rm -v ~/wrksp:/w alpine ls /w             # must work
+```
+
+Two things that make this work, neither of them obvious:
+
+- **An explicit `mounts:` list REPLACES the default, it does not merge.** `environment/vm/lima/yaml.go` branches on `len(conf.Mounts) == 0` → mount `~` writable, else use only the listed entries. The shipped default is an *empty* list, i.e. **whole `$HOME` writable** — so a fresh `colima start` with no config is exactly the escape this guards against. This replace-not-merge behaviour is also why Colima beats raw Lima here: Lima's own `FillDefault` unions mount lists with no removal semantics, so a Lima `override.yaml` can only ever *add* mounts. (Same flaw rules out Rancher Desktop, which hardcodes `~` writable in `getMounts()` and regenerates it on every start.)
+- **`/var/folders` is needed for testcontainers**, which `namefinder`'s api and workers packages use — macOS `$TMPDIR` lives under it. `/tmp` is deliberately *not* mounted: mounting host `/private/tmp` onto the guest `/tmp` would shadow the VM's own. Bind mounts in the compose files are almost all relative (`./…`), so they resolve inside `~/wrksp` and need nothing else. Build contexts do **not** need a mount — `docker build` streams the context over the API, so a context in `/private/tmp` builds fine.
+
+**Unlike Docker Desktop's `settings.json`, nothing rewrites this file.** Docker Desktop owned its config, rewrote it on every settings change, replaced the symlink with a real file, and could only be edited while fully quit — which is why the hardening never actually landed there. Colima reads its config and leaves it alone; `colima restart` preserves the symlink (verified). Changing the mount list does need a restart to take effect, and `mountType` specifically cannot change after VM creation.
+
+### Gotchas
+
+- **`colima start` / `colima stop` are yours to run** — there is no autostart. `brew services start colima` exists if that's ever wanted.
+- **The `docker stats` hang.** Something on this machine polls `docker stats --no-trunc --no-stream` and wedges when no daemon is reachable; five such processes were found orphaned across two weeks during the migration. If stray `docker` PIDs accumulate, that is the source, not Colima.
+- Registry auth moved from Docker Desktop's `desktop` credential helper to `osxkeychain` (`~/.docker/config.json`), so a `docker login` may be needed once. `cliPluginsExtraDirs` in that file points at `/opt/homebrew/lib/docker/cli-plugins` so the brew compose/buildx plugins are found.
+- `binfmt: true` is set, so amd64/386 images run under emulation without extra setup. `rosetta` is off.
+
 ## `bin/` — standalone scripts on PATH
 
 `bin/` holds self-contained helper scripts, each symlinked individually into `~/.local/bin` (already on `PATH` from `.zshrc`) by its own `link` call in `install.sh` — **not** a directory symlink, since `~/.local/bin` also holds unrelated machine-local binaries. Adding a script means adding a `link <alias> bin/<name> ~/.local/bin/<name>` line; the `install.local` skip list keeps itself current from the alias.

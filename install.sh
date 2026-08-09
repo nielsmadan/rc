@@ -191,6 +191,8 @@ link gitignore        git/ignore       ~/.config/git/ignore
 link secrets          secrets/secrets.yaml ~/.config/sops/secrets.yaml
 link hammerspoon      hammerspoon      ~/.hammerspoon
 link finicky          finicky/finicky.ts ~/.finicky.ts
+# The mounts: list in here is a security control, not a preference — see AGENTS.md.
+link colima           colima/colima.yaml ~/.colima/default/colima.yaml
 # Standalone helper scripts. ~/.local/bin is already on PATH from .zshrc.
 link yt-transcript    bin/yt-transcript ~/.local/bin/yt-transcript
 link video-frames     bin/video-frames  ~/.local/bin/video-frames
