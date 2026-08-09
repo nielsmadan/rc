@@ -12,8 +12,8 @@ if the clone has a lefthook config, open a new tab next to the gap's
 neighbour (right of the sibling below the gap, or left of the lowest open
 sibling when filling below it) with the original tab's split structure,
 every pane sitting in the clone root. If the sibling directory already
-exists, the clone is skipped entirely — the tab just opens pointed at the
-existing directory.
+exists, the clone is skipped entirely — the tab opens pointed at the
+existing directory and runs `git pull --rebase` in it.
 
 Pure helpers (path math, git wrappers, `.env` discovery) live in
 `clone_repo_lib.py` so they can be unit-tested outside iTerm2.
@@ -116,9 +116,9 @@ async def _do_clone_to_tab(window, tab, session):
     immediately and the user can watch clone progress. `mise trust` and the
     `.env` copy are chained after the clone so they only run on success.
 
-    When the destination directory already exists, no shell command is sent:
-    the tab opens pointed at the existing directory and nothing is cloned,
-    trusted, or copied.
+    When the destination directory already exists, nothing is cloned, trusted
+    or copied — the tab opens pointed at the existing directory and the pane
+    runs `git pull --rebase` to bring that checkout up to date.
     """
     try:
         path = await session.async_get_variable("path")
@@ -163,7 +163,9 @@ async def _do_clone_to_tab(window, tab, session):
         # name is cloned from `origin`.
         if dest_exists:
             origin = None
-            message = f"{dest} exists.\nOpen a new tab there (no clone)?"
+            message = (
+                f"{dest} exists.\nOpen a new tab there and git pull --rebase?"
+            )
         else:
             origin = await asyncio.to_thread(lib.resolve_origin_url, repo_root)
             if not origin:
@@ -211,16 +213,14 @@ async def _do_clone_to_tab(window, tab, session):
         await root_session.async_activate()
 
         # Only clone into a freshly-created directory. An existing dir is
-        # assumed to be a working checkout already, so we send no command —
-        # the tab just opens pointed at it.
+        # assumed to be a working checkout already, so it just gets refreshed.
         if not dest_exists:
             # Shell command: clone in the visible pane, then `mise trust`, then
             # copy each `.env` file we found in the source repo (root and
             # subdirectories), mirroring relative paths via `mkdir -p`. Chained
             # with `&&` so clone/trust must succeed first. A trailing
             # `lefthook install` runs as its own statement, self-gated on the
-            # clone having a lefthook config. Tiny sleep so the shell has
-            # finished starting before we type into it.
+            # clone having a lefthook config.
             env_files = await asyncio.to_thread(lib.find_env_files, repo_root)
             copy_cmds = []
             for rel in env_files:
@@ -240,8 +240,12 @@ async def _do_clone_to_tab(window, tab, session):
                 f"{env_clause}"
                 f"{lib.lefthook_install_clause()}"
             )
-            await asyncio.sleep(0.3)
-            await root_session.async_send_text(cmd + "\n")
+        else:
+            cmd = "git pull --rebase"
+
+        # Tiny sleep so the shell has finished starting before we type into it.
+        await asyncio.sleep(0.3)
+        await root_session.async_send_text(cmd + "\n")
     except Exception as exc:
         print(f"clone_repo_to_tab error: {exc}")
 
