@@ -274,12 +274,6 @@ _sops_exec() {
     command "$cmd" "$@"
   fi
 }
-claude()   { _sops_exec claude   "$@"; }
-codex()    { _sops_exec codex    "$@"; }
-gemini()   { _sops_exec gemini   "$@"; }
-opencode() { _sops_exec opencode "$@"; }
-pi()       { _sops_exec pi       "$@"; }
-railway()  { _sops_exec railway  "$@"; }
 
 # Editor wrappers — codecompanion.nvim reads CLAUDE_CODE_OAUTH_TOKEN from
 # env, so nvim/mvim/neovide need the secrets injected too. The existing
