@@ -2,8 +2,7 @@
 **/.claude/scheduled_tasks.lock
 **/docs/superpowers/
 **/.superpowers
-**/.antigravitycli/ 
-**/.aiconf
+
 .DS_Store
 
 **/.claude/.cc-writes/
