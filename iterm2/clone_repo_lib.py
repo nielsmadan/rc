@@ -89,6 +89,15 @@ def select_sibling_slot(current_repo_root: str, candidate_repo_roots: list):
     return name, anchor, side
 
 
+def tab_title_for_destination(
+    current_title: "str | None", destination_name: str
+) -> str:
+    slot = sibling_number(destination_name)
+    if not current_title or slot < 1:
+        return destination_name
+    return sibling_base(current_title) + str(slot)
+
+
 def resolve_repo_root(path: str) -> "str | None":
     """Return the absolute repo root for `path`, or None if `path` isn't in a repo."""
     result = subprocess.run(

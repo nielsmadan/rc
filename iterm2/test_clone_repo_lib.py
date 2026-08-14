@@ -148,6 +148,32 @@ class TestSelectSiblingSlot(unittest.TestCase):
         )
 
 
+class TestTabTitleForDestination(unittest.TestCase):
+    def test_uses_current_title_base_with_destination_slot(self):
+        self.assertEqual(
+            lib.tab_title_for_destination("core2", "dreamhack-core3"),
+            "core3",
+        )
+
+    def test_uses_selected_gap_instead_of_incrementing_current_title(self):
+        self.assertEqual(
+            lib.tab_title_for_destination("core4", "dreamhack-core2"),
+            "core2",
+        )
+
+    def test_appends_slot_to_bare_title(self):
+        self.assertEqual(
+            lib.tab_title_for_destination("core", "dreamhack-core2"),
+            "core2",
+        )
+
+    def test_untitled_tab_falls_back_to_destination_name(self):
+        self.assertEqual(
+            lib.tab_title_for_destination(None, "dreamhack-core3"),
+            "dreamhack-core3",
+        )
+
+
 class TestResolveRepoRoot(unittest.TestCase):
     def test_root_returns_self(self):
         with tempfile.TemporaryDirectory() as d:

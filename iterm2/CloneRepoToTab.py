@@ -11,9 +11,10 @@ subdirectories, mirroring their relative paths), run `lefthook install`
 if the clone has a lefthook config, open a new tab next to the gap's
 neighbour (right of the sibling below the gap, or left of the lowest open
 sibling when filling below it) with the original tab's split structure,
-every pane sitting in the clone root. If the sibling directory already
-exists, the clone is skipped entirely — the tab opens pointed at the
-existing directory and runs `git pull --rebase` in it.
+every pane sitting in the clone root. The new tab's title reuses the
+triggering tab title's base with the selected slot number. If the sibling
+directory already exists, the clone is skipped entirely — the tab opens
+pointed at the existing directory and runs `git pull --rebase` in it.
 
 Pure helpers (path math, git wrappers, `.env` discovery) live in
 `clone_repo_lib.py` so they can be unit-tested outside iTerm2.
@@ -208,7 +209,10 @@ async def _do_clone_to_tab(window, tab, session):
         root_session = new_tab.current_session
         await _recreate(snapshot, root_session, profile)
 
-        await new_tab.async_set_title(name)
+        current_title = await tab.async_get_variable("titleOverride")
+        await new_tab.async_set_title(
+            lib.tab_title_for_destination(current_title, name)
+        )
         await new_tab.async_select()
         await root_session.async_activate()
 
