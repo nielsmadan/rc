@@ -215,10 +215,12 @@ mounts:
 Enforcement is **structural, not policy**: `dockerd` runs inside the VM, so a host path the VM never mounted does not exist in the daemon's namespace. An out-of-scope `-v` yields an empty directory and writes into the VM's own filesystem, never the host. Verify after any change:
 
 ```bash
-colima ssh -- ls /Users/nielsmadan          # must print only: wrksp
+colima ssh -- mount | grep virtiofs   # must list ONLY wrksp and /var/folders
 docker run --rm -v /Users/nielsmadan:/h alpine ls /h   # must NOT show real home contents
 docker run --rm -v ~/wrksp:/w alpine ls /w             # must work
 ```
+
+Check `mount`, not `ls`. An out-of-scope `-v` leaves an empty directory behind in the guest that outlives the container, so `ls /Users/nielsmadan` accumulates entries that were never mounts — guest `~/ac` is one, left by a past escape probe. Those stale dirs make the `ls` form report a breach that isn't there; `mount` shows only live virtiofs.
 
 Two things that make this work, neither of them obvious:
 
@@ -230,6 +232,7 @@ Two things that make this work, neither of them obvious:
 ### Gotchas
 
 - **`colima start` / `colima stop` are yours to run** — there is no autostart. `brew services start colima` exists if that's ever wanted.
+- **`colima list` reports `Running` for a VM that is dead.** The lima hostagent hosts the VZ VM in-process and keeps reporting `Running` after the VM dies, leaving a stale `docker.sock` behind — so every `docker` command fails with "Cannot connect to the Docker daemon" while Colima insists it's up. The tell is `colima status` failing with `error retrieving current runtime: empty value` while `colima list` says Running. Confirm in `~/.colima/_lima/colima/ha.stderr.log`: `[VZ] - vm state change: VirtualMachineStateError` followed by `VZErrorDomain Code=3 "The virtual machine is no longer live."` repeating forever. Fix: **`colima stop --force`** then `colima start` — a plain `colima stop` can't stop a VM that isn't answering. Seen 2026-08-15 and 2026-08-20; the second went unnoticed for two days. Cause unknown. For a real liveness check use `docker version --format '{{.Server.Version}}'`, which exercises the socket end to end — `colima list` does not.
 - **The `docker stats` hang.** Something on this machine polls `docker stats --no-trunc --no-stream` and wedges when no daemon is reachable; five such processes were found orphaned across two weeks during the migration. If stray `docker` PIDs accumulate, that is the source, not Colima.
 - Registry auth moved from Docker Desktop's `desktop` credential helper to `osxkeychain` (`~/.docker/config.json`), so a `docker login` may be needed once. `cliPluginsExtraDirs` in that file points at `/opt/homebrew/lib/docker/cli-plugins` so the brew compose/buildx plugins are found.
 - `binfmt: true` is set, so amd64/386 images run under emulation without extra setup. `rosetta` is off.
