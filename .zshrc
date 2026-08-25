@@ -238,15 +238,10 @@ fi
 # loads where the script has been fetched into $HOME. Harmless in other terminals.
 [[ -e "${HOME}/.iterm2_shell_integration.zsh" ]] && source "${HOME}/.iterm2_shell_integration.zsh"
 
-# AI tools (Claude, etc.) — legacy plain-env source. Migrate each key into
-# secrets/secrets.yaml (via `sops edit`), then remove the corresponding
-# `export` line from ~/.airc so it's not also in shell env.
+# Agent tooling (~/ac): PATH, the sandboxed claude/codex/opencode/pi wrappers,
+# and the SOPS_* paths below them. Sourced first so anything here can override
+# it — but do not redefine those four wrappers, or the sandbox stops applying.
 [ -f ~/.airc ] && source ~/.airc
-
-# SOPS reads the age identity from this path. Default macOS location uses a
-# space-padded `Library/Application Support/sops/age/` path; we keep ours at
-# the cross-platform XDG location instead.
-export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
 
 # `sops edit` shells out to $EDITOR and waits for it to exit. Plain `mvim`
 # (our $EDITOR) spawns its GUI in the background and returns instantly, which
@@ -254,36 +249,23 @@ export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
 # sops specifically.
 export SOPS_EDITOR=nvim
 
-# AI CLI wrappers — invoke each via `sops exec-env` so its API keys are
-# injected only into the subprocess, never into this shell's env.
-#
-# `sops exec-env <file> <command>` takes the command as a single string that
-# sops re-tokenizes via the shell, NOT a `--`-separated argv. We use
-# `printf '%q '` to shell-quote each user-supplied arg so prompts with spaces
-# (`claude -p "tell me about cats"`) survive the round-trip.
-#
-# If sops, the secrets file, or the age identity is missing on this machine,
-# fall through to the bare command — useful on hosts that don't need the
-# dev secrets (e.g. fresh installs where you just want mvim/nvim to work).
-SOPS_SECRETS="$HOME/.config/sops/secrets.yaml"
-_sops_exec() {
-  local cmd=$1; shift
-  if command -v sops >/dev/null 2>&1 && [ -f "$SOPS_SECRETS" ] && [ -f "$SOPS_AGE_KEY_FILE" ]; then
-    sops exec-env "$SOPS_SECRETS" "$cmd $(printf '%q ' "$@")"
-  else
-    command "$cmd" "$@"
-  fi
-}
-
 # Editor wrappers — codecompanion.nvim reads CLAUDE_CODE_OAUTH_TOKEN from
 # env, so nvim/mvim/neovide need the secrets injected too. The existing
 # `m` / `n` aliases (mvim, neovide &) keep working: they expand to the
 # function name, then the function runs.
-nvim()    { _sops_exec nvim    "$@"; }
-mvim()    { _sops_exec mvim    "$@"; }
-neovide() { _sops_exec neovide "$@"; }
+#
+# sops-exec is a script in ~/ac/bin (linked into ~/.local/bin), not a function
+# defined here: agent launchers that source only ~/.airc need the same injection
+# and cannot reach a function that lives in an interactive-only file. Guarded so
+# this repo still stands alone on a machine without ~/ac — the wrappers simply
+# don't exist there rather than existing without keys.
+if command -v sops-exec >/dev/null 2>&1; then
+  nvim()    { sops-exec nvim    "$@"; }
+  mvim()    { sops-exec mvim    "$@"; }
+  neovide() { sops-exec neovide "$@"; }
+fi
 
-alias sec="sops edit $SOPS_SECRETS"
+alias sec='sops edit $SOPS_SECRETS'
 
 # Dev helper functions (mksim, etc.)
 [ -f ~/.devrc ] && source ~/.devrc

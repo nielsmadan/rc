@@ -304,8 +304,8 @@ Architecture:
 - **`.sops.yaml`** (repo root) — SOPS creation rules. Lists allowed age recipients (public keys, one per Mac). Plaintext, committed.
 - **`secrets/secrets.yaml`** (repo) — encrypted YAML. Variable names are visible (diff-friendly); values are AES-256-GCM ciphertext, decryptable only by listed recipients. Committed.
 - **`secrets/secrets-mini.yaml`** (repo) — encrypted YAML scoped to the Mac mini only (its recipient list in `.sops.yaml` is deliberately limited to the mini's age key). Holds secrets that should not exist on any other machine. When adding a new Mac to `.sops.yaml`, **do not** add it as a recipient of `secrets-mini.yaml` — leave that file's recipient list alone.
-- **`SOPS_AGE_KEY_FILE`** — env var set in `.zshrc` to `~/.config/sops/age/keys.txt`. macOS' default location for SOPS is `~/Library/Application Support/sops/age/keys.txt` (path with spaces); we use the cleaner XDG location.
-- **CLI wrappers** in `.zshrc` (`claude`, `codex`, `gemini`) invoke each tool via `sops exec-env "$SOPS_SECRETS" --` so keys land only in that subprocess.
+- **`SOPS_AGE_KEY_FILE`** / **`SOPS_SECRETS`** — set in `~/ac/.airc.d/04-sops.zsh`, which `.zshrc` picks up when it sources `~/.airc`. macOS' default location for SOPS is `~/Library/Application Support/sops/age/keys.txt` (path with spaces); we use the cleaner XDG location.
+- **CLI wrappers** invoke each tool through `sops-exec` (`~/ac/bin/sops-exec`, linked into `~/.local/bin`), which wraps `sops exec-env` so keys land only in that subprocess. `~/ac` owns the agent wrappers (`claude`, `codex`, `opencode`, `pi`); `.zshrc` owns the `nvim` / `mvim` / `neovide` wrappers. It is a script, not a shell function, so launchers that never read `.zshrc` can reach it.
 - **HTTP-based MCP servers** (e.g. Jina, Todoist) in `~/.claude.json` use `${ENV_VAR}` headers; Claude Code interpolates those at startup. Since our `claude` wrapper goes through `sops exec-env`, Claude Code receives the env var. The parent shell does not.
 - **stdio MCP servers** with env-var deps can use `command: "sops"` `args: ["exec-env", "<repo>/secrets/secrets.yaml", "--", "<server>"]` directly, so even Claude Code's own process never sees their keys.
 
@@ -334,4 +334,4 @@ anything; the answer is usually memory, not a runaway process.
 
 ## Local-only files (not in this repo)
 
-`.zshrc` sources `~/.airc`, `~/.devrc`, and `~/.zshrc.local` if present (`.devrc` is in the repo and symlinked in; the others are user-local). `.gitconfig` includes `~/.gitconfig-local`. Don't expect to find these here. (`~/.airc` is being phased out as keys migrate to fnox — see the Secrets management section.)
+`.zshrc` sources `~/.airc`, `~/.devrc`, and `~/.zshrc.local` if present (`.devrc` is in the repo and symlinked in; the others are user-local). `.gitconfig` includes `~/.gitconfig-local`. Don't expect to find these here. (`~/.airc` is a symlink to `~/ac/.airc`, the agent-tooling shell config — see that repo.)
