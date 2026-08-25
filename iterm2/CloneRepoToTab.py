@@ -14,7 +14,8 @@ sibling when filling below it) with the original tab's split structure,
 every pane sitting in the clone root. The new tab's title reuses the
 triggering tab title's base with the selected slot number. If the sibling
 directory already exists, the clone is skipped entirely — the tab opens
-pointed at the existing directory and runs `git pull --rebase` in it.
+pointed at the existing directory, fetches without writing `FETCH_HEAD`, and
+rebases onto its configured upstream.
 
 Pure helpers (path math, git wrappers, `.env` discovery) live in
 `clone_repo_lib.py` so they can be unit-tested outside iTerm2.
@@ -119,7 +120,8 @@ async def _do_clone_to_tab(window, tab, session):
 
     When the destination directory already exists, nothing is cloned, trusted
     or copied — the tab opens pointed at the existing directory and the pane
-    runs `git pull --rebase` to bring that checkout up to date.
+    fetches without writing `FETCH_HEAD`, then rebases onto the configured
+    upstream.
     """
     try:
         path = await session.async_get_variable("path")
@@ -164,9 +166,7 @@ async def _do_clone_to_tab(window, tab, session):
         # name is cloned from `origin`.
         if dest_exists:
             origin = None
-            message = (
-                f"{dest} exists.\nOpen a new tab there and git pull --rebase?"
-            )
+            message = f"{dest} exists.\nOpen a new tab there and update its upstream?"
         else:
             origin = await asyncio.to_thread(lib.resolve_origin_url, repo_root)
             if not origin:
@@ -245,7 +245,7 @@ async def _do_clone_to_tab(window, tab, session):
                 f"{lib.lefthook_install_clause()}"
             )
         else:
-            cmd = "git pull --rebase"
+            cmd = lib.existing_checkout_update_command()
 
         # Tiny sleep so the shell has finished starting before we type into it.
         await asyncio.sleep(0.3)

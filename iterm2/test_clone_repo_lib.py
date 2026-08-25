@@ -18,7 +18,18 @@ def make_repo(parent: str, name: str, with_origin: bool = True) -> str:
     subprocess.run(["git", "init", "-q", path], check=True)
     # Make at least one commit so HEAD exists (clone needs a branch).
     subprocess.run(
-        ["git", "-C", path, "commit", "--allow-empty", "-q", "-m", "init"],
+        [
+            "git",
+            "-C",
+            path,
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--allow-empty",
+            "-q",
+            "-m",
+            "init",
+        ],
         env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
              "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
         check=True,
@@ -220,6 +231,85 @@ class TestComputeDestination(unittest.TestCase):
             lib.compute_destination("/Users/x/wrksp/myapp/", "newname"),
             "/Users/x/wrksp/newname",
         )
+
+
+class TestExistingCheckoutUpdateCommand(unittest.TestCase):
+    def test_updates_to_upstream_without_replacing_fetch_head(self):
+        with tempfile.TemporaryDirectory() as d:
+            remote = os.path.join(d, "remote.git")
+            source = make_repo(d, "source", with_origin=False)
+            checkout = os.path.join(d, "checkout")
+            identity = {
+                **os.environ,
+                "GIT_AUTHOR_NAME": "t",
+                "GIT_AUTHOR_EMAIL": "t@t",
+                "GIT_COMMITTER_NAME": "t",
+                "GIT_COMMITTER_EMAIL": "t@t",
+            }
+
+            subprocess.run(["git", "init", "--bare", "-q", remote], check=True)
+            subprocess.run(["git", "-C", source, "branch", "-M", "main"], check=True)
+            subprocess.run(
+                ["git", "-C", source, "remote", "add", "origin", f"file://{remote}"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", source, "push", "-q", "-u", "origin", "main"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", remote, "symbolic-ref", "HEAD", "refs/heads/main"],
+                check=True,
+            )
+            subprocess.run(["git", "clone", "-q", f"file://{remote}", checkout], check=True)
+
+            fetch_head = os.path.join(checkout, ".git", "FETCH_HEAD")
+            with open(fetch_head, "w") as f:
+                f.write("preserve me\n")
+
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    source,
+                    "-c",
+                    "commit.gpgsign=false",
+                    "commit",
+                    "--allow-empty",
+                    "-q",
+                    "-m",
+                    "update",
+                ],
+                env=identity,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", source, "push", "-q", "origin", "main"],
+                check=True,
+            )
+            expected_head = subprocess.run(
+                ["git", "-C", source, "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+
+            result = subprocess.run(
+                ["sh", "-c", lib.existing_checkout_update_command()],
+                cwd=checkout,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            actual_head = subprocess.run(
+                ["git", "-C", checkout, "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            self.assertEqual(actual_head, expected_head)
+            with open(fetch_head) as f:
+                self.assertEqual(f.read(), "preserve me\n")
 
 
 def touch(path: str):

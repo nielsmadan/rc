@@ -127,6 +127,10 @@ def compute_destination(repo_root: str, name: str) -> str:
     return os.path.join(os.path.dirname(repo_root.rstrip("/")), name)
 
 
+def existing_checkout_update_command() -> str:
+    return "git fetch --no-write-fetch-head && git rebase --fork-point '@{upstream}'"
+
+
 _ENV_SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__"}
 
 
