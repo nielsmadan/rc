@@ -35,7 +35,7 @@ Plug 'preservim/vim-markdown'
 Plug 'junegunn/goyo.vim'
 
 "--->MINE can't do it with git+ssh. :(
-Plug '~/wrksp/harlequin'
+Plug '~/wrksp/all/harlequin'
 
 call plug#end()
 
