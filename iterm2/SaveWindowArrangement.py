@@ -22,6 +22,7 @@ app = None
 
 _debounce = {}      # window_id -> asyncio.Task
 _tab_monitors = {}  # tab_id    -> asyncio.Task
+_rpc_saves = set()  # create_task keeps only a weak ref; hold a strong one
 
 
 async def save_window(window, *, allow_prompt):
@@ -45,6 +46,14 @@ async def save_window(window, *, allow_prompt):
         await window.async_set_title(name)
 
     await window.async_save_window_as_arrangement(name)
+
+
+async def _save_from_rpc(window):
+    # Nothing is awaiting this task, so a failure would otherwise vanish.
+    try:
+        await save_window(window, allow_prompt=True)
+    except Exception as exc:
+        print(f"save failed for window {window.window_id}: {exc}")
 
 
 async def _delayed_save(window_id):
@@ -155,9 +164,13 @@ async def main(_connection):
 
     @iterm2.RPC
     async def save_window_arrangement():
+        # Hand off so the RPC returns immediately: the untitled-window path
+        # awaits a text-input alert, and iTerm2 fails the call after 5s.
         window = app.current_window
         if window:
-            await save_window(window, allow_prompt=True)
+            task = asyncio.create_task(_save_from_rpc(window))
+            _rpc_saves.add(task)
+            task.add_done_callback(_rpc_saves.discard)
 
     await save_window_arrangement.async_register(connection)
 
