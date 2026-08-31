@@ -75,7 +75,7 @@ Leader is `,` in both. Both define the same diff-mode mappings (arrows for hunk 
 
 Plugins live in `nvim/lua/plugins/` (auto-imported by lazy.nvim — drop a new spec into any `*.lua` file there). Settings and ad-hoc commands live in `nvim/lua/config/` and only run if `require`d explicitly from `lazy.lua`.
 
-The `harlequin` colorscheme is a separate local repo at `~/wrksp/harlequin` referenced by both `.vimrc` (`Plug '~/wrksp/harlequin'`) and `nvim/lua/plugins/colorscheme.lua` (`dir = "~/wrksp/harlequin"`). Don't try to install it from a remote.
+The `harlequin` colorscheme is a separate local repo at `~/wrksp/all/harlequin` referenced by both `.vimrc` (`Plug '~/wrksp/all/harlequin'`) and `nvim/lua/plugins/colorscheme.lua` (`dir = "~/wrksp/all/harlequin"`). Don't try to install it from a remote.
 
 ## Vim quirks worth knowing
 
