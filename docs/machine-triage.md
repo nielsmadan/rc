@@ -34,6 +34,21 @@ xcrun simctl list devices booted     # what's actually running
 xcrun simctl shutdown all            # safe; reclaims the memory immediately
 ```
 
+## Work the bottleneck, then remeasure
+
+Sluggishness moves. Separate compressor and swap thrash from real CPU demand first, then
+aggregate related processes into families rather than ranking individual PIDs, remove the
+largest confirmed consumer, and measure again. The next bottleneck is usually somewhere else
+entirely.
+
+A high load average is not by itself evidence of a CPU-heavy process: threads blocked on page
+faults or kernel work count toward it too.
+
+**A readiness loop that shells out to `lsof -iTCP` is its own cause of slowness.** Each call
+walks every process's open descriptors, so on a process-heavy machine the polling costs more
+than whatever it is waiting for. Use bounded direct TCP connection attempts with backoff
+instead.
+
 ## Known heavy residents (the floor, not the bug)
 
 `watchman` is a persistent multi-GB resident on this machine (3.4-3.9 GB observed
