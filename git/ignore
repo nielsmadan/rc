@@ -2,7 +2,10 @@
 **/.claude/scheduled_tasks.lock
 **/docs/superpowers/
 **/docs/plans/
+**/docs/specs/
 **/.superpowers
+
+**/worktrees
 
 .DS_Store
 
