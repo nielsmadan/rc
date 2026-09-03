@@ -263,6 +263,8 @@ class TestExistingCheckoutUpdateCommand(unittest.TestCase):
             )
             subprocess.run(["git", "clone", "-q", f"file://{remote}", checkout], check=True)
 
+            touch(os.path.join(checkout, "lefthook.yml"))
+
             fetch_head = os.path.join(checkout, ".git", "FETCH_HEAD")
             with open(fetch_head, "w") as f:
                 f.write("preserve me\n")
@@ -294,8 +296,12 @@ class TestExistingCheckoutUpdateCommand(unittest.TestCase):
                 check=True,
             ).stdout.strip()
 
+            lefthook_stub = (
+                'lefthook() { if [ "$1" = check-install ]; then return 1; fi; '
+                ": > .lefthook-installed; }; "
+            )
             result = subprocess.run(
-                ["sh", "-c", lib.existing_checkout_update_command()],
+                ["sh", "-c", lefthook_stub + lib.existing_checkout_update_command()],
                 cwd=checkout,
                 capture_output=True,
                 text=True,
@@ -310,6 +316,7 @@ class TestExistingCheckoutUpdateCommand(unittest.TestCase):
             self.assertEqual(actual_head, expected_head)
             with open(fetch_head) as f:
                 self.assertEqual(f.read(), "preserve me\n")
+            self.assertTrue(os.path.isfile(os.path.join(checkout, ".lefthook-installed")))
 
 
 def touch(path: str):
@@ -372,7 +379,7 @@ class TestLefthookInstallClause(unittest.TestCase):
             clause = lib.lefthook_install_clause()
             # Replace the real `lefthook` with a marker so the test needs no
             # lefthook binary and stays hermetic.
-            script = "true" + clause.replace("lefthook install", "echo INSTALLED")
+            script = "true; " + clause.replace("lefthook install", "echo INSTALLED")
             out = subprocess.run(
                 ["sh", "-c", script], cwd=d, capture_output=True, text=True
             )
@@ -381,7 +388,7 @@ class TestLefthookInstallClause(unittest.TestCase):
     def test_noop_when_no_config(self):
         with tempfile.TemporaryDirectory() as d:
             clause = lib.lefthook_install_clause()
-            script = "true" + clause.replace("lefthook install", "echo INSTALLED")
+            script = "true; " + clause.replace("lefthook install", "echo INSTALLED")
             out = subprocess.run(
                 ["sh", "-c", script], cwd=d, capture_output=True, text=True
             )
@@ -389,15 +396,51 @@ class TestLefthookInstallClause(unittest.TestCase):
             self.assertEqual(out.returncode, 0)
 
     def test_detects_each_config_name(self):
+        expected_names = {
+            f"{prefix}.{extension}"
+            for prefix in ("lefthook", ".lefthook", ".config/lefthook")
+            for extension in ("yml", "yaml", "json", "jsonc", "toml")
+        }
+        self.assertEqual(set(lib.LEFTHOOK_CONFIG_NAMES), expected_names)
         clause = lib.lefthook_install_clause()
-        for name in lib.LEFTHOOK_CONFIG_NAMES:
+        for name in expected_names:
             with tempfile.TemporaryDirectory() as d:
                 touch(os.path.join(d, name))
-                script = "true" + clause.replace("lefthook install", "echo INSTALLED")
+                script = "true; " + clause.replace("lefthook install", "echo INSTALLED")
                 out = subprocess.run(
                     ["sh", "-c", script], cwd=d, capture_output=True, text=True
                 )
                 self.assertIn("INSTALLED", out.stdout, f"missed {name}")
+
+    def test_installs_when_existing_hooks_are_missing(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, "lefthook.yml"))
+            clause = lib.lefthook_install_clause(only_if_missing=True)
+            stub = (
+                'lefthook() { if [ "$1" = check-install ]; then '
+                ": > checked; return 1; fi; : > installed; }; "
+            )
+            out = subprocess.run(
+                ["sh", "-c", stub + clause], cwd=d, capture_output=True, text=True
+            )
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertTrue(os.path.isfile(os.path.join(d, "checked")))
+            self.assertTrue(os.path.isfile(os.path.join(d, "installed")))
+
+    def test_keeps_current_existing_hooks(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, "lefthook.yml"))
+            clause = lib.lefthook_install_clause(only_if_missing=True)
+            stub = (
+                'lefthook() { if [ "$1" = check-install ]; then '
+                ": > checked; return 0; fi; : > installed; }; "
+            )
+            out = subprocess.run(
+                ["sh", "-c", stub + clause], cwd=d, capture_output=True, text=True
+            )
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertTrue(os.path.isfile(os.path.join(d, "checked")))
+            self.assertFalse(os.path.exists(os.path.join(d, "installed")))
 
 
 if __name__ == "__main__":

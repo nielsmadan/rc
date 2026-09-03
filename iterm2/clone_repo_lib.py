@@ -128,7 +128,10 @@ def compute_destination(repo_root: str, name: str) -> str:
 
 
 def existing_checkout_update_command() -> str:
-    return "git fetch --no-write-fetch-head && git rebase --fork-point '@{upstream}'"
+    return (
+        "git fetch --no-write-fetch-head && git rebase --fork-point '@{upstream}'"
+        f" && {lefthook_install_clause(only_if_missing=True)}"
+    )
 
 
 _ENV_SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__"}
@@ -150,25 +153,23 @@ def find_env_files(repo_root: str) -> list:
     return sorted(out)
 
 
-# Repo-root config filenames lefthook recognises (name × extension).
-LEFTHOOK_CONFIG_NAMES = (
-    "lefthook.yml",
-    "lefthook.yaml",
-    ".lefthook.yml",
-    ".lefthook.yaml",
-    "lefthook.toml",
-    "lefthook.json",
+# Repo-relative config paths Lefthook recognises (name × extension).
+LEFTHOOK_CONFIG_NAMES = tuple(
+    f"{prefix}.{extension}"
+    for prefix in ("lefthook", ".lefthook", ".config/lefthook")
+    for extension in ("yml", "yaml", "json", "jsonc", "toml")
 )
 
 
-def lefthook_install_clause() -> str:
+def lefthook_install_clause(*, only_if_missing: bool = False) -> str:
     """Shell snippet that runs `lefthook install` iff a lefthook config exists.
 
     The clone dir doesn't exist when the command is assembled, so detection
-    has to happen at runtime in the typed shell command. Built as its own
-    statement (leading `; `) that self-gates on a config file being present in
-    the freshly-cloned cwd — a non-lefthook repo (or a failed clone, which
-    leaves an empty dir) simply skips it without leaving a non-zero exit.
+    has to happen at runtime in the typed shell command. A non-Lefthook repo
+    simply skips the install without leaving a non-zero exit.
     """
     test = " || ".join(f"[ -f {name} ]" for name in LEFTHOOK_CONFIG_NAMES)
-    return f"; if {test}; then lefthook install; fi"
+    install = "lefthook install"
+    if only_if_missing:
+        install = "lefthook check-install >/dev/null 2>&1 || lefthook install"
+    return f"if {test}; then {install}; fi"

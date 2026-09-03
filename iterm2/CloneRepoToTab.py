@@ -15,7 +15,8 @@ every pane sitting in the clone root. The new tab's title reuses the
 triggering tab title's base with the selected slot number. If the sibling
 directory already exists, the clone is skipped entirely — the tab opens
 pointed at the existing directory, fetches without writing `FETCH_HEAD`, and
-rebases onto its configured upstream.
+rebases onto its configured upstream, then installs missing or stale Lefthook
+hooks when a config is present.
 
 Pure helpers (path math, git wrappers, `.env` discovery) live in
 `clone_repo_lib.py` so they can be unit-tested outside iTerm2.
@@ -120,8 +121,8 @@ async def _do_clone_to_tab(window, tab, session):
 
     When the destination directory already exists, nothing is cloned, trusted
     or copied — the tab opens pointed at the existing directory and the pane
-    fetches without writing `FETCH_HEAD`, then rebases onto the configured
-    upstream.
+    fetches without writing `FETCH_HEAD`, rebases onto the configured upstream,
+    then installs missing or stale Lefthook hooks when configured.
     """
     try:
         path = await session.async_get_variable("path")
@@ -223,8 +224,7 @@ async def _do_clone_to_tab(window, tab, session):
             # copy each `.env` file we found in the source repo (root and
             # subdirectories), mirroring relative paths via `mkdir -p`. Chained
             # with `&&` so clone/trust must succeed first. A trailing
-            # `lefthook install` runs as its own statement, self-gated on the
-            # clone having a lefthook config.
+            # `lefthook install` is self-gated on the clone having a config.
             env_files = await asyncio.to_thread(lib.find_env_files, repo_root)
             copy_cmds = []
             for rel in env_files:
@@ -242,7 +242,7 @@ async def _do_clone_to_tab(window, tab, session):
                 f"git clone {shlex.quote(origin)} . "
                 f"&& mise trust ."
                 f"{env_clause}"
-                f"{lib.lefthook_install_clause()}"
+                f" && {lib.lefthook_install_clause()}"
             )
         else:
             cmd = lib.existing_checkout_update_command()
