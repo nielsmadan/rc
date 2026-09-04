@@ -36,3 +36,6 @@ railway = { version = "latest", exe = "railway" }
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
+
+[env]
+ANDROID_HOME = "{{env.HOME}}/Library/Android/sdk"

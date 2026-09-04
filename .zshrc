@@ -4,19 +4,9 @@
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
-# Path for Android SDK
-export ANDROID_HOME="$HOME/Library/Android/sdk"
-
 # Keep brew auto-update, but silence the env-hint footer it prints
 export HOMEBREW_NO_ENV_HINTS=1
 
-# Android SDK tools (only when the SDK is actually present)
-if [[ -d "$ANDROID_HOME" ]]; then
-  export PATH="$PATH:$ANDROID_HOME/emulator"
-  export PATH="$PATH:$ANDROID_HOME/tools"
-  export PATH="$PATH:$ANDROID_HOME/tools/bin"
-  export PATH="$PATH:$ANDROID_HOME/platform-tools"
-fi
 export PATH="$HOME/development/flutter/bin:$HOME/.local/bin:$PATH"
 
 # ---------------------------------------------------------------------------
@@ -138,6 +128,14 @@ extract() {
 
 # mise
 eval "$(mise activate zsh)"
+
+# Android SDK tools (only when the SDK is actually present)
+if [[ -d "$ANDROID_HOME" ]]; then
+  export PATH="$PATH:$ANDROID_HOME/emulator"
+  export PATH="$PATH:$ANDROID_HOME/tools"
+  export PATH="$PATH:$ANDROID_HOME/tools/bin"
+  export PATH="$PATH:$ANDROID_HOME/platform-tools"
+fi
 
 # flutterfire CLI
 export PATH="$PATH":"$HOME/.pub-cache/bin"
