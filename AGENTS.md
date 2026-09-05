@@ -326,6 +326,13 @@ Migration status: keys still in `~/.airc` work via the legacy plain-env path. On
 
 Note on `.kdbx`: the file at `~/syncthing/keepass/dev-secrets.kdbx` is left in place for personal-life secrets browsed via KeePassXC (different security/UX posture from dev secrets).
 
+## Environment variables
+
+Before adding an env var anywhere, read `docs/env-vars.md`. It maps the six slots on this
+machine by **reach** — `.zshrc` is interactive-only, mise `[env]` reaches any process via
+the shim, `sops-exec` reaches exactly one on purpose — and says which to pick. Picking by
+habit rather than by reach is how a var ends up invisible to the tool that needed it.
+
 ## Machine troubleshooting
 
 "This Mac is slow" triage — memory-compressor thrash vs. CPU, orphaned iOS Simulators,
