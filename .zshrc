@@ -7,6 +7,11 @@
 # Keep brew auto-update, but silence the env-hint footer it prints
 export HOMEBREW_NO_ENV_HINTS=1
 
+# Keep PATH de-duplicated. Several dirs get prepended more than once (here, in
+# ~/.zprofile, and by third-party installers), and a nested shell re-runs the lot,
+# so without this they accumulate. Set before the first assignment to cover them all.
+typeset -U path PATH
+
 export PATH="$HOME/development/flutter/bin:$HOME/.local/bin:$PATH"
 
 # ---------------------------------------------------------------------------
@@ -331,9 +336,6 @@ fi
 # opencode
 export PATH="$HOME/.opencode/bin:$PATH"
 
-# Added by Antigravity CLI installer
-export PATH="$HOME/.local/bin:$PATH"
-
 # ---------------------------------------------------------------------------
 #  zsh-autosuggestions + zsh-syntax-highlighting
 # ---------------------------------------------------------------------------
@@ -344,4 +346,8 @@ source "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
 source "$HOME/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 
 autoload -U +X bashcompinit && bashcompinit
-complete -o nospace -C /Users/nielsmadan/.local/share/mise/installs/aqua-hashicorp-vault/2.0.2/vault vault
+# vault ships no zsh completion — it completes itself via `complete -C`. Point at
+# the mise shim rather than the versioned install path: that survives a pin bump
+# and carries no username, so this file stays portable across machines.
+[[ -x "$HOME/.local/share/mise/shims/vault" ]] && \
+  complete -o nospace -C "$HOME/.local/share/mise/shims/vault" vault
