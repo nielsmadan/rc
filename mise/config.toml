@@ -32,10 +32,12 @@ railway = { version = "latest", exe = "railway" }
 "aqua:charmbracelet/vhs" = "latest"
 "pipx:mlx-whisper" = "latest"
 "pipx:llm" = "latest"
-"github:nolabs-ai/nono" = "0.73.0"
+"github:nolabs-ai/nono" = "0.74.0"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
 
 [env]
+AGENT_DEVICE_IOS_TEAM_ID = "VED8HFWY84"
+AGENT_DEVICE_IOS_BUNDLE_ID = "com.nielsmadan.agentdevice.runner"
 ANDROID_HOME = "{{env.HOME}}/Library/Android/sdk"
