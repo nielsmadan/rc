@@ -5,7 +5,9 @@
       "Guid": "rc-dotfiles-split-nav",
       "Dynamic Profile Parent Name": "Default",
       "Use Separate Colors for Light and Dark Mode": false,
-      "Mouse Reporting": false,
+      "Mouse Reporting": true,
+      "Mouse Reporting allow mouse wheel": true,
+      "Mouse Reporting allow clicks and drags": false,
       "Keyboard Map": {
         "0x68-0x40000-0x4": {
           "Action": 18,
@@ -246,6 +248,7 @@
       "Name": "ssh: mini",
       "Guid": "rc-ssh-mini",
       "Dynamic Profile Parent Name": "rc",
+      "Mouse Reporting": false,
       "Custom Command": "Yes",
       "Command": "ssh -t mini /opt/homebrew/bin/tmux -CC new -A -s main"
     },
@@ -253,6 +256,7 @@
       "Name": "ssh: barney",
       "Guid": "rc-ssh-barney",
       "Dynamic Profile Parent Name": "rc",
+      "Mouse Reporting": false,
       "Custom Command": "Yes",
       "Command": "ssh -t barney /opt/homebrew/bin/tmux -CC new -A -s main"
     }
