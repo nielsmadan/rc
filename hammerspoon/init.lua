@@ -294,12 +294,6 @@ for _, name in ipairs(localCfg.fullscreen_apps or {}) do
   FULLSCREEN_TO_PLACE[name] = true
 end
 
--- Seconds to let each fullscreen transition animation finish before the next
--- step, and to let an app that fullscreens itself on launch settle before we
--- look at it at all (Unity games enter fullscreen well after windowCreated).
-local FULLSCREEN_SETTLE = 1.2
-local FULLSCREEN_APPEAR = 2.5
-
 local function ruleMatches(rule, win)
   local app = win:application()
   if not app or app:name() ~= rule.app then return false end
@@ -374,6 +368,9 @@ end
 -- once and leaves manual resizes / title changes alone. Bulk passes ignore
 -- this (always re-home) but refresh it. Cleared on windowDestroyed.
 local placedWindows = {}
+local fullscreenPlacer = require("fullscreen_placement").new(resolvePlacement, function(id)
+  placedWindows[id] = true
+end)
 
 -- Sequenced focus → setFrame for FOCUS_TO_PLACE windows, then hand focus
 -- back to `prev`. Async and one window at a time: focus() ends in an
@@ -396,30 +393,6 @@ local function placeViaFocus(items, prev)
     end)
   end
   step(1)
-end
-
--- Move a native-fullscreen window to `screen` by cycling out of and back into
--- fullscreen, sequenced on timers because each transition is an animation that
--- has to finish before the next step takes. Returns early when the window is
--- already on the target screen, so a re-home pass can't yank a correctly-placed
--- window through two seconds of animation on every wake.
-local function placeViaFullscreenCycle(win, screen)
-  if not win:isStandard() or win:screen() == screen then return end
-  local function setFrameNow()
-    local correctness = hs.window.setFrameCorrectness
-    hs.window.setFrameCorrectness = false
-    win:setFrame(screen:frame(), 0)
-    hs.window.setFrameCorrectness = correctness
-  end
-  if not win:isFullScreen() then return setFrameNow() end
-  win:setFullScreen(false)
-  hs.timer.doAfter(FULLSCREEN_SETTLE, function()
-    if not win:isStandard() then return end
-    setFrameNow()
-    hs.timer.doAfter(FULLSCREEN_SETTLE, function()
-      if win:isStandard() then win:setFullScreen(true) end
-    end)
-  end)
 end
 
 -- Re-home every managed window in two phases:
@@ -514,13 +487,15 @@ function homeAllManagedWindows()
     if screen and placement then
       local frame = placement(screen:frame())
       local id = win:id()
-      if id then placedWindows[id] = true end
       local app = win:application()
       if app and FULLSCREEN_TO_PLACE[app:name()] then
-        placeViaFullscreenCycle(win, screen)
+        if id then placedWindows[id] = nil end
+        fullscreenPlacer.start(win, false)
       elseif app and FOCUS_TO_PLACE[app:name()] then
+        if id then placedWindows[id] = true end
         deferred[#deferred + 1] = { win = win, frame = frame }
       else
+        if id then placedWindows[id] = true end
         win:setFrame(frame, 0)
         raiseOrder[#raiseOrder + 1] = win
       end
@@ -594,15 +569,13 @@ local function placeWindow(win)
   if not id or placedWindows[id] then return end
   local screen, placement = resolvePlacement(win)
   if not (screen and placement) then return end
-  placedWindows[id] = true
   local frame = placement(screen:frame())
   local app = win:application()
   if app and FULLSCREEN_TO_PLACE[app:name()] then
-    hs.timer.doAfter(FULLSCREEN_APPEAR, function()
-      placeViaFullscreenCycle(win, screen)
-    end)
+    fullscreenPlacer.start(win, true)
     return
   end
+  placedWindows[id] = true
   if app and FOCUS_TO_PLACE[app:name()] then
     placeViaFocus({ { win = win, frame = frame } }, hs.window.focusedWindow())
     return
@@ -651,10 +624,14 @@ if #managedAppNames > 0 then
   managedFilter = hs.window.filter.new(managedAppNames)
   local function onManagedWindow(win) placeWindow(win) end
   managedFilter:subscribe(hs.window.filter.windowCreated,      onManagedWindow)
+  managedFilter:subscribe(hs.window.filter.windowVisible,      onManagedWindow)
   managedFilter:subscribe(hs.window.filter.windowTitleChanged, onManagedWindow)
   managedFilter:subscribe(hs.window.filter.windowDestroyed, function(win)
     local id = win and win:id()
-    if id then placedWindows[id] = nil end
+    if id then
+      placedWindows[id] = nil
+      fullscreenPlacer.cancel(id)
+    end
   end)
 end
 
