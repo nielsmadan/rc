@@ -199,6 +199,7 @@ link video-frames     bin/video-frames  ~/.local/bin/video-frames
 link transcribe       bin/transcribe    ~/.local/bin/transcribe
 link img-sheet        bin/img-sheet     ~/.local/bin/img-sheet
 link update-tools     bin/update-tools  ~/.local/bin/update-tools
+link check-runtimes   bin/check-runtimes ~/.local/bin/check-runtimes
 # SaveWindowArrangement.py runs as an AutoLaunch daemon (auto-saves window
 # arrangements + registers the Cmd+S RPC). Drop the pre-daemon manual-script
 # symlink from the plain Scripts dir if a prior install left one there.

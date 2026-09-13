@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+
+RUNTIMES = set("node ruby python rust java bun deno go elixir erlang dotnet php swift zig".split())
+LTS_RUNTIMES = {"node", "java", "deno", "dotnet"}
+NODE_RELEASES = "https://nodejs.org/dist/index.json"
+JAVA_RELEASES = "https://api.adoptium.net/v3/info/available_releases"
+DENO_LTS = "https://dl.deno.land/release-lts-latest.txt"
+DOTNET_RELEASES = "https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json"
+STATUS_COLORS = {
+    "latest lts": "32", "older lts": "33", "off lts": "33",
+    "up to date": "32", "patch behind": "92", "minor behind": "33", "major behind": "31",
+}
+
+
+def read_command(*command):
+    try:
+        result = subprocess.run(
+            command, cwd=Path.home(), capture_output=True, text=True, timeout=45,
+            env={
+                **os.environ,
+                "MISE_FETCH_REMOTE_VERSIONS_CACHE": "0s",
+                "MISE_PRERELEASES": "false",
+            },
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError(f"{command[0]}: {error}") from error
+    if result.returncode:
+        detail = result.stderr.strip() or f"exit {result.returncode}"
+        raise ValueError(f"{' '.join(command)}: {detail}")
+    return result.stdout.strip()
+
+
+def fetch(url):
+    return read_command("curl", "--fail", "--silent", "--show-error", "--location", "--max-time", "20", url)
+
+
+def version_key(version):
+    match = re.fullmatch(r"(?:[a-zA-Z][a-zA-Z_-]*-)?v?(\d+(?:\.\d+)*)(?:\+[^\s]+|-otp-\d+)?", version)
+    if not match:
+        raise ValueError(f"cannot compare version {version!r}")
+    parts = tuple(int(part) for part in match[1].split("."))
+    return parts + (0,) * max(0, 4 - len(parts))
+
+
+def latest(tool, selector="latest"):
+    version = read_command("mise", "latest", f"{tool}@{selector}")
+    version_key(version)
+    return version
+
+
+def java_prefix(record):
+    version = record["version"]
+    match = re.match(r"([a-zA-Z][a-zA-Z_-]*-)(?=\d)", version)
+    return match[1] if match else ""
+
+
+def latest_lts(tool, prefix):
+    if tool == "node":
+        releases = json.loads(fetch(NODE_RELEASES))
+        versions = [release["version"].removeprefix("v") for release in releases if release.get("lts")]
+        if not versions:
+            raise ValueError("no Node LTS releases found")
+        return max(versions, key=version_key), {release_line(tool, version) for version in versions}
+    if tool == "java":
+        releases = json.loads(fetch(JAVA_RELEASES))
+        version = latest(tool, f"{prefix}{int(releases['most_recent_lts'])}")
+        return version, {(int(major),) for major in releases["available_lts_releases"]}
+    if tool == "deno":
+        version = fetch(DENO_LTS).removeprefix("v")
+        version_key(version)
+        return version, {release_line(tool, version)}
+    if tool == "dotnet":
+        releases = json.loads(fetch(DOTNET_RELEASES))["releases-index"]
+        supported = [
+            release["latest-sdk"] for release in releases
+            if release["release-type"] == "lts"
+            and release["support-phase"] in {"active", "maintenance"}
+            and release["eol-date"] >= date.today().isoformat()
+        ]
+        if not supported:
+            raise ValueError("no supported .NET LTS release found")
+        lines = {
+            release_line(tool, release["latest-sdk"]) for release in releases
+            if release["release-type"] == "lts"
+            and release["support-phase"] in {"active", "maintenance", "eol"}
+        }
+        return max(supported, key=version_key), lines
+    return None, set()
+
+
+def release_line(tool, version):
+    return version_key(version)[:2 if tool in {"deno", "dotnet"} else 1]
+
+
+def runtime_status(tool, installed, stable, lts, lts_lines, deno_channel=None):
+    if not installed:
+        return "not installed"
+    current = version_key(installed)
+    if tool in LTS_RUNTIMES:
+        if lts is None or (tool == "deno" and deno_channel is None):
+            return "unknown"
+        line = release_line(tool, installed)
+        if tool == "deno":
+            if deno_channel != "lts":
+                return "off lts"
+        elif line not in lts_lines:
+            return "off lts"
+        return "latest lts" if line == release_line(tool, lts) else "older lts"
+    if stable is None:
+        return "unknown"
+    available = version_key(stable)
+    if current >= available:
+        return "up to date"
+    if current[0] < available[0]:
+        return "major behind"
+    if current[1] < available[1]:
+        return "minor behind"
+    return "patch behind"
+
+
+def installed_deno_channel(record):
+    executable = Path(record["install_path"]) / "bin" / "deno"
+    output = read_command(str(executable), "--version")
+    match = re.search(r"^deno \S+ \((\w+),", output)
+    if not match:
+        raise ValueError("could not identify installed Deno release channel")
+    return match[1]
+
+
+def check_runtime(item):
+    tool, record = item
+    errors = []
+    prefix = java_prefix(record) if tool == "java" else ""
+    stable = lts = None
+    lts_lines = set()
+    try:
+        stable = latest(tool, prefix.rstrip("-") or "latest")
+    except ValueError as error:
+        errors.append(f"{tool} stable: {error}")
+    try:
+        lts, lts_lines = latest_lts(tool, prefix)
+    except (ValueError, KeyError, TypeError) as error:
+        errors.append(f"{tool} LTS: {error}")
+
+    installed = record["version"] if record.get("installed") else None
+    current_key = None
+    if installed:
+        try:
+            current_key = version_key(installed)
+        except ValueError as error:
+            errors.append(f"{tool}: {error}")
+
+    status = "not installed" if not installed else "unknown"
+    if current_key is not None:
+        try:
+            channel = installed_deno_channel(record) if tool == "deno" else None
+            status = runtime_status(tool, installed, stable, lts, lts_lines, channel)
+        except (ValueError, KeyError, TypeError) as error:
+            errors.append(f"{tool} status: {error}")
+
+    newer = False
+
+    def release_cell(version, is_lts=False):
+        nonlocal newer
+        if version is None:
+            return "unknown" if not is_lts or tool in LTS_RUNTIMES else "—"
+        label = version + (" [LTS]" if is_lts else "")
+        if current_key is not None and version_key(version) > current_key:
+            newer = True
+            label += " NEW"
+        return label
+
+    row = [
+        tool, record.get("requested_version", "?"), installed or "not installed",
+        release_cell(stable), release_cell(lts, is_lts=True), status,
+    ]
+    return row, newer, errors
+
+
+def print_table(rows):
+    table = [["Runtime", "Requested", "Installed", "Latest stable", "Latest LTS", "Status"], *rows]
+    widths = [max(len(row[index]) for row in table) for index in range(len(table[0]))]
+    color = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+    for row in table:
+        line = "  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip()
+        if color:
+            line = line.replace("[LTS]", "\033[1;32m[LTS]\033[0m").replace(" NEW", " \033[1;33mNEW\033[0m")
+            status = row[-1]
+            if status in STATUS_COLORS:
+                line = line[:-len(status)] + f"\033[{STATUS_COLORS[status]}m{status}\033[0m"
+        print(line)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Check global mise runtime versions without installing updates or changing pins.",
+        epilog=(
+            "Checks beyond configured pins, preserving Java's vendor. LTS metadata is checked "
+            "for Node, Java, Deno, and .NET. Metadata caches may refresh. "
+            "Exit 0 on a complete check (including available updates), 1 on a failed check."
+        ),
+    )
+    parser.add_argument("runtimes", nargs="*", metavar="RUNTIME", help="check only these runtimes (default: all global runtimes)")
+    args = parser.parse_args()
+    unknown = set(args.runtimes) - RUNTIMES
+    if unknown:
+        parser.error(f"unknown runtime(s): {', '.join(sorted(unknown))}")
+    try:
+        inventory = json.loads(read_command("mise", "ls", "--global", "--json"))
+        if not isinstance(inventory, dict):
+            raise ValueError("expected a mise inventory object")
+        missing = set(args.runtimes) - inventory.keys()
+        if missing:
+            parser.error(f"not configured globally: {', '.join(sorted(missing))}")
+        selected = set(args.runtimes) if args.runtimes else RUNTIMES
+        items = [
+            (tool, record) for tool, records in sorted(inventory.items()) if tool in selected
+            for record in records
+        ]
+        if not items:
+            print("No global mise runtimes configured.")
+            return 0
+        print("Checking global mise runtimes…", flush=True)
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(check_runtime, items))
+    except (ValueError, KeyError, TypeError) as error:
+        print(f"Check failed: {error}", file=sys.stderr)
+        return 1
+
+    print_table([row for row, _, _ in results])
+    errors = [error for _, _, failures in results for error in failures]
+    newer = sum(has_newer for _, has_newer, _ in results)
+    if newer:
+        print(f"\n{newer} configured runtime version(s) have newer releases available.")
+    elif not errors:
+        print("\nNo newer releases available for installed runtimes.")
+    print("No runtimes or configuration were changed.")
+    if errors:
+        print("\nCheck incomplete:", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+    return 1 if errors else 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)
