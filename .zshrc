@@ -43,6 +43,7 @@ typeset -A _zcompgen=(
   lefthook 'lefthook completion zsh'
   railway  'railway completion zsh'
   sops     'sops completion zsh'
+  tart     'tart --generate-completion-script zsh'
   rustup   'rustup completions zsh'
   cargo    'rustup completions zsh cargo'
 )
