@@ -236,6 +236,18 @@ elif [[ "$LC_TERMINAL" == "iTerm2" ]] && command -v it2ssh >/dev/null 2>&1; then
   alias ssh="it2ssh"
 fi
 
+tailssh() {
+  local tailscale_host
+  case "${1-}" in
+    mini) tailscale_host=100.65.206.80 ;;
+    *)
+      print -u2 'Usage: tailssh mini [command ...]'
+      return 2
+      ;;
+  esac
+  ssh -o "HostName=$tailscale_host" "$@"
+}
+
 # iTerm2 shell integration: lets the shell report cwd + host to iTerm2 so
 # "reuse previous session's directory" works over SSH — split panes inherit the
 # remote dir instead of trying to cd into a local-only path. Per-machine: only

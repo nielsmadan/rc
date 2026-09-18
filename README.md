@@ -1,5 +1,20 @@
 Welcome to my dotfiles and small scripts!
 
+## SSH over Tailscale
+
+`tailssh mini` forces mini's Tailscale IP while retaining
+its SSH user, forwarding settings, and terminal integration. Ordinary `ssh`
+continues to prefer the local network. Tailscale must be connected.
+
+```sh
+tailssh mini
+tailssh mini hostname
+```
+
+The Tailscale IP is mapped in `.zshrc`; keep it aligned with `~/.ssh/config`
+if mini's address changes. Open a new shell or run `source ~/.zshrc`
+after updating.
+
 ## Updating tools
 
 `bin/update-tools` updates global mise CLI tools, Homebrew packages and GUI apps,
