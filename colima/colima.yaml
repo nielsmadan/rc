@@ -258,7 +258,7 @@ sshPort: 0
 # Colima default behaviour: $HOME is mounted as writable.
 # Default: []
 mounts:
-  - location: /Users/nielsmadan/wrksp
+  - location: ~/wrksp
     writable: true
   - location: /var/folders
     writable: true
