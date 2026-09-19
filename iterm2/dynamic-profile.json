@@ -5,6 +5,7 @@
       "Guid": "rc-dotfiles-split-nav",
       "Dynamic Profile Parent Name": "Default",
       "Use Separate Colors for Light and Dark Mode": false,
+      "Enable Progress Bars": false,
       "Mouse Reporting": true,
       "Mouse Reporting allow mouse wheel": true,
       "Mouse Reporting allow clicks and drags": false,
