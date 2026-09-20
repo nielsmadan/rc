@@ -320,7 +320,11 @@ Global npm CLIs are managed through mise's `npm:` backend (`npm:wrangler`, `npm:
 
 Dev API keys (e.g. `JINA_API_KEY`) live in `secrets/secrets.yaml` in this repo, encrypted with [SOPS](https://github.com/getsops/sops) using [age](https://github.com/FiloSottile/age) recipients. Each Mac has its own age identity at `~/.config/sops/age/keys.txt` (mode 600); the corresponding **public** keys are listed in `.sops.yaml` at the repo root. The encrypted file is safe to commit — that's the whole point.
 
-Why this setup: API keys must not sit in long-lived shell env, because Claude Code agents (and similar tools) routinely run `env`/`printenv`/cat configs, and those values end up in transcripts. SOPS' `exec-env` injects decrypted values into a subprocess only — the parent shell never sees them.
+Why this setup: keys stay out of the interactive shell and out of plaintext files on disk — `sops exec-env` decrypts into the launched tool's process tree only, so the parent shell and unrelated processes never see them.
+
+It is **not** a barrier against the agent itself. A tool started this way inherits every injected variable, and so does every command it runs (measured 2026-09-20: `JINA_API_KEY` and `GH_TOKEN` are both present in a Claude Code Bash subprocess). That is acceptable by design, because this store holds low-value dev tokens that are cheap to revoke — which is also the standard it sets for what may go in: anything that would not be safe in an agent's environment does not belong here.
+
+One exception is imposed from outside: **Claude Code strips `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`** from the environment it hands to tool subprocesses (its own behaviour, nothing to do with this setup). So a nested `claude` spawned from inside a session inherits no credential; launch it through `sops-exec claude …` — with `AGENT_REQUIRE_SECRETS=1`, so a re-injection failure exits 78 loudly instead of starting a keyless agent — rather than trying to read the token.
 
 Architecture:
 - **`.sops.yaml`** (repo root) — SOPS creation rules. Lists allowed age recipients (public keys, one per Mac). Plaintext, committed.
