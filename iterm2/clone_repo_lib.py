@@ -137,19 +137,55 @@ def existing_checkout_update_command() -> str:
 _ENV_SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__"}
 
 
+def _git_ignored(repo_root: str, rel_paths: list) -> set:
+    """The subset of `rel_paths` that git ignores, empty when it can't tell.
+
+    Index-aware, so a tracked path matching an ignore rule is not reported.
+    """
+    if not rel_paths:
+        return set()
+    result = subprocess.run(
+        ["git", "-C", repo_root, "check-ignore", "-z", "--stdin"],
+        input="\0".join(rel_paths) + "\0",
+        capture_output=True,
+        text=True,
+    )
+    # 1 means nothing matched; 128 means no repo, so prune nothing.
+    if result.returncode not in (0, 1):
+        return set()
+    return {p for p in result.stdout.split("\0") if p}
+
+
 def find_env_files(repo_root: str) -> list:
     """Return relative paths of every `.env` file under `repo_root`.
 
-    Walks the tree, pruning common bulky/irrelevant directories. Returned
-    paths are POSIX-relative to `repo_root` (e.g. `".env"`, `"server/.env"`),
-    sorted for stable output.
+    Prunes `_ENV_SKIP_DIRS` and every git-ignored directory: build output and
+    test scratch trees accumulate throwaway `.env` files that have no business
+    in a fresh clone. Only directories are tested against gitignore — `.env`
+    itself is normally ignored, which is the whole reason it needs copying.
+    Returned paths are POSIX-relative to `repo_root` (e.g. `".env"`,
+    `"server/.env"`), sorted for stable output.
     """
     out = []
-    for dirpath, dirnames, filenames in os.walk(repo_root):
-        dirnames[:] = [d for d in dirnames if d not in _ENV_SKIP_DIRS]
-        if ".env" in filenames:
-            rel = os.path.relpath(dirpath, repo_root)
-            out.append(".env" if rel == "." else os.path.join(rel, ".env"))
+    level = [""]  # relative dir prefixes, "" being repo_root itself
+    while level:
+        children = []
+        for prefix in level:
+            try:
+                entries = os.scandir(os.path.join(repo_root, prefix))
+            except OSError:
+                continue
+            with entries:
+                for entry in entries:
+                    if entry.is_dir(follow_symlinks=False):
+                        if entry.name not in _ENV_SKIP_DIRS:
+                            children.append(prefix + entry.name)
+                    elif entry.name == ".env":
+                        out.append(prefix + ".env")
+        # One check-ignore per depth, not per directory: git's startup cost
+        # dominates, and a wide repo has far more directories than levels.
+        ignored = _git_ignored(repo_root, children)
+        level = [c + "/" for c in children if c not in ignored]
     return sorted(out)
 
 

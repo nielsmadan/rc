@@ -371,6 +371,55 @@ class TestFindEnvFiles(unittest.TestCase):
             self.assertEqual(lib.find_env_files(d), [])
 
 
+
+def init_repo(path: str, *ignore_lines: str):
+    """Bare-minimum repo (no commit) with a .gitignore — enough for check-ignore."""
+    os.makedirs(path, exist_ok=True)
+    subprocess.run(["git", "init", "-q", path], check=True)
+    with open(os.path.join(path, ".gitignore"), "w") as fh:
+        fh.write("\n".join(ignore_lines) + "\n")
+
+
+class TestFindEnvFilesGitignore(unittest.TestCase):
+    def test_skips_gitignored_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            init_repo(d, ".cache/")
+            touch(os.path.join(d, ".cache", ".env"))
+            touch(os.path.join(d, "server", ".env"))
+            self.assertEqual(lib.find_env_files(d), ["server/.env"])
+
+    def test_skips_env_deep_under_ignored_ancestor(self):
+        # The shape that caused the bug: pytest tmpdirs nested under .cache/.
+        with tempfile.TemporaryDirectory() as d:
+            init_repo(d, ".cache/")
+            touch(os.path.join(d, ".cache", "tmp", "pytest-1", "test_a0", ".env"))
+            touch(os.path.join(d, ".cache", "tmp", "pytest-1", "test_b0", ".env"))
+            self.assertEqual(lib.find_env_files(d), [])
+
+    def test_finds_env_files_that_are_themselves_gitignored(self):
+        # `.env` is ignored in nearly every repo — that is why it gets copied.
+        with tempfile.TemporaryDirectory() as d:
+            init_repo(d, ".env")
+            touch(os.path.join(d, ".env"))
+            touch(os.path.join(d, "server", ".env"))
+            self.assertEqual(lib.find_env_files(d), [".env", "server/.env"])
+
+    def test_keeps_ignored_dir_holding_tracked_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            init_repo(d, "build/", ".env")
+            touch(os.path.join(d, "build", ".env"))
+            touch(os.path.join(d, "build", "keep.txt"))
+            subprocess.run(
+                ["git", "-C", d, "add", "-f", "build/keep.txt"], check=True
+            )
+            self.assertEqual(lib.find_env_files(d), ["build/.env"])
+
+    def test_outside_a_repo_prunes_only_the_fixed_skip_list(self):
+        with tempfile.TemporaryDirectory() as d:
+            touch(os.path.join(d, ".cache", ".env"))
+            self.assertEqual(lib.find_env_files(d), [".cache/.env"])
+
+
 class TestLefthookInstallClause(unittest.TestCase):
     def test_runs_install_when_config_present(self):
         # Drop a config file, run the snippet in a shell, assert it fires.
