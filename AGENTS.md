@@ -106,7 +106,25 @@ The global gitignore lives at `git/ignore` in this repo, symlinked to `~/.config
    For title-pattern rules to take effect, the title needs to be set *before* one of the three trigger events fires. Practical workflow: open the iTerm2 window, set its title to e.g. `config` (Cmd+I → Window Title, or `echo -ne "\033]0;config\007"` in the shell), then trigger a re-home — toggling display mirroring or putting the lid down for a few seconds will work, otherwise the rule kicks in on the next monitor change / sleep-wake naturally.
 2. **F18-chord window-placement modal.** Hold F18 and tap a key: `f` (fill), `1`/`2`/`3` (top/middle/bottom third), `q`/`w` (top/bottom half), `a`/`s` (left/right half), or `h` (home — re-run the homing pass on all managed windows, same code path as monitor change / wake). Full key map and rationale in the comment block at the top of `hammerspoon/init.lua`.
 
-**"Placement keys dead / auto-layout dead" = lost Accessibility, NOT Secure Input.** Both the F18 trigger and the placement keys use Carbon `RegisterEventHotKey`, which **Secure Input does not block** (Secure Input blocks `CGEventTap`, the keylogger path). Every placement path ends in `win:setFrame(...)`, which needs the **Accessibility** permission and silently no-ops without it — so a revoked Accessibility grant is the real signature of dead placement + dead auto-layout (auto-layout is keyboard-free, so Secure Input is logically irrelevant to it). `init.lua` accordingly checks `hs.accessibilityState()` — the F18 overlay and a load-time alert both point at Accessibility — rather than the old `secureInputActive()` guard, which was a red herring that misdiagnosed this twice. (Aside: Secure Input can get stuck owned by a dead PID when a login-item app grabs it and quits; that's a fresh per-login leak, cleared on logout, and unrelated to the placement keys.)
+**Dead placement has two different causes, and the symptom tells them apart.** Check Accessibility first, then Secure Input; `init.lua` warns about both in the F18 overlay, and about Accessibility in a load-time alert.
+
+- **Nothing moves, but the keys clearly fire = lost Accessibility.** Every placement path ends in `win:setFrame(...)`, which needs the **Accessibility** permission and silently no-ops without it. This is also the only candidate for dead *auto-layout*, which is keyboard-free. Read the state with `hs -c 'return hs.accessibilityState()'`.
+- **Overlay appears but each key types into the focused app = Secure Input.** It suppresses dispatch of **modifier-less character** hotkeys, which is the entire placement set. It does *not* block `RegisterEventHotKey` wholesale — bare F18 and modified combos (measured with a scratch `⌘⌃⌥K` binding) keep firing under it, which is why the overlay still comes up. The Carbon registration still succeeds too: `hotkey.lua:90` only logs `Enabled hotkey …` when `_hk:enable()` returns truthy, so a logged success proves the OS accepted the key and says nothing about dispatch.
+
+Measured 2026-09-20 on Hammerspoon 1.1.1 / macOS 26.6.2, with `loginwindow` holding Secure Input from boot: **a lock/unlock does not release it — only logging out did.** No config or OS change was involved (the build had been installed three weeks). Note `hs.eventtap` is dead in this state too, so an eventtap key probe captures **zero events** and cannot be used to diagnose it.
+
+Diagnostics, in the order that settled it:
+
+```sh
+hs -c 'return hs.accessibilityState()'                  # Accessibility grant
+hs -c 'return hs.eventtap.isSecureInputEnabled()'       # Secure Input active?
+ioreg -l -w 0 | grep -o 'kCGSSessionSecureInputPID"=[0-9]*'   # and who holds it
+hs -c 'return #hs.hotkey.getHotkeys()'                  # poll while holding F18
+```
+
+That last one is the check that isolates the modal: `getHotkeys()` lists only *enabled* hotkeys, so the count jumping from 1 to 13 while F18 is held proves `hyper:enter()` ran and registered every placement key — pointing at dispatch rather than at the config. **Modal hotkeys log at debug level** (`hotkey.lua:92`), so an empty console during a hold proves nothing; polling the count does. To confirm the suppression outside the modal entirely, bind a bare character key globally (`hs.hotkey.bind({}, "9", …)`) and press it — if the character reaches the app, dispatch is the problem, not the chord.
+
+(Aside: Secure Input can also get stuck owned by a dead PID when a login-item app grabs it and quits; either way it is a per-login leak cleared by logging out.)
 
 ### Per-machine config: `hammerspoon/local.lua`
 

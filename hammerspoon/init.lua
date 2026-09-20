@@ -131,12 +131,20 @@ hs.hotkey.bind({}, "f18",
     -- Placement goes through AX setFrame, which silently no-ops without the
     -- Accessibility permission — the keys still FIRE, the windows just don't
     -- move, which reads identically to "keys are dead". Surface that real
-    -- failure mode instead of failing mute. (Secure Input is NOT checked here:
-    -- it doesn't block RegisterEventHotKey hotkeys, so it never blocks these
-    -- keys — an earlier version blamed it and misled diagnosis.)
+    -- failure mode instead of failing mute.
+    --
+    -- Secure Input is a second, distinct failure: it suppresses dispatch of
+    -- modifier-less character hotkeys while F18 and modified combos keep
+    -- firing, so this overlay appears normally and every placement key types
+    -- into the focused app instead. Measured 2026-09-20 (Hammerspoon 1.1.1,
+    -- macOS 26.6.2): the Carbon registration still succeeds, lock/unlock does
+    -- not release it, logging out does.
     if not hs.accessibilityState() then
       showHint("⚠︎ Accessibility is OFF — window placement won't work.\n" ..
                "System Settings ▸ Privacy & Security ▸ Accessibility ▸ enable Hammerspoon.")
+    elseif hs.eventtap.isSecureInputEnabled() then
+      showHint("⚠︎ Secure Input is ON — placement keys won't fire.\n" ..
+               "Log out and back in to clear it.")
     else
       showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  z/x=⅔cols  h=home  esc=cancel")
     end
