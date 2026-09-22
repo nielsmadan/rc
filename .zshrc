@@ -228,12 +228,9 @@ alias zshrc="mvim ~/.zshrc"
 
 # Inside kitty, route ssh through the kitten so xterm-kitty terminfo gets
 # installed on the remote — otherwise prompt redraws produce garbled output.
-# Same idea for iTerm2: it2ssh ships shell integration + terminfo to the remote.
 # WezTerm uses TERM=xterm-256color by default, so no wrapper needed.
 if [[ "$TERM" == "xterm-kitty" ]] && command -v kitten >/dev/null 2>&1; then
   alias ssh="kitten ssh"
-elif [[ "$LC_TERMINAL" == "iTerm2" ]] && command -v it2ssh >/dev/null 2>&1; then
-  alias ssh="it2ssh"
 fi
 
 tailssh() {
@@ -247,12 +244,6 @@ tailssh() {
   esac
   ssh -o "HostName=$tailscale_host" "$@"
 }
-
-# iTerm2 shell integration: lets the shell report cwd + host to iTerm2 so
-# "reuse previous session's directory" works over SSH — split panes inherit the
-# remote dir instead of trying to cd into a local-only path. Per-machine: only
-# loads where the script has been fetched into $HOME. Harmless in other terminals.
-[[ -e "${HOME}/.iterm2_shell_integration.zsh" ]] && source "${HOME}/.iterm2_shell_integration.zsh"
 
 # Agent tooling (~/ac): PATH, the sandboxed claude/codex/opencode/pi wrappers,
 # and the SOPS_* paths below them. Sourced first so anything here can override

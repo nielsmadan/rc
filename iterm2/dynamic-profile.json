@@ -249,9 +249,100 @@
       "Name": "ssh: mini",
       "Guid": "rc-ssh-mini",
       "Dynamic Profile Parent Name": "rc",
-      "Mouse Reporting": false,
       "Custom Command": "Yes",
-      "Command": "ssh -t mini /opt/homebrew/bin/tmux -CC new -A -s main"
+      "Command": "ssh -q -t mini /opt/homebrew/bin/tmux new -A -s main",
+      "Keyboard Map": {
+        "0x64-0x100000-0x2": {
+          "Action": 11,
+          "Text": "0x02 0x25",
+          "Label": "tmux: split right"
+        },
+        "0x44-0x120000-0x2": {
+          "Action": 11,
+          "Text": "0x02 0x22",
+          "Label": "tmux: split down"
+        },
+        "0x74-0x100000-0x11": {
+          "Action": 11,
+          "Text": "0x02 0x63",
+          "Label": "tmux: new window"
+        },
+        "0x77-0x100000-0xd": {
+          "Action": 11,
+          "Text": "0x02 0x78",
+          "Label": "tmux: kill pane"
+        },
+        "0x68-0x40000-0x4": {
+          "Action": 11,
+          "Text": "0x02 0x68",
+          "Label": "tmux: select pane left"
+        },
+        "0x6a-0x40000-0x26": {
+          "Action": 11,
+          "Text": "0x02 0x6a",
+          "Label": "tmux: select pane below"
+        },
+        "0x6b-0x40000-0x28": {
+          "Action": 11,
+          "Text": "0x02 0x6b",
+          "Label": "tmux: select pane above"
+        },
+        "0x6c-0x40000-0x25": {
+          "Action": 11,
+          "Text": "0x02 0x6c",
+          "Label": "tmux: select pane right"
+        },
+        "0x31-0x100000-0x12": {
+          "Action": 11,
+          "Text": "0x02 0x31",
+          "Label": "tmux: select window 1"
+        },
+        "0x32-0x100000-0x13": {
+          "Action": 11,
+          "Text": "0x02 0x32",
+          "Label": "tmux: select window 2"
+        },
+        "0x33-0x100000-0x14": {
+          "Action": 11,
+          "Text": "0x02 0x33",
+          "Label": "tmux: select window 3"
+        },
+        "0x34-0x100000-0x15": {
+          "Action": 11,
+          "Text": "0x02 0x34",
+          "Label": "tmux: select window 4"
+        },
+        "0x35-0x100000-0x17": {
+          "Action": 11,
+          "Text": "0x02 0x35",
+          "Label": "tmux: select window 5"
+        },
+        "0x36-0x100000-0x16": {
+          "Action": 11,
+          "Text": "0x02 0x36",
+          "Label": "tmux: select window 6"
+        },
+        "0x37-0x100000-0x1a": {
+          "Action": 11,
+          "Text": "0x02 0x37",
+          "Label": "tmux: select window 7"
+        },
+        "0x38-0x100000-0x1c": {
+          "Action": 11,
+          "Text": "0x02 0x38",
+          "Label": "tmux: select window 8"
+        },
+        "0x39-0x100000-0x19": {
+          "Action": 11,
+          "Text": "0x02 0x39",
+          "Label": "tmux: select window 9"
+        },
+        "0x73-0x100000-0x1": {
+          "Action": 60,
+          "Text": "save_window_arrangement()",
+          "Label": "Save Window Arrangement"
+        }
+      }
     }
   ]
 }

@@ -133,3 +133,5 @@
 	allowedSignersFile = ~/.ssh/allowed_signers
 [url "git@github.com:"]
 	pushInsteadOf = https://github.com/
+[beads]
+	role = maintainer
