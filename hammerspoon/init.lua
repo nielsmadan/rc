@@ -1,8 +1,8 @@
 -- Per-machine config (monitor names, app placements, window rules) is
 -- loaded from ~/.hammerspoon/local.lua — see local.lua.example in this
 -- directory for the API. That file is gitignored so each machine has
--- its own. Without it, no auto-placement happens; the F18 modal still
--- works fine. The screen watcher below posts an hs.alert listing
+-- its own. Without it, no auto-placement happens; the Hyper hotkeys still
+-- work fine. The screen watcher below posts an hs.alert listing
 -- connected screen names on every screen-config change, so the right
 -- name to put in local.lua appears on screen when monitors are plugged.
 
@@ -20,21 +20,22 @@ hs.window.setFrameCorrectness = true
 -- which made "placement silently does nothing" much harder to diagnose.
 require("hs.ipc")
 
--- ─── Window-management modal system ──────────────────────────────────
--- Entry: F18 (held). Caps Lock is remapped to F18 by a launchd plist
--- running hidutil at login (see launchd/com.nielsmadan.hidutil-...).
--- On the Moonlander, assign any free key to F18 in Oryx.
+-- ─── Window-management hotkeys ─────────────────────────────────────
+-- Trigger: the Hyper key (⌃⌥⌘⇧). The Hyperkey app (hyperkey.app) turns
+-- Caps Lock into that real modifier chord; on the Moonlander, assign a
+-- key in Oryx to send the same chord. Each binding below is a plain
+-- hs.hotkey.bind on Hyper+<key> — real modifier combos keep dispatching
+-- under Secure Input (only modifier-less character hotkeys get
+-- suppressed), so these need no modal or entry/exit dance: holding
+-- Hyper and tapping several keys in a row just works like any other
+-- modifier shortcut.
 --
--- Hold F18 and tap a key (chord). The modal stays open while F18 is held,
--- so you can tap several keys in a row without re-pressing F18:
 --   f       = toggle fill (press again to restore previous frame)
 --   1 / 2 / 3 = top / middle / bottom third (vertical = stacked rows)
 --   q / w   = top / bottom half (vertical = stacked rows)
 --   a / s   = left / right half (horizontal = side-by-side cols)
 --   z / x   = left / right two-thirds (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
---   esc     = abort
--- F18 itself is consumed (apps never see it as a literal F18 keypress).
 
 local function place(fx, fy, fw, fh)
   return function()
@@ -53,7 +54,7 @@ local function place(fx, fy, fw, fh)
   end
 end
 
--- F18 f toggles fill: fill the screen, or — if the window is already filled
+-- Hyper+f toggles fill: fill the screen, or — if the window is already filled
 -- — restore whatever frame it had before. preFillFrame remembers that frame
 -- per window id. "Already filled" = within FILL_SLOP of the screen frame
 -- (iTerm2 snaps to char cells, so a filled window never lands exact), so if
@@ -82,104 +83,45 @@ local function toggleFill()
   hs.window.setFrameCorrectness = prev
 end
 
-local hyper = hs.hotkey.modal.new()
-
--- Forward-declared so the F18+H binding below can call it; the actual
+-- Forward-declared so the Hyper+H binding below can call it; the actual
 -- definition lives further down with the rest of the placement code.
 local homeAllManagedWindows
 
-local hint          -- current hs.alert handle (or nil)
-local hyperActive   -- true while F18 is held; guards double-enter
+local HYPER = { "cmd", "alt", "ctrl", "shift" }
 
--- pcall'd close — alert handles can go stale (auto-dismiss, internal
--- close, etc.). An exception inside a hotkey callback is logged but
--- harmless; defensive anyway.
-local function safeClose(h)
-  if h then pcall(hs.alert.closeSpecific, h) end
-end
-
-local function showHint(text)
-  safeClose(hint)
-  hint = hs.alert.show(text, true)
-end
-
-local function clearHint()
-  safeClose(hint)
-  hint = nil
-end
-
-local function leaveAll()
-  hyper:exit()
-  clearHint()
-  hyperActive = false
-end
-
--- F18 via hs.hotkey.bind (RegisterEventHotKey), not hs.eventtap: macOS
--- silently disables CGEventTaps on timeout / Lua exception / Secure Input
--- after sleep, with no auto-recovery. RegisterEventHotKey has no such mode.
-hs.hotkey.bind({}, "f18",
-  function()  -- pressed
-    if hyperActive then return end
-    hyperActive = true
-    -- Clear any stale hint, but do NOT exit the modal here: a synchronous
-    -- hyper:exit() immediately followed by hyper:enter() unregisters then
-    -- re-registers the same Carbon hotkeys in one tick, which intermittently
-    -- leaves them unregistered for the whole session (overlay shows but no
-    -- key fires). enter() on an already-exited modal is enough.
-    clearHint()
-    hyper:enter()
-    -- Placement goes through AX setFrame, which silently no-ops without the
-    -- Accessibility permission — the keys still FIRE, the windows just don't
-    -- move, which reads identically to "keys are dead". Surface that real
-    -- failure mode instead of failing mute.
-    --
-    -- Secure Input is a second, distinct failure: it suppresses dispatch of
-    -- modifier-less character hotkeys while F18 and modified combos keep
-    -- firing, so this overlay appears normally and every placement key types
-    -- into the focused app instead. Measured 2026-09-20 (Hammerspoon 1.1.1,
-    -- macOS 26.6.2): the Carbon registration still succeeds, lock/unlock does
-    -- not release it, logging out does.
+-- Wraps each action with the Accessibility check: placement goes through AX
+-- setFrame, which silently no-ops without the Accessibility permission — the
+-- hotkey still fires, the window just doesn't move, which reads identically
+-- to "the binding is dead". Surface that real failure mode instead of
+-- failing mute.
+local function bindHyper(key, fn)
+  hs.hotkey.bind(HYPER, key, function()
     if not hs.accessibilityState() then
-      showHint("⚠︎ Accessibility is OFF — window placement won't work.\n" ..
-               "System Settings ▸ Privacy & Security ▸ Accessibility ▸ enable Hammerspoon.")
-    elseif hs.eventtap.isSecureInputEnabled() then
-      showHint("⚠︎ Secure Input is ON — placement keys won't fire.\n" ..
-               "Log out and back in to clear it.")
-    else
-      showHint("window: f=fill⇄  1/2/3=thirds  q/w=rows  a/s=cols  z/x=⅔cols  h=home  esc=cancel")
+      hs.alert.show("⚠︎ Accessibility is OFF — window placement won't work.\n" ..
+                     "System Settings ▸ Privacy & Security ▸ Accessibility ▸ enable Hammerspoon.")
+      return
     end
-  end,
-  function()  -- released
-    if not hyperActive then return end
-    hyperActive = false
-    hyper:exit()
-    clearHint()
-  end
-)
+    fn()
+  end)
+end
 
--- Action bindings stay in the modal: they perform the action but DON'T
--- exit, so you can hold F18 and tap several keys in a row (e.g. 1 then 2).
--- The modal exits only when F18 is physically released (the release
--- handler above) or escape aborts it.
-hyper:bind({}, "escape", leaveAll)
+bindHyper("f", toggleFill)
 
-hyper:bind({}, "f", toggleFill)
+bindHyper("1", place(0, 0,     1, 1 / 3))
+bindHyper("2", place(0, 1 / 3, 1, 1 / 3))
+bindHyper("3", place(0, 2 / 3, 1, 1 / 3))
 
-hyper:bind({}, "1", place(0, 0,     1, 1 / 3))
-hyper:bind({}, "2", place(0, 1 / 3, 1, 1 / 3))
-hyper:bind({}, "3", place(0, 2 / 3, 1, 1 / 3))
+bindHyper("q", place(0, 0,     1, 1 / 2))
+bindHyper("w", place(0, 1 / 2, 1, 1 / 2))
 
-hyper:bind({}, "q", place(0, 0,     1, 1 / 2))
-hyper:bind({}, "w", place(0, 1 / 2, 1, 1 / 2))
+bindHyper("a", place(0,     0, 1 / 2, 1))
+bindHyper("s", place(1 / 2, 0, 1 / 2, 1))
 
-hyper:bind({}, "a", place(0,     0, 1 / 2, 1))
-hyper:bind({}, "s", place(1 / 2, 0, 1 / 2, 1))
-
-hyper:bind({}, "z", place(0,     0, 2 / 3, 1))
-hyper:bind({}, "x", place(1 / 3, 0, 2 / 3, 1))
+bindHyper("z", place(0,     0, 2 / 3, 1))
+bindHyper("x", place(1 / 3, 0, 2 / 3, 1))
 
 -- Manual re-home: same placement pass that fires on screen change / wake.
-hyper:bind({}, "h", function() homeAllManagedWindows() end)
+bindHyper("h", function() homeAllManagedWindows() end)
 -- ──────────────────────────────────────────────────────────────────────
 
 -- Reload on save of any .lua under ~/.hammerspoon.
@@ -645,7 +587,7 @@ end
 
 -- Defer initial pass so hs.application's registry is fully populated.
 -- Exposed as a global for hs.ipc, so a re-home can be triggered from a
--- shell (`hs -c "homeWindows()"`) without the F18 chord. Testing any of
+-- shell (`hs -c "homeWindows()"`) without the Hyper chord. Testing any of
 -- this through hs.reload() instead is misleading: a reload empties
 -- placedWindows, so every managed window re-places on its next title
 -- change, and that burst moves focus around before the bulk pass runs.
