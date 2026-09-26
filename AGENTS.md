@@ -58,30 +58,9 @@ Every `link` call in `install.sh` carries a short **alias** as its first argumen
 
 An *existing* `install.local` is **merged, not left alone**: aliases added since it was written get appended (commented out, so behaviour is unchanged), and aliases it lists that match no `link` call are flagged with a `warn:` line. Before this merge existed, adding a `link` call left every already-installed machine's file silently stale — the new alias was simply absent, and you cannot skip a target you cannot see. Aliases that aren't plain `link` calls (`obsidian-vimrc`, `githooks`) call `seen_key` directly so they appear in the list too.
 
-## Two editor configs coexist
+## Editor configuration
 
-This repo maintains **both** a legacy Vim config and a modern Neovim config in parallel — they are not migrating from one to the other.
-
-- **Vim** — single-file `.vimrc`, plugins via `vim-plug`, completion via `coc.nvim`, linting/fixing via `ALE`, fuzzy finding via `fzf.vim`.
-- **Neovim** — Lua config under `nvim/`, plugins via `lazy.nvim`, completion via `blink.cmp` + `nvim-lspconfig` + `mason`, fuzzy finding via `snacks.nvim` picker. `nvim/init.lua` also `:source`s `nvim/vimrc.vim` for shared baseline mappings (leader, `jj`→Esc, window nav, system clipboard, etc.).
-
-Leader is `,` in both. Both define the same diff-mode mappings (arrows for hunk nav/pull/push, `<M-1/2/3>` for `:diffget N`, `<M-p>N` for `:diffput N`).
-
-## Keybinding docs — keep them in sync
-
-`VIM_KEYBINDINGS.md` and `NVIM_KEYBINDINGS.md` are hand-curated tables of *custom* mappings. **Whenever you add, remove, or change a mapping in `.vimrc`, `nvim/vimrc.vim`, or any `nvim/lua/**` file, update the matching keybindings doc in the same change.**
-
-## Neovim layout
-
-Plugins live in `nvim/lua/plugins/` (auto-imported by lazy.nvim — drop a new spec into any `*.lua` file there). Settings and ad-hoc commands live in `nvim/lua/config/` and only run if `require`d explicitly from `lazy.lua`.
-
-The `harlequin` colorscheme is a separate local repo at `~/wrksp/all/harlequin` referenced by both `.vimrc` (`Plug '~/wrksp/all/harlequin'`) and `nvim/lua/plugins/colorscheme.lua` (`dir = "~/wrksp/all/harlequin"`). Don't try to install it from a remote.
-
-## Vim quirks worth knowing
-
-- `<leader>f` is bound twice in `.vimrc`: CoC's `coc-format-selected` is later overridden in normal mode by ALE's `ToggleFormatOnWrite`. The visual-mode binding still goes to CoC.
-- ALE picks the JS/TS fixer per-buffer via `s:SetJSFixer()`: `biome` if a `biome.json[c]` is found upward from the file, else `prettierd`. ALE is also configured to ignore `tsserver` to avoid overlap with CoC.
-- `:TSCheck`, `:Lint`, `:Knip` shell out via `vim-dispatch` and route results to the quickfix list; `<leader>q` opens it (`botright copen`).
+The Vim/Neovim split and keybinding synchronization rules are in [docs/editor-config.md](docs/editor-config.md).
 
 ## Git integration
 
@@ -93,178 +72,23 @@ The global gitignore lives at `git/ignore` in this repo, symlinked to `~/.config
 
 ## Hammerspoon
 
-`~/.hammerspoon` is a **directory** symlink to `hammerspoon/` (not per-file), so `hammerspoon/init.lua` and `~/.hammerspoon/init.lua` are the same inode — editing the repo file IS editing the running config. Never `ln -sf` the init.lua paths: source and dest resolve to the same file, producing a self-loop ("Too many levels of symbolic links"); verify topology by `readlink`-ing the parent *directory*, not the file. The config auto-reloads on save via `hs.pathwatcher` — but **only on atomic editor-style saves, not in-place/programmatic writes** through the symlink: FSEvents doesn't deliver the event for a write that lands on the real repo path, so a tooling edit to `init.lua` needs an explicit reload to go live — the menubar "Reload Config", or `hs -c 'hs.reload()'` over ipc (the transport errors it prints as the Lua state is torn down are normal). You can't nudge the *watcher* itself from a shell. The same symlink/FSEvents quirk affects the iTerm2 dynamic-profile file. `init.lua` also loads `hs.ipc`, so the running config is queryable from the shell (`hs -c "return hs.accessibilityState()"`). Two responsibilities:
-
-1. **Per-window/per-app homing.** *Bulk* re-homing (every managed window at once, via `homeAllManagedWindows`) fires on three triggers: (a) the 0.5s post-load initial pass, (b) `hs.screen.watcher` (monitor connect/disconnect/reconfigure), (c) `hs.caffeinate.watcher` `systemDidWake` (after sleep). *Per-window* placement (`placeWindow`) additionally fires as managed windows **appear and get titled**, via an `hs.window.filter` subscribed to `windowCreated` + `windowTitleChanged` (title-pattern `WINDOW_RULES` only match once iTerm2 sets the title, which is after `windowCreated`). This per-window path was once removed (commit `36d8339`) because it caused a feedback loop with iTerm2 (setFrame → char-grid snap → prompt redraw → OSC title escape → `windowTitleChanged` → setFrame → …). It's back, made safe by **placing each window at most once**: `placeWindow` records a window's id in `placedWindows` the first time it's placed (on appear, on its first matching title, or by any bulk pass) and then leaves it alone forever. So the re-fired events can't re-home a window — which both kills the feedback loop *and* means a manual resize/move sticks and ordinary title changes (iTerm2 tracking cwd, Vim tracking the filename) don't snap it back. `windowDestroyed` clears the record so a reused id can't suppress a genuinely new window; the table resets on reload. Bulk passes always re-home (ignoring the record) but also refresh it. Resolution order:
-   - **`WINDOW_RULES`** (checked first, first-match-wins). Each rule has an exact `app` name, optional `titlePattern` (Lua pattern), then either a single `screen` + `placement(sf) → frame`, or an ordered `placements` candidate list (see below). Use this when you want to pin a specific window — e.g. an iTerm2 window with a title containing `config` goes to the bottom third on the `LG Ultra HD` monitor.
-   - **`APP_PLACEMENTS`** (fallback). Map of app name → either a placement function (placed on `MAIN_SCREEN_NAME`) or an ordered candidate list. Currently: `Neovide`/`MacVim`/`Code` → `centeredWithMargin`, `Juggler` → `leftDock(480)`.
-
-   **Ordered placement candidates.** Both `APP_PLACEMENTS` entries and `WINDOW_RULES` can resolve to a list of `{ screen, placement }` candidates instead of a single one; `resolvePlacement` returns the **first candidate whose target monitor is connected** (`findScreen` returns nil for an absent monitor). A candidate with its `screen` omitted or `""` targets `hs.screen.primaryScreen()` (always connected) — so a trailing `{ placement = h.fill }` is a catch-all fallback (e.g. *external monitor if present, else fullscreen on the built-in display*). If no candidate's screen is connected, the window is left untouched. `h.fill` (fullscreen) is among the exposed helpers.
-
-   **Stacking: `raise()`, not `focus()`.** Homing also brings every placed window forward, in `WINDOW_RULES` order then `APP_PLACEMENTS` order (so the last one placed ends up on top). That uses `win:raise()` — bare `kAXRaiseAction`, which brings a window forward *without* activating its app. `hs.window:focus()` is `becomeMain()` + `app:_bringtofront()`; the second half steals focus, flickers the menu bar, and can drag you to another Space. Don't "fix" this back to a focus-then-restore-the-previous-window dance: it produces the **same** final z-order (restoring focus raises that window over everything you just placed) for much more disruption, and it races — `_bringtofront` is async, so a synchronous loop of `focus()` calls has no defined ordering. A raised window lands above everything except the currently focused window and always-on-top panels, which is the wanted result. Two measured caveats: place and raise must be **separate loops** (interleaving `setFrame` with `raise` visibly scrambles the resulting stack; a tight run of bare raises lands in call order), and even then the resulting order is only **approximate** — each AXRaise is handled on its target app's own run loop, so a burst of them doesn't reliably settle in call order. Good enough while managed windows mostly don't overlap; sequencing the raises on timers would make it exact at the cost of an async, visibly slower pass. The one exception is `FOCUS_TO_PLACE` (currently just `Neovide`): winit-based apps only honor `setFrame` on the focused window, so those go through `placeViaFocus` — sequenced focus → 0.05s → `setFrame`, with the previously focused window restored at the end. That's the only path that touches focus at all. Untested idea if it ever needs simplifying: `becomeMain()` + `raise()` may satisfy winit without activating the app, which would delete the whole focus path.
-
-   For title-pattern rules to take effect, the title needs to be set *before* one of the three trigger events fires. Practical workflow: open the iTerm2 window, set its title to e.g. `config` (Cmd+I → Window Title, or `echo -ne "\033]0;config\007"` in the shell), then trigger a re-home — toggling display mirroring or putting the lid down for a few seconds will work, otherwise the rule kicks in on the next monitor change / sleep-wake naturally.
-2. **Hyper-key window-placement hotkeys.** `f` (fill), `1`/`2`/`3` (top/middle/bottom third), `q`/`w` (top/bottom half), `a`/`s` (left/right half), `z`/`x` (left/right two-thirds), `h` (home — re-run the homing pass on all managed windows, same code path as monitor change / wake), or `j` (ladder — gather every iTerm2 window onto the focused window's screen as a staircase, frontmost bottom-left at full width, each one behind it a title bar higher and 120px further right, so every title bar stays clickable whatever the stacking order), each bound directly as Hyper (⌃⌥⌘⇧) + the key via `hs.hotkey.bind` — no modal, since Hyper is a real OS modifier chord rather than a synthesized one. The chord itself comes from the [Hyperkey](https://hyperkey.app) app remapping Caps Lock (see below for how that interacts with the `hidutil` Caps→F18 remap). Full key map and rationale in the comment block at the top of `hammerspoon/init.lua`.
-
-**Dead placement has two different causes, and the symptom tells them apart.** Check Accessibility first, then Secure Input; each Hyper binding in `init.lua` warns on trigger if Accessibility is off, and there's also a load-time alert.
-
-- **Nothing moves, but the keys clearly fire = lost Accessibility.** Every placement path ends in `win:setFrame(...)`, which needs the **Accessibility** permission and silently no-ops without it. This is also the only candidate for dead *auto-layout*, which is keyboard-free. Read the state with `hs -c 'return hs.accessibilityState()'`.
-- **Secure Input should no longer break these specifically.** It suppresses dispatch of **modifier-less character** hotkeys, which is exactly what the old F18-chord modal used (bare `f`/`1`/`2`/… inside the modal) — that's why the modal got replaced with direct Hyper+key bindings. Modified combos (measured with a scratch `⌘⌃⌥K` binding, not yet re-confirmed with a full 4-modifier Hyper chord) keep firing under Secure Input, so a placement key typing into the focused app instead of moving the window would now point at something else being wrong rather than this known failure mode.
-
-Measured 2026-09-20 on Hammerspoon 1.1.1 / macOS 26.6.2, with `loginwindow` holding Secure Input from boot: **a lock/unlock does not release it — only logging out did.** No config or OS change was involved (the build had been installed three weeks). Note `hs.eventtap` is dead in this state too, so an eventtap key probe captures **zero events** and cannot be used to diagnose it.
-
-Diagnostics:
-
-```sh
-hs -c 'return hs.accessibilityState()'                  # Accessibility grant
-hs -c 'return hs.eventtap.isSecureInputEnabled()'       # Secure Input active?
-ioreg -l -w 0 | grep -o 'kCGSSessionSecureInputPID"=[0-9]*'   # and who holds it
-hs -c 'return #hs.hotkey.getHotkeys()'                  # Hyper bindings are always registered, not modal-scoped — no need to hold anything first
-```
-
-(Aside: Secure Input can also get stuck owned by a dead PID when a login-item app grabs it and quits; either way it is a per-login leak cleared by logging out.)
-
-### Per-machine config: `hammerspoon/local.lua`
-
-`MAIN_SCREEN_NAME`, `APP_PLACEMENTS`, and `WINDOW_RULES` are **not** in `init.lua` — they live in `hammerspoon/local.lua`, which is **gitignored** (each machine has its own). `init.lua` exposes the placement helpers (`centeredWithMargin`, `leftDock(width)`, `rightOf(width)`, `fill`, the `topThird`/`middleThird`/`bottomThird` and `topHalf`/`bottomHalf`/`leftHalf`/`rightHalf` family) to the local file via a `helpers` argument; the local file returns the per-machine config table.
-
-`install.sh` writes an empty stub at `hammerspoon/local.lua` if one doesn't exist, so a fresh install never errors on a missing file. The stub is a no-op that returns empty config — edit it (or copy from `local.lua.example` for a starting point) to enable auto-placement on this machine.
-
-If `local.lua` is missing, the homing logic silently no-ops (the Hyper hotkeys still work fine). If `local.lua` has a runtime error, an `hs.alert` shows it on reload.
-
-Adding a managed window in `local.lua`:
-- **By app**: append to `app_placements`. Reuse a built-in helper (`h.centeredWithMargin`, `h.leftDock(width)`, `h.rightOf(width)`, `h.fill`, `h.topThird`/`h.middleThird`/`h.bottomThird`, `h.topHalf`/`h.bottomHalf`, `h.leftHalf`/`h.rightHalf`), or write a new placement function (takes the screen frame `sf`, returns `{x, y, w, h}`). The value can be a single helper or an ordered `{ {screen, placement}, … }` candidate list for monitor fallback.
-- **By window title**: append to `window_rules`. Mark the target window's title (in iTerm2: Cmd+I → Window Title; in any shell: `echo -ne "\033]0;config\007"`) so it matches your `titlePattern`.
-
-App names are matched exactly via `app:name()` (no Xcode-vs-Code fuzzy collisions). Screen names need exact matches too — every screen-config change posts an `hs.alert` listing connected screen names so you can copy the right one in. Project convention: "vertical" = stacked rows, "horizontal" = side-by-side columns (opposite of CSS/Moom).
-
-### hidutil remaps (Caps Lock → F18, + per-machine local config)
-
-`hidutil` key remaps are applied in **two layers**, mirroring the hammerspoon `init.lua` / `local.lua` split:
-
-1. **Universal** (committed) — Caps Lock (`0x700000039`) → F18 (`0x70000006D`). Lives in the launchd plist `launchd/com.nielsmadan.hidutil-capslock-to-f18.plist` **and** in `install.sh`. The Moonlander used to be configured (via Oryx) to send F18 from a free key too, for the same Hammerspoon binding to fire from either keyboard.
-2. **Per-machine** (gitignored) — `launchd/hidutil.local.sh`, a shell snippet of extra `hidutil` calls for *this machine only*. Sourced **after** the universal set, so it can override per device. `install.sh` writes an empty stub if missing and symlinks it to the fixed path `~/.config/hidutil/local.sh`; the plist sources that fixed path at login (the same fixed-location trick hammerspoon uses, since a committed/symlinked plist can't know the repo's path). Committed template: `launchd/hidutil.local.sh.example`.
-
-**Mid-migration to a Hyper key (⌃⌥⌘⇧) via the [Hyperkey](https://hyperkey.app) app, replacing F18.** `hidutil` can only do 1:1 key remaps, so it can never itself produce a chorded modifier — F18 existed only as a stand-in Hammerspoon could bind to. Hammerspoon's window-placement hotkeys (above) now bind directly to Hyper, so once Hyperkey is configured to own Caps Lock and the Moonlander is reflashed (via Oryx) to send the same Hyper chord instead of F18, this whole universal remap and `com.nielsmadan.hidutil-capslock-to-f18.plist` become retirable — **but not before**: while this remap is still active, `hidutil` intercepts Caps Lock at the HID level before Hyperkey (which runs at the Accessibility/CGEventTap level) ever sees it, so Hyperkey configured to watch Caps Lock won't fire — either point Hyperkey at F18 instead until the remap is retired, or disable this launchd job first (`launchctl bootout gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18`, plus commenting `hidutil` into `install.local`) so Caps Lock reaches Hyperkey unmodified.
-
-Both the plist (at login) and `install.sh` (immediately, so it's live without a logout) apply the universal remap, then source `~/.config/hidutil/local.sh` if present. Because `hidutil --set` **replaces** a matched device's entire `UserKeyMapping`, a scoped per-machine `--set` that should coexist with Caps→F18 on that device must re-include the Caps→F18 entry.
-
-Example per-machine use (this is what the ISO-keyboard machine's `hidutil.local.sh` does): remap the key below Esc, which on a Mac ISO/international keyboard emits `0x35` and renders as the useless section sign (`§`/`±`), so its *source* becomes `0x64` (Non-US `\`) — producing `` ` ``/`~` like US/ANSI. It's scoped via `--matching '{"Product":"Apple Internal Keyboard / Trackpad"}'` so external keyboards keep a normal backtick. **Caveat:** `VendorID`/`ProductID` `0x0`/`0x0` is a `hidutil` *wildcard* (matches every HID service), so the built-in keyboard must be matched by its `Product` string, not by ID.
-
-If a remap stops working after a sleep/wake cycle, re-run the LaunchAgent (re-applies the universal set + sources the local file):
-
-```sh
-launchctl kickstart gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18
-```
-
-Or just the universal Caps Lock → F18 directly:
-
-```sh
-hidutil property --set '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x70000006D}]}'
-```
+`~/.hammerspoon` is a directory symlink into this repo, so edits are live config changes; programmatic edits need an explicit reload. Placement, window-placement hotkeys, Accessibility/Secure Input, and per-machine configuration details live in [docs/hammerspoon.md](docs/hammerspoon.md).
 
 ## iTerm2
 
-`iterm2/` holds a dynamic profile (symlinked into `~/Library/Application Support/iTerm2/DynamicProfiles/`), a colorscheme (`rc.itermcolors`, imported manually inside iTerm2), and `SaveWindowArrangement.py`.
-
-`SaveWindowArrangement.py` is symlinked into iTerm2's `Scripts/AutoLaunch/` dir, so it runs as a long-lived daemon at iTerm2 startup. It does two things: (1) registers the `save_window_arrangement` RPC, bound to **Cmd+S** via a key mapping in `dynamic-profile.json` (action `60` = "Invoke Script Function") — on an untitled window it prompts for a name, sets that as the window title, then saves; (2) auto-saves any window that has a title set, re-saving its named arrangement (name = the title) on a debounce whenever it changes. A window is "known"/auto-saved **iff it has an iTerm2 window title** — the same titles used for Hammerspoon `WINDOW_RULES`. Untitled windows are ignored. Changing the RPC name or the Cmd+S binding means editing both the script and `dynamic-profile.json` in lockstep. Like `CloneRepoToTab.py`, its RPC body is **fire-and-forget** — the save runs as an `asyncio` task so the RPC returns immediately. Measured: iTerm2 fails an outstanding call after **5s**, and the untitled-window path awaits a text-input alert, so awaiting the save inline made every first-save of a new window report `FAILED: Timeout` — while the save itself still completed. Don't collapse it back to an inline `await`; the task reference is held in a module-level set because `asyncio.create_task` keeps only a weak one.
-
-**Both AutoLaunch daemons are loaded once, at iTerm2 startup.** Editing `SaveWindowArrangement.py` or `CloneRepoToTab.py` does not change live behaviour — the running copy keeps serving the old code until iTerm2 is restarted (or the script is re-run from iTerm2's Scripts menu). It is very easy to "fix" something and then watch the old bug reproduce.
-
-Neither daemon can be imported outside iTerm2: both `import iterm2`, which exists only in iTerm2's bundled Python runtime. So the daemon files are **not** unit-testable — that is the reason `CloneRepoToTab.py` is split into a thin daemon over the pure `iterm2/clone_repo_lib.py` at all. The most a daemon file gets is a syntax check (`python3 -m py_compile iterm2/CloneRepoToTab.py`); all real coverage lives in `iterm2/test_clone_repo_lib.py`, and nothing runs it automatically — it is a manual `python3 iterm2/test_clone_repo_lib.py`.
-
-`CloneRepoToTab.py` is the second AutoLaunch daemon (same lifecycle as `SaveWindowArrangement.py`). It registers the `clone_repo_to_tab` RPC, bound to **Cmd+Ctrl+N** in `dynamic-profile.json`. On trigger it resolves the active session's git repo, then scans the **current window's** tabs for that repo's family of sibling checkouts **open** in it (siblings = same parent dir + same base name with trailing digits stripped) and auto-picks the target by **filling the lowest gap** in the family (`select_sibling_slot`). Each open sibling occupies a *slot* = its trailing number, but a **bare name** (no digit suffix) counts as **slot 1** — the first checkout is "the first" whether it's named `foo` or `foo1`. The target is the smallest slot ≥ 1 that's unoccupied, named `base + slot`: with a hole like `foo1, foo3, foo4` it fills `foo2`; with `foo2, foo3` (no `foo1`) it fills `foo1`; a contiguous run like `foo`/`foo1` + `foo2` + `foo3` has no gap so it goes to `foo4` (the old highest-slot + 1 behaviour). Gap-filling is the point of the current design — reuse the holes left by closed checkouts instead of letting the numbers drift upward forever; don't simplify it back to highest + 1. Selection is **deterministic** — independent of which sibling triggered it. The active tab's title has no part in repo selection; it is read only after the new tab is created and supplies that tab's display-name base with the selected repo slot (`core2` + slot 3 → `core3`), falling back to the destination folder name when the active tab has no explicit title. It then shows an **OK/Cancel** confirmation. **If that sibling directory already exists** on disk, the dialog offers to open a new tab there and update it from its configured upstream; on OK it opens the tab pointed at the existing directory (splits recreated, every pane in that directory), sends `git fetch --no-write-fetch-head && git rebase --fork-point '@{upstream}'` into the main pane, then runs `lefthook check-install || lefthook install` when a Lefthook config exists — nothing is cloned, trusted, or copied, and a dirty tree or conflict surfaces as git's own error in the pane. Avoiding `FETCH_HEAD` prevents this command from racing Pure's asynchronous prompt fetch. **Otherwise** the dialog offers to clone `<origin>` into the new sibling; on OK it creates the empty directory, opens the new tab (same split structure), then sends a shell command into the main pane that runs `git clone <origin> .`, then `mise trust .`, then copies every `.env` file found in the source repo (root and any subdirectories, mirroring their relative paths via `mkdir -p`), then runs `lefthook install` if the freshly-cloned repo has a recognized Lefthook config (`lefthook`, `.lefthook`, or `.config/lefthook`, with a `yml`, `yaml`, `json`, `jsonc`, or `toml` extension) — so the user can watch progress. **New-tab placement** follows the gap: `side = "right"` places it immediately right of the sibling *below* the gap (the common case — e.g. `foo2` right of `foo1`), `side = "left"` places it immediately left of the lowest open sibling (when filling below the minimum — e.g. `foo1` left of `foo2`). The `.env` walk prunes `.git`, `node_modules`, `.venv`, `venv`, `__pycache__` **and every git-ignored directory** — a fixed name list alone let the walk descend into `.cache/`, where one repo's pytest tmpdirs contributed 102 throwaway `.env` files and their whole directory tree to the clone command. Only *directories* are tested against gitignore; `.env` itself is ignored in nearly every repo, which is precisely why it needs copying. `git check-ignore` is index-aware, so an ignored directory holding tracked files is still walked. The walk is breadth-first with **one `check-ignore` per depth level, not per directory** — git's startup cost dominates, and batching took a 206-directory repo from 2.2s to 0.2s. Both Lefthook paths self-gate on a config being present; existing checkouts additionally skip installation when `check-install` reports that their hooks are already current. Because targeting fills gaps in the *open* family (not a filesystem skip-existing scan), triggering repeatedly walks through the missing slots and then off the top; if the picked directory already exists on disk it's opened rather than cloned. Setup errors (not a git repo, no `origin` when cloning, name exists but isn't a directory, mkdir failure) abort with an `iterm2.Alert` before the tab is created; clone failures surface in the pane as git's own stderr. The RPC body is fire-and-forget — the real work runs as an `asyncio` task — because iTerm2's RPC dispatcher has a short timeout that the confirm dialog + clone easily exceed. The pure helpers (`select_sibling_slot`, `tab_title_for_destination`, `sibling_base`/`sibling_number`/`is_sibling`, `resolve_repo_root`, `resolve_origin_url`, `compute_destination`, `existing_checkout_update_command`) live in `iterm2/clone_repo_lib.py` and have `unittest` tests in `iterm2/test_clone_repo_lib.py` — run via `python3 iterm2/test_clone_repo_lib.py`.
-
-`install.sh` also writes two iTerm2 `defaults` (default-profile GUID + 10% inactive-pane dimming) — but **only when iTerm2 is not running**. iTerm2 flushes its in-memory prefs to disk on quit and would clobber any `defaults write` made while it was open. If install reports `skip iTerm2 defaults`, quit iTerm2 and re-run `install.sh`. (The plist it clobbers is `com.googlecode.iterm2.plist`; the same rule applies to any hand/script edit of that file — do it only while iTerm2 is fully quit.)
-
-**Restored windows use a frozen profile snapshot.** A restored pane/window keeps the profile settings that were live when its arrangement was saved — it does **not** re-read `dynamic-profile.json`. So a dynamic-profile change only affects sessions started *after* the change; a plain new tab heals only new panes, and "some panes behave differently after a profile edit" is expected. Worse, the `SaveWindowArrangement.py` daemon auto-saves titled windows on a debounce, so a *briefly*-toggled profile key gets baked into every saved arrangement inside `com.googlecode.iterm2.plist` and persists there long after the live profile is reverted — the daemon can re-pollute arrangements any time a polluted window is open when it next fires.
-
-**Claude Code + scrollback:** CC repaints the entire alternate screen every frame instead of scrolling lines off the top, so iTerm2's `Scrollback in Alternate Screen` profile key is **inert for CC** — don't add it to `dynamic-profile.json` (it only lets the SaveWindowArrangement daemon re-pollute arrangements, pure downside). Native mouse-wheel scrollback for CC comes instead from `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1` in Claude Code's own `settings.json` env (equivalent to `"tui": "default"`; lives in the aiconf config, outside this repo). That renders CC on the main screen so the terminal owns selection / `Cmd`-click URLs / real scrollback, at the cost of `Ctrl+O` transcript view and in-app mouse.
+The AutoLaunch daemons are loaded once per iTerm2 start, and restored arrangements retain profile snapshots. Their RPC, testing, profile, and scrollback details live in [docs/iterm2.md](docs/iterm2.md).
 
 ## SSH profiles and tmux
 
-`iterm2/dynamic-profile.json` carries the `ssh: mini` SSH profile; the Default and `rc` profiles have `Custom Command = No` and just launch the local shell — **nothing local ever starts tmux**, the only local footprint is an inert `~/.tmux.conf` symlink.
-
-Current approach: the SSH profiles run `ssh -q -t <host> /opt/homebrew/bin/tmux new -A -s main` — **plain tmux, not control mode**. The session persists across disconnect / sleep / network changes, and splits follow the *remote* directory because tmux is doing the splitting.
-
-**`-CC` is off-limits here, and the reason is structural.** In control mode the tmux protocol and the ssh client's own stderr share one stream, and iTerm2 parses every line it gets back as a control command. One line that doesn't start with `%` and iTerm2 drops out of tmux mode, dumps the rest of the protocol on screen as raw `%extended-output …` text, and opens its "Unrecognized command from tmux. Did your ssh session die?" dialog. Observed trigger: `setsockopt TCP_NODELAY: Invalid argument`, an OpenSSH client diagnostic from `set_nodelay()` on a forwarded channel — this config has two wildcard forwarders that can emit it (`ForwardAgent yes` on `mini`, `RemoteForward 7483` under `Host *`). The specific line doesn't matter; *any* stray stderr byte does this. `-q` on the ssh command suppresses client diagnostics and is kept for that reason, but it narrows the window rather than closing it — don't take it as a licence to go back to `-CC`.
-
-Because tmux owns the panes, the `ssh: mini` profile remaps the window/split keys to send tmux's prefix (`C-b`, hex `0x02`) plus a key, via `Action 11` (Send Hex Code): `⌘D` → `%`, `⌘⇧D` → `"`, `⌘T` → `c`, `⌘W` → `x`, `⌥h/j/k/l` → `h/j/k/l`, `⌘1`–`⌘9` → window `1`–`9`. A child dynamic profile's `Keyboard Map` **replaces** the parent's rather than merging, so the profile re-declares `⌘S` (`save_window_arrangement()`) itself and deliberately omits `⌘⌃N` (`clone_repo_to_tab()` resolves the *local* session's git repo, which is meaningless in a remote pane). The profile also drops its `Mouse Reporting` override so it inherits `rc`'s wheel-yes / clicks-no setting: the wheel scrolls tmux history, while clicks and drags stay native so selection still reaches the real macOS clipboard.
-
-Gotchas:
-- **Absolute `/opt/homebrew/bin/tmux` is mandatory, not cosmetic.** Bare `tmux` is not on PATH for a non-interactive `ssh host cmd` (Homebrew's PATH is only wired up in login/interactive shells via `path_helper`), so `ssh -t <host> tmux …` dies "command not found" and the iTerm2 session "ends" instantly. tmux must also be installed on the remote (`brew install tmux`); mini has it.
-- **Open the profile once, then use `⌘T` for more windows** — that is now a tmux window inside the same client. A second `⌘O` of the profile attaches a second client to `-s main`, and the two mirror each other at the smaller client's size.
-- **tmux runs on the remote, so `tmux/tmux.conf` only takes effect there after a commit + pull on that machine.** Editing it here changes nothing about an existing ssh session until mini pulls and the session is reloaded (`C-b :source-file ~/.tmux.conf`, or kill the session).
-- **mini's home is `/Users/nielsm` (user `nielsm`); this Mac is `/Users/nielsmadan`.** That mismatch produced the recurring `ssh mini … [Errno 2] No such file or directory: '/Users/nielsmadan'` error under iTerm2's native SSH "reuse directory" (it fed mini's conductor the profile's *local* fallback path) — one of the reasons the profiles don't use native SSH integration.
-
-**No iTerm2 SSH integration is in play, on either machine.** `.zshrc` used to alias `ssh` to `it2ssh` under iTerm2 and source `~/.iterm2_shell_integration.zsh`; both are gone. The alias existed to ship terminfo to the remote, which iTerm2 never needed (it reports a standard `xterm-256color`, unlike kitty's `xterm-kitty` — the `kitten ssh` branch stays for exactly that reason). The shell-integration source existed to make iTerm2's "reuse previous session's directory" work over SSH, which tmux now does instead. Worth knowing before reinstating either: `it2ssh` base64-uploads the **entire environment** to the remote, and under the `sops exec-env` wrappers that includes live API tokens. The stale `~/.iterm2_shell_integration.zsh` file on mini is unreferenced, not sourced.
-
-`tmux/tmux.conf` (symlinked to `~/.tmux.conf` by `install.sh`'s `link tmux tmux/tmux.conf`) is small but no longer minimal, because plain tmux means tmux owns the panes. Load-bearing: `default-terminal tmux-256color` + `terminal-overrides …:Tc` stop tmux stripping truecolor (matters for nvim/harlequin colors); `mouse on` makes the wheel scroll history; `set-clipboard on` + `terminal-features …:clipboard` send copies through OSC 52 so they reach the local clipboard; `base-index 1` + `renumber-windows on` keep window numbers lined up with `⌘1`–`⌘9`; the `%`/`"`/`c` rebindings add `-c "#{pane_current_path}"` so splits and new windows inherit the pane's directory; `h/j/k/l` become `select-pane` (this costs the default `l` = `last-window`). Also kept: `history-limit 50000` and the `update-environment` env-passthrough line. `tmux/inherit-dir.sh` exists but is untracked, unwired, and inert (calls bare `tmux`) — ignore it.
-
-Forwarded ssh-agent sockets go stale inside long-lived tmux; `.zshrc`'s `refresh_ssh_auth_sock` precmd hook repairs that (see the Zsh section).
+The remote tmux protocol, key mappings, and stale-agent-socket behavior are in [docs/ssh-tmux.md](docs/ssh-tmux.md).
 
 ## Finicky
 
-[Finicky](https://github.com/johnste/finicky) (Homebrew cask, **not** mise — it's a GUI `.app`) is set as the system default browser and routes every clicked link: personal → Brave, dev hosts → Chromium, client/customer URLs → LibreWolf (each in its own container).
+The split config, container routing, and case-sensitive names are documented in [docs/finicky.md](docs/finicky.md).
 
-The config is **split** to keep client identities out of the repo, mirroring the `hammerspoon/local.lua` / `hidutil.local.sh` pattern:
+## Colima (container runtime)
 
-- **`finicky/finicky.ts`** (committed, symlinked to `~/.finicky.ts`) — the routing engine, `DEV_MATCHERS`, and `defaultBrowser`. Names no client. It `import`s `LOCAL` from `./finicky.local`.
-- **`finicky/finicky.local.ts`** (**gitignored**) — `export const LOCAL`, an array of `{ container, match: [globs] }` entries holding all the identifiable routing (clients *and* the own `mathfiend` product). `install.sh` writes an empty `export const LOCAL = []` stub if missing so the import never fails on a fresh box; `finicky/finicky.local.ts.example` is the committed template.
-
-**It must be `.ts`, not `.js`.** finicky resolves the `~/.finicky.ts` symlink to its real repo path, then bundles with esbuild — so the relative `import "./finicky.local"` resolves against `finicky/`. A `.js` config is Babel-staged into a cache dir *first* and esbuild bundles from there, which breaks the relative import.
-
-Routing mechanics: a single guarded `rewrite` rule turns a matched URL into the `ext+container:name=<container>&url=<href>` scheme (read by LibreWolf's [Open external links in a container](https://addons.mozilla.org/firefox/addon/open-url-in-container/) add-on), and a handler sends `ext+container:*` to LibreWolf. The rewrite is guarded against re-rewriting an already-rewritten URL so rules can't chain; `containerFor()` returns the first matching entry. Shared services (GitHub, App Store Connect, AWS, Firebase, …) are scoped by path/ID/org/region so they don't collide across containers or hijack personal browsing. **Container names are case-sensitive** and must match those created in LibreWolf exactly.
-
-## Colima (container runtime — Docker Desktop is gone)
-
-This repo installs Colima and keeps it running. Using Docker is not its business — the agent-facing guidance for an unreachable daemon is a global instruction (the `containers` fragment in `~/ac/loadout/instructions/`), so it reaches every harness in every repo rather than only sessions that can read this file.
-
-Docker Desktop was removed in favour of [Colima](https://github.com/abiosoft/colima), which runs upstream `dockerd` (moby) inside a Lima VM and points the stock `docker` CLI at it via a Docker context it registers itself (`autoActivate: true`) — same engine, same API, same BuildKit. Docker Engine needs a Linux kernel, so every option on this platform is a VM; this is the thinnest wrapper that still gives real dockerd.
-
-The CLI side comes from Homebrew, **not** from Colima — `colima` bundles no client. `brew install colima docker docker-compose docker-buildx docker-credential-helper`. Docker Desktop used to own `/usr/local/bin/docker*` as symlinks into the app bundle; those are gone, which is what lets the brew CLI win — don't count on PATH order for that, it differs per machine (`/opt/homebrew/bin` precedes `/usr/local/bin` here, but on the mini `/usr/local/bin` is first and Docker Desktop's symlinks shadowed everything until they were removed). `kubectl` also used to come from the app bundle — it now comes from mise.
-
-Uninstalling Docker Desktop is `sudo /Applications/Docker.app/Contents/MacOS/uninstall` (its own documented CLI uninstaller). It drops the `/usr/local/bin/docker*` symlinks, `com.docker.vmnetd`, and the `~/Library/Containers/com.docker.docker` VM disk — but it leaves `/Library/LaunchDaemons/com.docker.socket.plist` plus `/Library/PrivilegedHelperTools/com.docker.socket` behind, and does not delete `/Applications/Docker.app`. An "operation not permitted" complaint about `.com.apple.containermanagerd.metadata.plist` at the end is normal. Wipe `~/.docker` afterwards (Desktop's `credsStore` and contexts live there) and write it back with just `credsStore` + `cliPluginsExtraDirs`.
-
-### `colima/colima.yaml` — the `mounts:` list is a security control
-
-`colima/colima.yaml` is committed and symlinked to `~/.colima/default/colima.yaml`. Only one block in it is load-bearing:
-
-```yaml
-mounts:
-  - location: ~/wrksp
-    writable: true
-  - location: /var/folders
-    writable: true
-```
-
-**`~/wrksp`, not an absolute path** — this file is one symlink shared by two Macs with different homes (`/Users/nielsmadan` here, `/Users/nielsm` on the mini). Colima expands `~` per machine when it writes the lima config, so the absolute form silently mounted nothing on the other box. Verify the expansion landed with `grep -A4 '^mounts:' ~/.colima/_lima/colima/lima.yaml`.
-
-**This is the same control the Docker Desktop `filesharingDirectories` key used to provide, and it exists for the same reason.** Agents run inside a [nono](https://nono.sh) sandbox enforced by Seatbelt, but the container daemon is *outside* that boundary — so anything holding the socket can ask it to bind-mount a host path and write through it. Mounting `$HOME` would make `docker run -v /Users/nielsmadan:/h …` a one-line escape from every restriction, including the `~/.ssh` and `~/.zshrc` denies nono marks unremovable.
-
-Enforcement is **structural, not policy**: `dockerd` runs inside the VM, so a host path the VM never mounted does not exist in the daemon's namespace. An out-of-scope `-v` yields an empty directory and writes into the VM's own filesystem, never the host. Verify after any change:
-
-```bash
-colima ssh -- mount | grep virtiofs   # must list ONLY wrksp and /var/folders
-docker run --rm -v $HOME:/h alpine ls /h    # must NOT show real home contents
-docker run --rm -v ~/wrksp:/w alpine ls /w   # must work
-```
-
-Check `mount`, not `ls`. An out-of-scope `-v` leaves an empty directory behind in the guest that outlives the container, so `ls $HOME` accumulates entries that were never mounts — guest `~/ac` is one, left by a past escape probe. Those stale dirs make the `ls` form report a breach that isn't there; `mount` shows only live virtiofs.
-
-Two things that make this work, neither of them obvious:
-
-- **An explicit `mounts:` list REPLACES the default, it does not merge.** `environment/vm/lima/yaml.go` branches on `len(conf.Mounts) == 0` → mount `~` writable, else use only the listed entries. The shipped default is an *empty* list, i.e. **whole `$HOME` writable** — so a fresh `colima start` with no config is exactly the escape this guards against. This replace-not-merge behaviour is also why Colima beats raw Lima here: Lima's own `FillDefault` unions mount lists with no removal semantics, so a Lima `override.yaml` can only ever *add* mounts. (Same flaw rules out Rancher Desktop, which hardcodes `~` writable in `getMounts()` and regenerates it on every start.)
-- **`/var/folders` is needed for testcontainers**, which `namefinder`'s api and workers packages use — macOS `$TMPDIR` lives under it. `/tmp` is deliberately *not* mounted: mounting host `/private/tmp` onto the guest `/tmp` would shadow the VM's own.
-
-**Unlike Docker Desktop's `settings.json`, nothing rewrites this file.** Docker Desktop owned its config, rewrote it on every settings change, replaced the symlink with a real file, and could only be edited while fully quit — which is why the hardening never actually landed there. Colima reads its config and leaves it alone; `colima restart` preserves the symlink (verified). Changing the mount list does need a restart to take effect, and `mountType` specifically cannot change after VM creation.
-
-### Gotchas
-
-- **Autostart differs per machine.** Here `colima start` / `colima stop` are yours to run. On the mini — reached over ssh, where a stopped VM means every `docker` command fails with no console to notice — `brew services start colima` is enabled, which is the autostart path Colima's own FAQ endorses. The `-f` in the formula's `colima start -f` is `--foreground`, not `--force`: the job is *meant* to block for the VM's lifetime, and `keep_alive successful_exit: true` restarts it if colima exits. **So never `colima start` by hand on a machine where that service is loaded** — the foreground job then finds the VM already up, logs `already running, ignoring`, exits 0, and launchd respawns it every 10s forever into an unrotated `/opt/homebrew/var/log/colima.log`. Untangle with `brew services stop colima && colima stop && brew services start colima`, then confirm `launchctl list sh.brew.colima` holds a stable PID.
-- **`colima list` reports `Running` for a VM that is dead.** The lima hostagent hosts the VZ VM in-process and keeps reporting `Running` after the VM dies, leaving a stale `docker.sock` behind — so every `docker` command fails with "Cannot connect to the Docker daemon" while Colima insists it's up. The tell is `colima status` failing with `error retrieving current runtime: empty value` while `colima list` says Running. Confirm in `~/.colima/_lima/colima/ha.stderr.log`: `[VZ] - vm state change: VirtualMachineStateError` followed by `VZErrorDomain Code=3 "The virtual machine is no longer live."` repeating forever. Fix: **`colima stop --force`** then `colima start` — a plain `colima stop` can't stop a VM that isn't answering. Seen 2026-08-15 and 2026-08-20; the second went unnoticed for two days. Cause unknown. For a real liveness check use `docker version --format '{{.Server.Version}}'`, which exercises the socket end to end — `colima list` does not.
-- Registry auth moved from Docker Desktop's `desktop` credential helper to `osxkeychain` (`~/.docker/config.json`), so a `docker login` may be needed once. `cliPluginsExtraDirs` in that file points at `/opt/homebrew/lib/docker/cli-plugins` so the brew compose/buildx plugins are found.
-- `binfmt: true` is set, so amd64/386 images run under emulation without extra setup. `rosetta` is off.
+Colima is the Docker runtime here, not Docker Desktop. Its explicit `mounts:` list is a security boundary: it must expose only the workspace and `/var/folders`. Full mount, isolation, and stale-VM diagnostics live in [docs/colima-hardening.md](docs/colima-hardening.md).
 
 ## `bin/` — standalone scripts on PATH
 
@@ -276,6 +100,8 @@ The current set turns media into something an agent can actually read — text o
 - **`transcribe <src> [--model N] [--timestamps]`** — local Whisper speech-to-text for anything without captions: podcasts, Twitch VODs, meeting/screen recordings, voice memos. Covers exactly the hole `yt-transcript` leaves.
 - **`video-frames`** — `--sheet` (contact sheet, 1 thumb/60s, keyframe-only decode so long videos sample fast), `--scan <start> <end>` (frame-difference motion profile over a window, proposing the last still frame before sustained motion starts), bare `<src> <ts> <out>` (one high-quality frame, max 1920px), and `--clean`. Intended flow: sheet → scan → extract → look at the frame.
 - **`img-sheet <out.jpg> <image|dir>...`** — tiles images into one labelled contact sheet so a pile of screenshots costs one look instead of twenty. Cells are sized by **width only**, so rows pack tightly for uniform-aspect inputs; mixing portrait and landscape leaves padding.
+- **`update-tools [--check] [--bump-runtimes]`** — updates global tools managed by mise, Homebrew, uv, and pipx, plus agent-browser's Chrome download; it skips project dependencies and git checkouts and collects failures.
+- **`check-runtimes [RUNTIME ...]`** — reports configured mise runtimes against stable and LTS releases without changing versions or pins; optional names limit the check.
 
 Outside that media set, **`resource-log`** is the minute-by-minute memory/CPU sampler behind `launchd/com.nielsmadan.resource-log.plist` (loaded by `install.sh`); `resource-log report` reads the history. It runs under launchd's `/usr/bin/python3` (3.9), so keep it 3.9-compatible. Usage and caveats are in `docs/machine-triage.md`, and the tests are `python3 bin/test_resource_log.py`.
 
@@ -297,8 +123,6 @@ Weights land in `~/.cache/huggingface/hub/` (**not** managed by mise — mise in
 - YouTube only exposes formats above 360p to a client with a **JS runtime**, hence `--js-runtimes node` — passed only when both `node` and that (newer) yt-dlp flag exist, so an older yt-dlp doesn't hard-fail on an unknown option.
 - `yt-dlp` is **not pinned in `mise/config.toml`** — it's a pip install inside the mise python, so a python version bump loses it. `ffmpeg`/`ffprobe` and ImageMagick come from brew, per the mise-vs-brew rule.
 
-`ffmpeg`/`ffprobe` come from brew (C libs, per the mise-vs-brew rule); `yt-dlp` is **not currently pinned in `mise/config.toml`** — it's a pip install inside the mise python, so a python version bump loses it.
-
 ## Shell prompt
 
 `.zshrc` puts `~/.zsh/pure` on `fpath` and runs `prompt pure`. If the directory is missing, `prompt pure` fails silently and zsh falls back to its default `%m%#` prompt — `install.sh` clones `sindresorhus/pure` into `~/.zsh/pure` to prevent that.
@@ -315,15 +139,7 @@ Weights land in `~/.cache/huggingface/hub/` (**not** managed by mise — mise in
 
 ## Tool versions
 
-`mise/config.toml` (symlinked to `~/.config/mise/config.toml`) pins node/ruby/python/java/bun/go/fzf/pnpm/sops/age. `mise activate` is hooked in `.zshrc`.
-
-Global npm CLIs are managed through mise's `npm:` backend (`npm:wrangler`, `npm:firebase-tools`, `npm:agent-browser`) so they survive `node` version bumps and stay reproducible. Add new ones with `mise use -g npm:<pkg>` rather than `npm install -g`.
-
-**mise vs brew.** Default to **mise** for standalone dev CLIs and language-ecosystem tools — version-pinned in `mise/config.toml` and auto-replicated across machines. Use **brew** for GUI casks (`.app`s like Finicky), long-running daemons/services, C libraries, and tools needing a launchd unit or absolute path. When moving a tool brew→mise, `brew uninstall` it first so the mise shim wins on `PATH`.
-
-**Vault via mise/aqua:** install with an explicit pin (`aqua:hashicorp/vault@<version>`), **not** `@latest` — aqua's resolver picks bad tags (e.g. `2.0.1` has no darwin build and 404s). Pinning also sidesteps the BSL-relicense tap churn.
-
-**Railway CLI** is mise-managed (pinned in `mise/config.toml`, sops-wrapped so `RAILWAY_API_TOKEN` is injected per call). Upgrade with `mise upgrade railway`, not `railway upgrade` (fails: "Could not detect install method"). It needs a **personal account** token, not a team/workspace token — a team token fails the CLI's `me { email }` identity gate, making every command return "Unauthorized". Generate an unscoped token at railway.com/account/tokens; verify with `railway whoami`. The sops-injected env var shadows any `railway login` session, so the token is the only auth lever.
+Tool ownership, upgrade commands, and the shell prompt bootstrap are in [docs/tooling.md](docs/tooling.md).
 
 ## Secrets management
 
