@@ -115,8 +115,7 @@ child with it. The parent shell's block is never touched.
 
 That is the entire security argument: an agent can run `env` freely and find nothing,
 because the keys were never in the shell it inherited from. They were assembled for the
-`claude` process alone and die with it. `.zshrc:265-269` wraps `nvim`/`mvim`/`neovide` the
-same way.
+`claude` process alone and die with it.
 
 It is a **script, not a shell function**, so launchers that load no shell config can reach
 it off PATH.

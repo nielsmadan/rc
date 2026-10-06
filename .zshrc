@@ -256,22 +256,6 @@ tailssh() {
 # sops specifically.
 export SOPS_EDITOR=nvim
 
-# Editor wrappers — codecompanion.nvim reads CLAUDE_CODE_OAUTH_TOKEN from
-# env, so nvim/mvim/neovide need the secrets injected too. The existing
-# `m` / `n` aliases (mvim, neovide &) keep working: they expand to the
-# function name, then the function runs.
-#
-# sops-exec is a script in ~/ac/bin (linked into ~/.local/bin), not a function
-# defined here: agent launchers that source only ~/.airc need the same injection
-# and cannot reach a function that lives in an interactive-only file. Guarded so
-# this repo still stands alone on a machine without ~/ac — the wrappers simply
-# don't exist there rather than existing without keys.
-if command -v sops-exec >/dev/null 2>&1; then
-  nvim()    { sops-exec nvim    "$@"; }
-  mvim()    { sops-exec mvim    "$@"; }
-  neovide() { sops-exec neovide "$@"; }
-fi
-
 alias sec='sops edit $SOPS_SECRETS'
 
 # Dev helper functions (mksim, etc.)

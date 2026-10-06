@@ -63,7 +63,7 @@ An *existing* `install.local` is **merged, not left alone**: aliases added since
 This repo maintains **both** a legacy Vim config and a modern Neovim config in parallel — they are not migrating from one to the other.
 
 - **Vim** — single-file `.vimrc`, plugins via `vim-plug`, completion via `coc.nvim`, linting/fixing via `ALE`, fuzzy finding via `fzf.vim`.
-- **Neovim** — Lua config under `nvim/`, plugins via `lazy.nvim`, completion via `blink.cmp` + `nvim-lspconfig` + `mason`, fuzzy finding via `snacks.nvim` picker, AI via `codecompanion.nvim`. `nvim/init.lua` also `:source`s `nvim/vimrc.vim` for shared baseline mappings (leader, `jj`→Esc, window nav, system clipboard, etc.).
+- **Neovim** — Lua config under `nvim/`, plugins via `lazy.nvim`, completion via `blink.cmp` + `nvim-lspconfig` + `mason`, fuzzy finding via `snacks.nvim` picker. `nvim/init.lua` also `:source`s `nvim/vimrc.vim` for shared baseline mappings (leader, `jj`→Esc, window nav, system clipboard, etc.).
 
 Leader is `,` in both. Both define the same diff-mode mappings (arrows for hunk nav/pull/push, `<M-1/2/3>` for `:diffget N`, `<M-p>N` for `:diffput N`).
 
@@ -317,7 +317,7 @@ Weights land in `~/.cache/huggingface/hub/` (**not** managed by mise — mise in
 
 `mise/config.toml` (symlinked to `~/.config/mise/config.toml`) pins node/ruby/python/java/bun/go/fzf/pnpm/sops/age. `mise activate` is hooked in `.zshrc`.
 
-Global npm CLIs are managed through mise's `npm:` backend (`npm:wrangler`, `npm:firebase-tools`, `npm:agent-browser`, `npm:@agentclientprotocol/claude-agent-acp`) so they survive `node` version bumps and stay reproducible. Add new ones with `mise use -g npm:<pkg>` rather than `npm install -g`. `claude-agent-acp` is load-bearing — it's the ACP bridge `nvim/lua/plugins/ai.lua`'s CodeCompanion `claude_code` adapter spawns.
+Global npm CLIs are managed through mise's `npm:` backend (`npm:wrangler`, `npm:firebase-tools`, `npm:agent-browser`) so they survive `node` version bumps and stay reproducible. Add new ones with `mise use -g npm:<pkg>` rather than `npm install -g`.
 
 **mise vs brew.** Default to **mise** for standalone dev CLIs and language-ecosystem tools — version-pinned in `mise/config.toml` and auto-replicated across machines. Use **brew** for GUI casks (`.app`s like Finicky), long-running daemons/services, C libraries, and tools needing a launchd unit or absolute path. When moving a tool brew→mise, `brew uninstall` it first so the mise shim wins on `PATH`.
 
@@ -340,7 +340,7 @@ Architecture:
 - **`secrets/secrets.yaml`** (repo) — encrypted YAML. Variable names are visible (diff-friendly); values are AES-256-GCM ciphertext, decryptable only by listed recipients. Committed.
 - **`secrets/secrets-mini.yaml`** (repo) — encrypted YAML scoped to the Mac mini only (its recipient list in `.sops.yaml` is deliberately limited to the mini's age key). Holds secrets that should not exist on any other machine. When adding a new Mac to `.sops.yaml`, **do not** add it as a recipient of `secrets-mini.yaml` — leave that file's recipient list alone.
 - **`SOPS_AGE_KEY_FILE`** / **`SOPS_SECRETS`** — set in `~/ac/.airc.d/04-sops.zsh`, which `.zshrc` picks up when it sources `~/.airc`. macOS' default location for SOPS is `~/Library/Application Support/sops/age/keys.txt` (path with spaces); we use the cleaner XDG location.
-- **CLI wrappers** invoke each tool through `sops-exec` (`~/ac/bin/sops-exec`, linked into `~/.local/bin`), which wraps `sops exec-env` so keys land only in that subprocess. `~/ac` owns the agent wrappers (`claude`, `codex`, `opencode`, `pi`); `.zshrc` owns the `nvim` / `mvim` / `neovide` wrappers. It is a script, not a shell function, so launchers that never read `.zshrc` can reach it.
+- **CLI wrappers** invoke each tool through `sops-exec` (`~/ac/bin/sops-exec`, linked into `~/.local/bin`), which wraps `sops exec-env` so keys land only in that subprocess. `~/ac` owns the agent wrappers (`claude`, `codex`, `opencode`, `pi`). It is a script, not a shell function, so launchers that never read `.zshrc` can reach it.
 - **HTTP-based MCP servers** (e.g. Jina, Todoist) in `~/.claude.json` use `${ENV_VAR}` headers; Claude Code interpolates those at startup. Since our `claude` wrapper goes through `sops exec-env`, Claude Code receives the env var. The parent shell does not.
 - **stdio MCP servers** with env-var deps can use `command: "sops"` `args: ["exec-env", "<repo>/secrets/secrets.yaml", "--", "<server>"]` directly, so even Claude Code's own process never sees their keys.
 

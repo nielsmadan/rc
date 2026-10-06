@@ -76,15 +76,6 @@ Native snacks defaults also active: `<Esc>`/`q` close, `<Tab>`/`<S-Tab>` toggle 
 | `<leader>xL` | n | Toggle location list | `nvim/lua/plugins/default.lua` |
 | `<leader>xQ` | n | Toggle quickfix list | `nvim/lua/plugins/default.lua` |
 
-## AI — codecompanion.nvim
-
-| Key | Mode | Action | Source |
-|---|---|---|---|
-| `<leader>aa` | n/v | CodeCompanion actions menu | `nvim/lua/plugins/ai.lua` |
-| `<leader>at` | n/v | Toggle chat pane | `nvim/lua/plugins/ai.lua` |
-| `<leader>ac` | v | Add selection to chat | `nvim/lua/plugins/ai.lua` |
-| `<leader>ai` | n/v | Inline (`:CodeCompanion `) | `nvim/lua/plugins/ai.lua` |
-
 ## File explorer — oil.nvim
 
 | Key | Mode | Action | Source |
