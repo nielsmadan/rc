@@ -36,6 +36,7 @@ require("hs.ipc")
 --   a / s   = left / right half (horizontal = side-by-side cols)
 --   z / x   = left / right two-thirds (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
+--   j       = ladder all iTerm2 windows so every title bar is visible
 
 local function place(fx, fy, fw, fh)
   return function()
@@ -83,6 +84,54 @@ local function toggleFill()
   hs.window.setFrameCorrectness = prev
 end
 
+-- Hyper+j lays every iTerm2 window out as a staircase per screen: the
+-- frontmost window bottom-left at full width, each one behind it a title bar
+-- higher and LADDER_STEP_X further right, the backmost flush with the top.
+-- Every title bar is fully visible in that stacking order, and whatever
+-- window you click to the front, each window below it keeps a
+-- LADDER_STEP_X-wide strip of title bar uncovered.
+local LADDER_APP = "iTerm2"
+local LADDER_STEP_Y = 32   -- iTerm2 title bar height (its tab bar starts 31px down, measured)
+local LADDER_STEP_X = 120  -- wider than the traffic lights (~70px), so the strip has room to click
+
+-- Rank 1 = frontmost (bottom-left), rank n = backmost (top-right).
+local function ladderFrame(sf, n, rank)
+  return {
+    x = sf.x + (rank - 1) * LADDER_STEP_X,
+    y = sf.y + (n - rank) * LADDER_STEP_Y,
+    w = sf.w - (rank - 1) * LADDER_STEP_X,
+    h = sf.h - (n - rank) * LADDER_STEP_Y,
+  }
+end
+
+local function ladderWindows()
+  local wins = hs.fnutils.filter(hs.window.orderedWindows(), function(win)
+    local app = win:application()
+    return win:isStandard() and app ~= nil and app:name() == LADDER_APP
+  end)
+  if #wins == 0 then return end
+
+  local byScreen = {}
+  for _, win in ipairs(wins) do
+    local id = win:screen():id()
+    byScreen[id] = byScreen[id] or {}
+    table.insert(byScreen[id], win)
+  end
+
+  local prev = hs.window.setFrameCorrectness
+  hs.window.setFrameCorrectness = false
+  for _, group in pairs(byScreen) do
+    local sf = group[1]:screen():frame()
+    for rank, win in ipairs(group) do
+      win:setFrame(ladderFrame(sf, #group, rank), 0)
+    end
+  end
+  hs.window.setFrameCorrectness = prev
+
+  for i = #wins, 1, -1 do wins[i]:raise() end
+  wins[1]:focus()
+end
+
 -- Forward-declared so the Hyper+H binding below can call it; the actual
 -- definition lives further down with the rest of the placement code.
 local homeAllManagedWindows
@@ -122,6 +171,8 @@ bindHyper("x", place(1 / 3, 0, 2 / 3, 1))
 
 -- Manual re-home: same placement pass that fires on screen change / wake.
 bindHyper("h", function() homeAllManagedWindows() end)
+
+bindHyper("j", ladderWindows)
 -- ──────────────────────────────────────────────────────────────────────
 
 -- Reload on save of any .lua under ~/.hammerspoon.
