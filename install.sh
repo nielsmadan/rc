@@ -200,6 +200,23 @@ link transcribe       bin/transcribe    ~/.local/bin/transcribe
 link img-sheet        bin/img-sheet     ~/.local/bin/img-sheet
 link update-tools     bin/update-tools  ~/.local/bin/update-tools
 link check-runtimes   bin/check-runtimes ~/.local/bin/check-runtimes
+link resource-log     bin/resource-log  ~/.local/bin/resource-log
+
+# Minute-by-minute memory/CPU sampler. launchd only picks up a new agent at login,
+# so load it now too; a failed load warns rather than aborting the rest of the run.
+RESOURCE_LOG_PLIST="$HOME/Library/LaunchAgents/com.nielsmadan.resource-log.plist"
+link resource-log-agent launchd/com.nielsmadan.resource-log.plist "$RESOURCE_LOG_PLIST"
+if is_skipped resource-log-agent; then
+  :
+elif launchctl print "gui/$(id -u)/com.nielsmadan.resource-log" >/dev/null 2>&1; then
+  say "skip resource-log agent (already loaded)"
+elif pending "load LaunchAgent com.nielsmadan.resource-log"; then
+  if launchctl bootstrap "gui/$(id -u)" "$RESOURCE_LOG_PLIST"; then
+    echo "loaded LaunchAgent com.nielsmadan.resource-log"
+  else
+    echo "warn: could not load com.nielsmadan.resource-log; it starts at next login"
+  fi
+fi
 # SaveWindowArrangement.py runs as an AutoLaunch daemon (auto-saves window
 # arrangements + registers the Cmd+S RPC). Drop the pre-daemon manual-script
 # symlink from the plain Scripts dir if a prior install left one there.

@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+import argparse
+from collections import defaultdict
+from datetime import datetime, timedelta
+import gzip
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+
+LOG_DIR = Path.home() / "Library/Logs/resource-log"
+RETENTION_DAYS = 30
+TOP_FAMILIES = 25
+TOP_PROCS = 10
+TOP_CPU_PROCS = 5
+AGENTS = ("claude", "codex", "droid", "opencode", "pi")
+NODE_ROLES = (
+    (r"^node \(vitest", "vitest"),
+    (r"jest-worker", "jest"),
+    (r"tsserver\.js", "tsserver"),
+    (r"typescript-language-server", "ts-langserver"),
+    (r"-mcp\b|mcp-server", "mcp"),
+    (r"/vite(/bin/vite\.js|\b)", "vite"),
+    (r"/tsx/", "tsx"),
+    (r"react-native|metro", "metro"),
+    (r"firebase", "firebase"),
+)
+NODE_FAMILIES = {role for _, role in NODE_ROLES} | {"node"}
+DESCRIPTION = f"""\
+Sample memory and CPU once a minute (via the com.nielsmadan.resource-log LaunchAgent)
+and summarize the history. Samples are JSONL under {LOG_DIR}, one file per day,
+older days gzipped, kept {RETENTION_DAYS} days.
+
+  resource-log sample [--print]   take one sample (append it, or print it)
+  resource-log report [--since 24h]   timeline, heaviest families, orphaned node
+"""
+
+
+def family(comm, args):
+    name = os.path.basename(comm)
+    if re.fullmatch(r"\d+\.\d+\.\d+", name):
+        return "claude"
+    if name.endswith("-mcp"):
+        return "mcp"
+    if name == "node":
+        return next((role for pattern, role in NODE_ROLES if re.search(pattern, args)), "node")
+    return re.sub(r" Helper( \(.*\))?$", "", name)
+
+
+def parse_ps(stats_text, args_text):
+    args = dict(
+        (int(pid), rest)
+        for pid, _, rest in (line.strip().partition(" ") for line in args_text.splitlines() if line.strip())
+    )
+    rows = []
+    for line in stats_text.splitlines():
+        parts = line.split(None, 4)
+        if len(parts) < 5:
+            continue
+        pid, ppid, rss_kb, cpu, comm = parts
+        arg = args.get(int(pid), comm).strip()
+        rows.append({
+            "pid": int(pid), "ppid": int(ppid), "rss_mb": int(rss_kb) / 1024, "cpu": float(cpu),
+            "family": family(comm, arg), "args": arg,
+        })
+    return rows
+
+
+def parse_vm_stat(text):
+    page = int(re.search(r"page size of (\d+) bytes", text).group(1))
+    counts = dict(
+        (key.strip().strip('"'), int(value.strip().rstrip(".")))
+        for key, value in re.findall(r"^([^:\n]+):\s+(\d+)\.?$", text, re.M)
+    )
+    mb = lambda *keys: round(sum(counts.get(key, 0) for key in keys) * page / 2**20)
+    return {
+        "free": mb("Pages free", "Pages speculative"),
+        "wired": mb("Pages wired down"),
+        "compressor": mb("Pages occupied by compressor"),
+        "compressed": mb("Pages stored in compressor"),
+        "anonymous": mb("Anonymous pages"),
+        "file_backed": mb("File-backed pages"),
+    }
+
+
+def parse_swap(text):
+    values = dict((key, float(value)) for key, value in re.findall(r"(\w+) = ([\d.]+)M", text))
+    return {"swap_used": round(values.get("used", 0)), "swap_total": round(values.get("total", 0))}
+
+
+def parse_load(text):
+    return [float(value) for value in re.findall(r"[\d.]+", text)[:3]]
+
+
+def aggregate_families(rows):
+    totals = defaultdict(lambda: [0, 0.0, 0.0])
+    for row in rows:
+        entry = totals[row["family"]]
+        entry[0] += 1
+        entry[1] += row["rss_mb"]
+        entry[2] += row["cpu"]
+    return [[name, count, round(rss), round(cpu, 1)] for name, (count, rss, cpu) in totals.items()]
+
+
+def build_sample(now, rows, vm_text, swap_text, load_text, pressure_text):
+    families = sorted(aggregate_families(rows), key=lambda f: -f[2])
+    by_cpu = sorted(families[TOP_FAMILIES:], key=lambda f: -f[3])
+    kept_families = families[:TOP_FAMILIES] + [f for f in by_cpu if f[3] >= 20]
+    by_rss = sorted(rows, key=lambda r: -r["rss_mb"])[:TOP_PROCS]
+    top_cpu = [r for r in sorted(rows, key=lambda r: -r["cpu"])[:TOP_CPU_PROCS] if r not in by_rss]
+    orphans = aggregate_families(r for r in rows if r["ppid"] == 1 and r["family"] in NODE_FAMILIES)
+    return {
+        "t": now.isoformat(timespec="seconds"),
+        "load": parse_load(load_text),
+        "mem_mb": {**parse_vm_stat(vm_text), **parse_swap(swap_text)},
+        "pressure": int(pressure_text.strip() or 0),
+        "nproc": len(rows),
+        "agents": {name: sum(1 for r in rows if r["family"] == name) for name in AGENTS},
+        "sims": sum(1 for r in rows if r["family"] == "launchd_sim"),
+        "orphan_node": {name: [count, rss] for name, count, rss, _ in orphans},
+        "families": kept_families,
+        "procs": [[r["pid"], r["ppid"], round(r["rss_mb"]), r["cpu"], r["args"][:140]] for r in by_rss + top_cpu],
+    }
+
+
+def run(*command):
+    return subprocess.run(command, capture_output=True, text=True, timeout=30).stdout
+
+
+def take_sample(now):
+    rows = parse_ps(run("ps", "-Ao", "pid=,ppid=,rss=,%cpu=,comm="), run("ps", "-Ao", "pid=,args="))
+    return build_sample(
+        now, rows, run("vm_stat"), run("sysctl", "-n", "vm.swapusage"),
+        run("sysctl", "-n", "vm.loadavg"), run("sysctl", "-n", "kern.memorystatus_vm_pressure_level"),
+    )
+
+
+def maintenance_plan(names, today, retention_days):
+    cutoff = (today - timedelta(days=retention_days)).isoformat()
+    delete, compress = [], []
+    for name in names:
+        match = re.fullmatch(r"(\d{4}-\d{2}-\d{2})\.jsonl(\.gz)?", name)
+        if not match:
+            continue
+        if match.group(1) < cutoff:
+            delete.append(name)
+        elif not match.group(2) and match.group(1) < today.isoformat():
+            compress.append(name)
+    return delete, compress
+
+
+def maintain(log_dir, today):
+    delete, compress = maintenance_plan(os.listdir(log_dir), today, RETENTION_DAYS)
+    for name in delete:
+        (log_dir / name).unlink()
+    for name in compress:
+        source = log_dir / name
+        with open(source, "rb") as raw, gzip.open(log_dir / (name + ".gz"), "wb") as packed:
+            packed.write(raw.read())
+        source.unlink()
+
+
+def write_sample(log_dir, sample, today):
+    log_dir.mkdir(parents=True, exist_ok=True)
+    with open(log_dir / f"{today.isoformat()}.jsonl", "a") as stream:
+        stream.write(json.dumps(sample, separators=(",", ":")) + "\n")
+    maintain(log_dir, today)
+
+
+def parse_since(text):
+    match = re.fullmatch(r"(\d+)([mhd])", text)
+    if not match:
+        raise argparse.ArgumentTypeError("use e.g. 90m, 24h or 7d")
+    unit = {"m": "minutes", "h": "hours", "d": "days"}[match.group(2)]
+    return timedelta(**{unit: int(match.group(1))})
+
+
+def read_samples(log_dir, start):
+    samples = []
+    for path in sorted(log_dir.glob("*.jsonl*")):
+        if path.name[:10] < start.date().isoformat():
+            continue
+        opener = gzip.open if path.suffix == ".gz" else open
+        with opener(path, "rt") as stream:
+            samples.extend(json.loads(line) for line in stream if line.strip())
+    return [s for s in samples if s["t"] >= start.isoformat(timespec="seconds")]
+
+
+def bucket_minutes(span):
+    if span <= timedelta(hours=6):
+        return 10
+    return 60 if span <= timedelta(hours=48) else 360
+
+
+def bucket_key(timestamp, minutes):
+    moment = datetime.fromisoformat(timestamp)
+    total = moment.hour * 60 + moment.minute
+    floored = moment.replace(hour=0, minute=0, second=0) + timedelta(minutes=total - total % minutes)
+    return floored.strftime("%m-%d %H:%M")
+
+
+def timeline(samples, minutes):
+    buckets = defaultdict(list)
+    for sample in samples:
+        buckets[bucket_key(sample["t"], minutes)].append(sample)
+    rows = []
+    for key in sorted(buckets):
+        group = buckets[key]
+        worst = min(group, key=lambda s: s["mem_mb"]["free"])
+        top = worst["families"][0] if worst["families"] else ["-", 0, 0, 0]
+        rows.append([
+            key,
+            max(s["load"][0] for s in group),
+            min(s["mem_mb"]["free"] for s in group) / 1024,
+            max(s["mem_mb"]["compressor"] for s in group) / 1024,
+            max(s["mem_mb"]["swap_used"] for s in group) / 1024,
+            max(sum(s["agents"].values()) for s in group),
+            f"{top[0]} {top[2] / 1024:.1f}G",
+        ])
+    return rows
+
+
+def family_stats(samples):
+    totals = defaultdict(lambda: {"rss": 0.0, "cpu": 0.0, "peak_rss": 0, "peak_cpu": 0.0, "count": 0})
+    for sample in samples:
+        for name, count, rss, cpu in sample["families"]:
+            entry = totals[name]
+            entry["rss"] += rss
+            entry["cpu"] += cpu
+            entry["count"] += count
+            entry["peak_rss"] = max(entry["peak_rss"], rss)
+            entry["peak_cpu"] = max(entry["peak_cpu"], cpu)
+    n = len(samples) or 1
+    return [
+        [name, e["count"] / n, e["rss"] / n / 1024, e["peak_rss"] / 1024, e["cpu"] / n, e["peak_cpu"]]
+        for name, e in totals.items()
+    ]
+
+
+def orphan_peaks(samples):
+    peaks = {}
+    for sample in samples:
+        for name, (count, rss) in sample.get("orphan_node", {}).items():
+            if name not in peaks or rss > peaks[name][1]:
+                peaks[name] = (count, rss, sample["t"])
+    return sorted(([name, *peak] for name, peak in peaks.items()), key=lambda p: -p[2])
+
+
+def print_table(title, header, rows, formats):
+    print(f"\n{title}")
+    widths = [max([len(h)] + [len(f.format(r[i])) for r in rows]) for i, (h, f) in enumerate(zip(header, formats))]
+    print("  ".join(h.rjust(w) for h, w in zip(header, widths)))
+    for row in rows:
+        print("  ".join(f.format(v).rjust(w) for v, f, w in zip(row, formats, widths)))
+
+
+def report(log_dir, since, now):
+    samples = read_samples(log_dir, now - since)
+    if not samples:
+        print(f"no samples in the last {since} under {log_dir}")
+        return
+    minutes = bucket_minutes(since)
+    print(f"{len(samples)} samples, {samples[0]['t']} .. {samples[-1]['t']}")
+    print_table(
+        f"timeline ({minutes}m buckets; worst sample per bucket)",
+        ["bucket", "load", "freeG", "comprG", "swapG", "agents", "top family at worst"],
+        timeline(samples, minutes),
+        ["{}", "{:.0f}", "{:.1f}", "{:.1f}", "{:.1f}", "{}", "{}"],
+    )
+    stats = family_stats(samples)
+    formats = ["{}", "{:.1f}", "{:.1f}", "{:.1f}", "{:.0f}", "{:.0f}"]
+    header = ["family", "procs", "avgG", "peakG", "avg%cpu", "peak%cpu"]
+    print_table("heaviest by memory", header, sorted(stats, key=lambda s: -s[2])[:15], formats)
+    print_table("heaviest by CPU", header, sorted(stats, key=lambda s: -s[4])[:10], formats)
+    peaks = orphan_peaks(samples)
+    if peaks:
+        print_table(
+            "orphaned node (PPID 1), peak per role", ["role", "procs", "GB", "at"],
+            [[name, count, rss / 1024, t] for name, count, rss, t in peaks], ["{}", "{}", "{:.1f}", "{}"],
+        )
+
+
+def main():
+    parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", required=True)
+    sample = commands.add_parser("sample")
+    sample.add_argument("--print", action="store_true", help="print the sample instead of appending it")
+    summary = commands.add_parser("report")
+    summary.add_argument("--since", type=parse_since, default=timedelta(hours=24))
+    options = parser.parse_args()
+    now = datetime.now()
+    if options.command == "report":
+        report(LOG_DIR, options.since, now)
+    elif options.print:
+        print(json.dumps(take_sample(now), indent=1))
+    else:
+        write_sample(LOG_DIR, take_sample(now), now.date())
+
+
+if __name__ == "__main__":
+    sys.exit(main())

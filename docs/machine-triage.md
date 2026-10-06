@@ -34,6 +34,25 @@ xcrun simctl list devices booted     # what's actually running
 xcrun simctl shutdown all            # safe; reclaims the memory immediately
 ```
 
+## History: what the machine already recorded
+
+macOS keeps no load or memory history, but it does leave crash and jetsam reports:
+
+- `/Library/Logs/DiagnosticReports/JetsamEvent-*.ips` — written when the kernel kills
+  processes for memory. The JSON lists every process with `rpages`, so it records memory by
+  family at the moment of the kill.
+- `~/Library/Logs/DiagnosticReports/node-*.ips` — a burst of these whose triggering thread
+  shows `node::OOMErrorHandler` and whose parent is `launchd` is orphaned vitest workers
+  hitting the heap ceiling. The timestamps date the episode.
+
+For everything else there is `resource-log` (this repo's `bin/`). The
+`com.nielsmadan.resource-log` LaunchAgent samples load, free/compressor/swap, process
+families and orphaned node once a minute into `~/Library/Logs/resource-log/`, keeping 30 days.
+`resource-log report --since 24h` (or `90m`, `7d`) prints a timeline and the heaviest families.
+Per-process memory is RSS from `ps`, because `top` costs ~2.7 s per sample on this machine.
+RSS double-counts pages shared between processes, which inflates multi-process browsers
+(Brave read 13 GB by RSS against 7 GB by `top`).
+
 ## Work the bottleneck, then remeasure
 
 Sluggishness moves. Separate compressor and swap thrash from real CPU demand first, then
