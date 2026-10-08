@@ -34,6 +34,35 @@ xcrun simctl list devices booted     # what's actually running
 xcrun simctl shutdown all            # safe; reclaims the memory immediately
 ```
 
+## Orphaned vitest workers are the other prime suspect
+
+When a vitest run's main process dies before its workers — the runner is killed, or a
+`pnpm -r test` fails fast in one package and tears down another package's run mid-flight —
+the `node (vitest N)` workers re-parent to launchd (PPID 1) and keep running. Each holds
+0.3-2.5 GB; a 9-worker batch is ~12 GB. An agent that re-runs a full suite after every fix
+leaves a new batch each time, and the resulting thrash makes tests time out, which triggers
+the next re-run.
+
+Case from 2026-09-29: a Claude `longshot` session in `dreamhack/core3` running
+`pnpm check-all && pnpm test && … test:postgres` in a loop. Free RAM was 166 MB; killing
+11 orphans freed 21 GB, and a new batch of 9 appeared within two minutes.
+
+The giveaway is `node (vitest N)` processes with PPID 1. Clear them, then find and slow the
+session that is spawning them (their cwd names the checkout), or they come straight back:
+
+```sh
+ps -Ao pid=,ppid=,command= | awk '$2==1 && /^ *[0-9]+ +1 +node \(vitest/ {print $1}' | xargs kill
+```
+
+Avoid a per-process `lsof` loop over every process while the machine is in this state; it
+does not finish inside two minutes. `lsof -a -p <pid> -d cwd` on a single orphan is fine.
+
+Case from 2026-10-06: two orphan batches at once, from `dreamhack/core1` and `core2`
+`apps/api`. 15-day uptime, load ~340, 116 MB free, 31 GB in the compressor, 37 of 38 GB swap
+used. Seven workers sat at ~4 GB RSS each and died one by one at V8's default heap ceiling
+(`FatalProcessOutOfMemory`). Workers that keep growing until they hit that ceiling point to
+the suite leaking memory within a worker. Orphaning alone would not explain it.
+
 ## History: what the machine already recorded
 
 macOS keeps no load or memory history, but it does leave crash and jetsam reports:
@@ -94,3 +123,7 @@ instead.
 across sessions), alongside `com.apple.Virtualization.VirtualMachine` and the usual
 Electron stack (iTerm2, Telegram, Superhuman helpers, Teams, Chromium, WhatsApp).
 Know that baseline before concluding some new process is the culprit.
+
+Every nono-sandboxed agent session also runs its own `/usr/bin/log stream --style ndjson`
+watching for sandbox denials, at ~0.6% CPU each. Thirty-odd of them showing up as a "log"
+family near half a core is just the session count, not a leak.
