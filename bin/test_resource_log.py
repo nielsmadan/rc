@@ -11,13 +11,13 @@ SCRIPT = Path(__file__).with_name("resource-log")
 MODULE = runpy.run_path(str(SCRIPT))
 
 PS_STATS = """\
-  100     1  4194304  95.0 node
-  101     1  2097152  10.0 node
-  200    50   204800   5.0 2.1.280
-  201    50   102400   1.0 /Users/me/.local/bin/claude
-  300     1   512000  40.0 /Applications/Brave Browser.app/Contents/MacOS/Brave Browser Helper (Renderer)
-  301     1   256000   2.0 /Applications/Brave Browser.app/Contents/MacOS/Brave Browser
-  400   399    51200   0.0 node
+  100     1  4194304  95.0    12:01.50 node
+  101     1  2097152  10.0     0:30.00 node
+  200    50   204800   5.0  1-02:00:00 2.1.280
+  201    50   102400   1.0     0:01.25 /Users/me/.local/bin/claude
+  300     1   512000  40.0 1186:00.11 /Applications/Brave Browser.app/Contents/MacOS/Brave Browser Helper (Renderer)
+  301     1   256000   2.0     0:00.00 /Applications/Brave Browser.app/Contents/MacOS/Brave Browser
+  400   399    51200   0.0     0:00.01 node
 """
 PS_ARGS = """\
   100 node (vitest 3)
@@ -93,6 +93,31 @@ class SampleTest(unittest.TestCase):
 
     def test_keeps_command_lines_of_heaviest_processes(self):
         self.assertEqual(self.sample["procs"][0], [100, 1, 4096, 95.0, "node (vitest 3)"])
+
+
+class IntervalCpuTest(unittest.TestCase):
+    def setUp(self):
+        self.rows = MODULE["parse_ps"](PS_STATS, PS_ARGS)
+
+    def test_reads_cumulative_cpu_time_in_every_ps_spelling(self):
+        cpu_s = {row["pid"]: row["cpu_s"] for row in self.rows}
+        self.assertEqual(cpu_s[100], 721.5)
+        self.assertEqual(cpu_s[200], 93600.0)
+        self.assertEqual(cpu_s[300], 71160.11)
+
+    def test_counts_a_process_that_reads_zero_percent_but_burns_cpu(self):
+        rows = [{"pid": 7, "cpu": 0.0, "cpu_s": 160.0}]
+        self.assertEqual(MODULE["with_interval_cpu"](rows, {"7": 100.0}, 60)[0]["cpu"], 100.0)
+
+    def test_charges_new_and_reused_pids_their_whole_cpu_time(self):
+        rows = [{"pid": 8, "cpu": 0.0, "cpu_s": 30.0}, {"pid": 9, "cpu": 0.0, "cpu_s": 6.0}]
+        result = MODULE["with_interval_cpu"](rows, {"9": 500.0}, 60)
+        self.assertEqual([row["cpu"] for row in result], [50.0, 10.0])
+
+    def test_keeps_ps_percent_without_a_recent_previous_sample(self):
+        rows = [{"pid": 7, "cpu": 12.5, "cpu_s": 160.0}]
+        self.assertEqual(MODULE["with_interval_cpu"](rows, {}, 60), rows)
+        self.assertEqual(MODULE["with_interval_cpu"](rows, {"7": 100.0}, 3600), rows)
 
 
 class StorageTest(unittest.TestCase):

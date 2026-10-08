@@ -16,6 +16,7 @@ RETENTION_DAYS = 30
 TOP_FAMILIES = 25
 TOP_PROCS = 10
 TOP_CPU_PROCS = 5
+MAX_CPU_INTERVAL = 600
 AGENTS = ("claude", "codex", "droid", "opencode", "pi")
 NODE_ROLES = (
     (r"^node \(vitest", "vitest"),
@@ -50,6 +51,12 @@ def family(comm, args):
     return re.sub(r" Helper( \(.*\))?$", "", name)
 
 
+def parse_cputime(text):
+    days, _, clock = text.rpartition("-")
+    seconds = sum(float(part) * 60 ** power for power, part in enumerate(reversed(clock.split(":"))))
+    return seconds + int(days or 0) * 86400
+
+
 def parse_ps(stats_text, args_text):
     args = dict(
         (int(pid), rest)
@@ -57,16 +64,30 @@ def parse_ps(stats_text, args_text):
     )
     rows = []
     for line in stats_text.splitlines():
-        parts = line.split(None, 4)
-        if len(parts) < 5:
+        parts = line.split(None, 5)
+        if len(parts) < 6:
             continue
-        pid, ppid, rss_kb, cpu, comm = parts
+        pid, ppid, rss_kb, cpu, cputime, comm = parts
         arg = args.get(int(pid), comm).strip()
         rows.append({
             "pid": int(pid), "ppid": int(ppid), "rss_mb": int(rss_kb) / 1024, "cpu": float(cpu),
-            "family": family(comm, arg), "args": arg,
+            "cpu_s": parse_cputime(cputime), "family": family(comm, arg), "args": arg,
         })
     return rows
+
+
+# ps's %cpu restarts at zero on every exec, so a process stuck re-execing itself
+# reads 0% while pinning a core. Cumulative CPU time survives exec.
+def with_interval_cpu(rows, previous_cpu_s, elapsed):
+    if not previous_cpu_s or not 0 < elapsed <= MAX_CPU_INTERVAL:
+        return rows
+
+    def interval_cpu(row):
+        before = previous_cpu_s.get(str(row["pid"]), 0.0)
+        used = row["cpu_s"] - before if before <= row["cpu_s"] else row["cpu_s"]
+        return round(used / elapsed * 100, 1)
+
+    return [{**row, "cpu": interval_cpu(row)} for row in rows]
 
 
 def parse_vm_stat(text):
@@ -130,12 +151,27 @@ def run(*command):
     return subprocess.run(command, capture_output=True, text=True, timeout=30).stdout
 
 
-def take_sample(now):
-    rows = parse_ps(run("ps", "-Ao", "pid=,ppid=,rss=,%cpu=,comm="), run("ps", "-Ao", "pid=,args="))
-    return build_sample(
-        now, rows, run("vm_stat"), run("sysctl", "-n", "vm.swapusage"),
-        run("sysctl", "-n", "vm.loadavg"), run("sysctl", "-n", "kern.memorystatus_vm_pressure_level"),
+def take_sample(now, cpu_state):
+    rows = parse_ps(run("ps", "-Ao", "pid=,ppid=,rss=,%cpu=,time=,comm="), run("ps", "-Ao", "pid=,args="))
+    elapsed = now.timestamp() - cpu_state.get("t", 0)
+    sample = build_sample(
+        now, with_interval_cpu(rows, cpu_state.get("cpu_s"), elapsed), run("vm_stat"),
+        run("sysctl", "-n", "vm.swapusage"), run("sysctl", "-n", "vm.loadavg"),
+        run("sysctl", "-n", "kern.memorystatus_vm_pressure_level"),
     )
+    return sample, {"t": now.timestamp(), "cpu_s": {str(r["pid"]): r["cpu_s"] for r in rows}}
+
+
+def read_cpu_state(log_dir):
+    try:
+        return json.loads((log_dir / "cpu-state.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def write_cpu_state(log_dir, state):
+    log_dir.mkdir(parents=True, exist_ok=True)
+    (log_dir / "cpu-state.json").write_text(json.dumps(state, separators=(",", ":")))
 
 
 def maintenance_plan(names, today, retention_days):
@@ -294,10 +330,13 @@ def main():
     now = datetime.now()
     if options.command == "report":
         report(LOG_DIR, options.since, now)
-    elif options.print:
-        print(json.dumps(take_sample(now), indent=1))
     else:
-        write_sample(LOG_DIR, take_sample(now), now.date())
+        sample, cpu_state = take_sample(now, read_cpu_state(LOG_DIR))
+        if options.print:
+            print(json.dumps(sample, indent=1))
+        else:
+            write_sample(LOG_DIR, sample, now.date())
+            write_cpu_state(LOG_DIR, cpu_state)
 
 
 if __name__ == "__main__":

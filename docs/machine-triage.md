@@ -51,7 +51,27 @@ families and orphaned node once a minute into `~/Library/Logs/resource-log/`, ke
 `resource-log report --since 24h` (or `90m`, `7d`) prints a timeline and the heaviest families.
 Per-process memory is RSS from `ps`, because `top` costs ~2.7 s per sample on this machine.
 RSS double-counts pages shared between processes, which inflates multi-process browsers
-(Brave read 13 GB by RSS against 7 GB by `top`).
+(Brave read 13 GB by RSS against 7 GB by `top`). CPU is the change in each process's cumulative
+CPU time since the previous sample (state in `cpu-state.json`). Samples before 2026-10-07 used
+`ps`'s `%cpu`, which missed the exec loop below. A process that starts and exits between two
+samples is still invisible.
+
+## A process can pin a core while `ps` shows 0%
+
+`ps`'s `%cpu` restarts at zero on every `exec`, so a process stuck re-execing itself reads
+`0.0` in `ps` and in Activity Monitor's sorted list while burning a full core. The kernel time
+of all those process starts shows up as a high `sys` share in `top`. The tell is cumulative
+`TIME` climbing on a PID whose `%cpu` stays near zero. `resource-log sample --print` measures
+this machine-wide; for a single suspect, read it twice:
+
+```sh
+ps -o pid=,pcpu=,time= -p <pid>; sleep 5; ps -o pid=,pcpu=,time= -p <pid>
+```
+
+Case from 2026-10-07: `~/ac/bin/gh` execed the mise shim, which had no active `gh` inside nono
+sandboxes and fell back to the next `gh` on PATH, the wrapper again. Every sandboxed `gh` call
+looped until the agent's tool timeout. Eight at once took load from ~20 to ~260 and timed out
+dreamhack core's pre-push tests; one had run for 30 hours.
 
 ## Work the bottleneck, then remeasure
 
