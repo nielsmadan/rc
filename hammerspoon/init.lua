@@ -36,7 +36,7 @@ require("hs.ipc")
 --   a / s   = left / right half (horizontal = side-by-side cols)
 --   z / x   = left / right two-thirds (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
---   j       = ladder all iTerm2 windows so every title bar is visible
+--   j       = ladder all iTerm2 windows on the focused screen so every title bar is visible
 
 local function place(fx, fy, fw, fh)
   return function()
@@ -84,7 +84,8 @@ local function toggleFill()
   hs.window.setFrameCorrectness = prev
 end
 
--- Hyper+j lays every iTerm2 window out as a staircase per screen: the
+-- Hyper+j gathers every iTerm2 window onto the focused window's screen and
+-- lays them out as a staircase: the
 -- frontmost window bottom-left at full width, each one behind it a title bar
 -- higher and LADDER_STEP_X further right, the backmost flush with the top.
 -- Every title bar is fully visible in that stacking order, and whatever
@@ -105,26 +106,19 @@ local function ladderFrame(sf, n, rank)
 end
 
 local function ladderWindows()
+  local focused = hs.window.focusedWindow()
+  local screen = focused and focused:screen() or hs.screen.mainScreen()
   local wins = hs.fnutils.filter(hs.window.orderedWindows(), function(win)
     local app = win:application()
     return win:isStandard() and app ~= nil and app:name() == LADDER_APP
   end)
   if #wins == 0 then return end
 
-  local byScreen = {}
-  for _, win in ipairs(wins) do
-    local id = win:screen():id()
-    byScreen[id] = byScreen[id] or {}
-    table.insert(byScreen[id], win)
-  end
-
+  local sf = screen:frame()
   local prev = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
-  for _, group in pairs(byScreen) do
-    local sf = group[1]:screen():frame()
-    for rank, win in ipairs(group) do
-      win:setFrame(ladderFrame(sf, #group, rank), 0)
-    end
+  for rank, win in ipairs(wins) do
+    win:setFrame(ladderFrame(sf, #wins, rank), 0)
   end
   hs.window.setFrameCorrectness = prev
 
