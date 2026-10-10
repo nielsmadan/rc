@@ -124,6 +124,20 @@ across sessions), alongside `com.apple.Virtualization.VirtualMachine` and the us
 Electron stack (iTerm2, Telegram, Superhuman helpers, Teams, Chromium, WhatsApp).
 Know that baseline before concluding some new process is the culprit.
 
+The Cato VPN helper (`com.catonetworks.mac.CatoClient.helper`, a root LaunchDaemon) leaks: 4.5 GB
+of physical footprint after 16 days of uptime. `launchd/com.nielsmadan.cato-restart.plist`
+restarts it daily at 04:30, dropping the VPN for a few seconds. It runs as root, so `install.sh`
+does not install it. Copy it rather than symlinking it, because launchd requires a root-owned
+plist:
+
+```sh
+sudo install -m 644 -o root -g wheel ~/rc/launchd/com.nielsmadan.cato-restart.plist /Library/LaunchDaemons/
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.nielsmadan.cato-restart.plist
+```
+
+Edits to the repo copy need the same two commands again, preceded by
+`sudo launchctl bootout system/com.nielsmadan.cato-restart`.
+
 Every nono-sandboxed agent session also runs its own `/usr/bin/log stream --style ndjson`
 watching for sandbox denials, at ~0.6% CPU each. Thirty-odd of them showing up as a "log"
 family near half a core is just the session count, not a leak.
