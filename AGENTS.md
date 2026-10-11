@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to coding agents when working with code in this repository. `CLAUDE.md` is a bridge that points here.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## Repository purpose
 
