@@ -26,7 +26,7 @@ done
 unset _d
 
 # Completion functions for CLIs that ship their own zsh completion generator but
-# install via mise — so they have no Homebrew site-functions/_<tool> file the way
+# install via mise or uv — so they have no Homebrew site-functions/_<tool> file the way
 # git/docker/npm do. Each is generated once into a cache dir on fpath. The
 # generators run ONLY when a file is missing, so a normal startup forks nothing.
 # Cobra/clap scripts bake in the tool's subcommands/flags, so after a major
@@ -46,6 +46,7 @@ typeset -A _zcompgen=(
   tart     'tart --generate-completion-script zsh'
   rustup   'rustup completions zsh'
   cargo    'rustup completions zsh cargo'
+  prat     'prat completion zsh'
 )
 for _t in "${(@k)_zcompgen}"; do
   [[ -e $_zcompcache/_$_t ]] && continue
