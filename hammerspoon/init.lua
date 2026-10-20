@@ -38,6 +38,49 @@ require("hs.ipc")
 --   h       = home (re-run placement pass)
 --   j       = ladder all iTerm2 windows on the focused screen so every title bar is visible
 
+-- iTerm2 sometimes pins a window's minimum size at its current grid: every
+-- smaller setFrame or edge drag snaps back while growing still works. Setting
+-- the grid smaller over AppleScript clears the pin (the AX window id is also
+-- iTerm2's AppleScript window id). "Stuck" = asked to shrink, didn't move at
+-- all, and is still well over the request, so a window that merely hits its
+-- real minimum on the way down doesn't trigger it.
+local UNSTICK_APP = "iTerm2"
+local UNSTICK_SLOP = 40   -- two text rows; char-grid snapping stays under this
+
+local function stuckDims(before, want, got)
+  local function stuck(b, w, g)
+    return w < b - UNSTICK_SLOP and g > w + UNSTICK_SLOP and math.abs(g - b) <= UNSTICK_SLOP
+  end
+  return { rows = stuck(before.h, want.h, got.h), columns = stuck(before.w, want.w, got.w) }
+end
+
+local function unstickScript(id, stuck)
+  local sets = {}
+  if stuck.rows then sets[#sets + 1] = "set rows of s to 10" end
+  if stuck.columns then sets[#sets + 1] = "set columns of s to 20" end
+  return string.format([[
+tell application "iTerm2"
+  set s to current session of current tab of (first window whose id is %d)
+  %s
+end tell]], id, table.concat(sets, "\n  "))
+end
+
+-- Callers own setFrameCorrectness, as with a bare setFrame.
+local function setFrameUnstuck(win, frame)
+  local before = win:frame()
+  win:setFrame(frame, 0)
+  local app, id = win:application(), win:id()
+  if not (app and id and app:name() == UNSTICK_APP) then return end
+  local got = win:frame()
+  local stuck = stuckDims(before, frame, got)
+  if not (stuck.rows or stuck.columns) then return end
+  local ok = hs.osascript.applescript(unstickScript(id, stuck))
+  win:setFrame(frame, 0)
+  local now = win:frame()
+  print(string.format("unstick %q: wanted %.0fx%.0f, got %.0fx%.0f, after fix %.0fx%.0f (applescript ok=%s)",
+    win:title(), frame.w, frame.h, got.w, got.h, now.w, now.h, tostring(ok)))
+end
+
 local function place(fx, fy, fw, fh)
   return function()
     local win = hs.window.focusedWindow()
@@ -45,12 +88,12 @@ local function place(fx, fy, fw, fh)
     local sf = win:screen():frame()
     local prev = hs.window.setFrameCorrectness
     hs.window.setFrameCorrectness = false
-    win:setFrame({
+    setFrameUnstuck(win, {
       x = sf.x + sf.w * fx,
       y = sf.y + sf.h * fy,
       w = sf.w * fw,
       h = sf.h * fh,
-    }, 0)
+    })
     hs.window.setFrameCorrectness = prev
   end
 end
@@ -75,11 +118,11 @@ local function toggleFill()
   local prev = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
   if filled and id and preFillFrame[id] then
-    win:setFrame(preFillFrame[id], 0)
+    setFrameUnstuck(win, preFillFrame[id])
     preFillFrame[id] = nil
   else
     if id then preFillFrame[id] = f end
-    win:setFrame(target, 0)
+    setFrameUnstuck(win, target)
   end
   hs.window.setFrameCorrectness = prev
 end
@@ -118,7 +161,7 @@ local function ladderWindows()
   local prev = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
   for rank, win in ipairs(wins) do
-    win:setFrame(ladderFrame(sf, #wins, rank), 0)
+    setFrameUnstuck(win, ladderFrame(sf, #wins, rank))
   end
   hs.window.setFrameCorrectness = prev
 
@@ -491,7 +534,7 @@ function homeAllManagedWindows()
         deferred[#deferred + 1] = { win = win, frame = frame }
       else
         if id then placedWindows[id] = true end
-        win:setFrame(frame, 0)
+        setFrameUnstuck(win, frame)
         raiseOrder[#raiseOrder + 1] = win
       end
     end
@@ -577,7 +620,7 @@ local function placeWindow(win)
   end
   local correctness = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
-  win:setFrame(frame, 0)
+  setFrameUnstuck(win, frame)
   hs.window.setFrameCorrectness = correctness
   -- Deliberately no raise() here. A window that just appeared is already in
   -- front, and this path also fires on the first title change of every
