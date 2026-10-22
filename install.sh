@@ -160,6 +160,38 @@ else
   say "skip zsh-syntax-highlighting (already installed)"
 fi
 
+# Homebrew itself. Its installer prompts for a sudo password, so it only runs
+# interactively — a hook or other non-tty run would die on EOF under set -e.
+if ! command -v brew >/dev/null 2>&1 && [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+if command -v brew >/dev/null 2>&1; then
+  say "skip homebrew (already installed)"
+elif [ "$CHECK" = 0 ] && [ ! -t 0 ]; then
+  say "skip homebrew (not installed; re-run install.sh from a terminal)"
+elif pending "install homebrew"; then
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+  echo "installed homebrew"
+fi
+
+# Formulae and casks from the Brewfile. Only installs what is missing; upgrades
+# are update-tools' job. A failed package warns rather than aborting the run.
+seen_key brewfile
+if is_skipped brewfile; then
+  say "skip Brewfile (brewfile in install.local)"
+elif ! command -v brew >/dev/null 2>&1; then
+  say "skip Brewfile (brew not on PATH)"
+elif HOMEBREW_NO_AUTO_UPDATE=1 brew bundle check --no-upgrade --file="$DOTFILES_DIR/Brewfile" >/dev/null 2>&1; then
+  say "skip Brewfile (all installed)"
+elif pending "brew bundle install (Brewfile has missing packages)"; then
+  if brew bundle install --no-upgrade --file="$DOTFILES_DIR/Brewfile"; then
+    echo "installed Brewfile packages"
+  else
+    echo "warn: brew bundle install failed for some packages; see output above"
+  fi
+fi
+
 # Install Syncthing (menu-bar app) if not present. It's the login daemon that
 # syncs the KeePass vaults in ~/syncthing/; pairing/folder setup stays manual.
 # Cask, not mise — it's a long-lived daemon, not a per-shell dev tool.
