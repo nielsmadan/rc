@@ -317,7 +317,9 @@ fi
 
 # iTerm2 global prefs. Run with iTerm2 *not* running, otherwise iTerm2's in-memory
 # copy is flushed back to disk on quit and overwrites these values. Sets the "rc"
-# dynamic profile as default and dims inactive split panes to 10%.
+# dynamic profile as default, dims inactive split panes to 10%, and keeps session
+# status text (e.g. Codex's "Working") out of tab subtitles; the status dot has no
+# off switch.
 # Rewriting the same values every run is a no-op in effect, so --check neither
 # reports nor performs it.
 if [ "$CHECK" = 1 ]; then
@@ -327,6 +329,7 @@ elif ps -A -o comm | grep -q '/iTerm2$'; then
 else
   defaults write com.googlecode.iterm2 "Default Bookmark Guid" -string "rc-dotfiles-split-nav"
   defaults write com.googlecode.iterm2 SplitPaneDimmingAmount  -float  0.1
+  defaults write com.googlecode.iterm2 ShowSessionStatusInTabSubtitle -bool false
   say "wrote iTerm2 defaults"
 fi
 
