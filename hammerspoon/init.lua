@@ -36,7 +36,7 @@ require("hs.ipc")
 --   a / s   = left / right half (horizontal = side-by-side cols)
 --   z / x   = left / right two-thirds (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
---   j       = ladder all iTerm2 windows on the focused screen so every title bar is visible
+--   j       = ladder all iTerm2 windows on the focused screen, most tabs widest, every title bar visible
 
 -- iTerm2 sometimes pins a window's minimum size at its current grid: every
 -- smaller setFrame or edge drag snaps back while growing still works. Setting
@@ -128,12 +128,13 @@ local function toggleFill()
 end
 
 -- Hyper+j gathers every iTerm2 window onto the focused window's screen and
--- lays them out as a staircase: the
--- frontmost window bottom-left at full width, each one behind it a title bar
--- higher and LADDER_STEP_X further right, the backmost flush with the top.
--- Every title bar is fully visible in that stacking order, and whatever
--- window you click to the front, each window below it keeps a
--- LADDER_STEP_X-wide strip of title bar uncovered.
+-- lays them out as a staircase, ordered by tab count: the window with the
+-- most tabs bottom-left at full width, each one after it a title bar
+-- higher and LADDER_STEP_X further right, the fewest-tabs window flush with
+-- the top. Ties keep their current front-to-back order. The windows are
+-- stacked in ladder order and then the window you were in is focused, so
+-- every window below it keeps a LADDER_STEP_X-wide strip of title bar
+-- uncovered.
 local LADDER_APP = "iTerm2"
 local LADDER_STEP_Y = 32   -- iTerm2 title bar height (its tab bar starts 31px down, measured)
 local LADDER_STEP_X = 120  -- wider than the traffic lights (~70px), so the strip has room to click
@@ -148,6 +149,35 @@ local function ladderFrame(sf, n, rank)
   }
 end
 
+-- iTerm2's AppleScript window id is the same number as hs.window:id().
+-- "count of tabs of every window" sums across windows, hence the loop.
+local function itermTabCounts()
+  local ok, rows = hs.osascript.applescript([[tell application "iTerm2"
+    set out to {}
+    repeat with w in windows
+      set end of out to {id of w, count of tabs of w}
+    end repeat
+    return out
+  end tell]])
+  local counts = {}
+  for _, row in ipairs(ok and rows or {}) do counts[row[1]] = row[2] end
+  return counts
+end
+
+-- Most tabs first; ties (and every window, if the AppleScript call failed)
+-- keep the given front-to-back order.
+local function byTabCount(wins, counts)
+  local zorder = {}
+  for i, win in ipairs(wins) do zorder[win:id()] = i end
+  local sorted = hs.fnutils.copy(wins)
+  table.sort(sorted, function(a, b)
+    local ca, cb = counts[a:id()] or 0, counts[b:id()] or 0
+    if ca ~= cb then return ca > cb end
+    return zorder[a:id()] < zorder[b:id()]
+  end)
+  return sorted
+end
+
 local function ladderWindows()
   local focused = hs.window.focusedWindow()
   local screen = focused and focused:screen() or hs.screen.mainScreen()
@@ -156,6 +186,7 @@ local function ladderWindows()
     return win:isStandard() and app ~= nil and app:name() == LADDER_APP
   end)
   if #wins == 0 then return end
+  wins = byTabCount(wins, itermTabCounts())
 
   local sf = screen:frame()
   local prev = hs.window.setFrameCorrectness
@@ -166,7 +197,10 @@ local function ladderWindows()
   hs.window.setFrameCorrectness = prev
 
   for i = #wins, 1, -1 do wins[i]:raise() end
-  wins[1]:focus()
+  local stayIn = hs.fnutils.find(wins, function(win)
+    return focused ~= nil and win:id() == focused:id()
+  end)
+  ;(stayIn or wins[1]):focus()
 end
 
 -- Forward-declared so the Hyper+H binding below can call it; the actual
