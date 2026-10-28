@@ -223,6 +223,7 @@ link gitignore        git/ignore       ~/.config/git/ignore
 link secrets          secrets/secrets.yaml ~/.config/sops/secrets.yaml
 link hammerspoon      hammerspoon      ~/.hammerspoon
 link finicky          finicky/finicky.ts ~/.finicky.ts
+link librewolf        librewolf/librewolf.overrides.cfg ~/.librewolf/librewolf.overrides.cfg
 # The mounts: list in here is a security control, not a preference — see AGENTS.md.
 link colima           colima/colima.yaml ~/.colima/default/colima.yaml
 # Standalone helper scripts. ~/.local/bin is already on PATH from .zshrc.
