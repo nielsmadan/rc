@@ -319,6 +319,12 @@ local function fill(sf)
   return { x = sf.x, y = sf.y, w = sf.w, h = sf.h }
 end
 
+-- One step of the Hyper+j staircase, for homing a fixed set of windows into
+-- a ladder: rank 1 of n is bottom-left at full width, rank n flush with the top.
+local function ladder(n, rank)
+  return function(sf) return ladderFrame(sf, n, rank) end
+end
+
 -- Load ~/.hammerspoon/local.lua for per-machine MAIN_SCREEN_NAME,
 -- APP_PLACEMENTS and WINDOW_RULES. Missing file = empty config, no
 -- auto-placement (modal still works). See local.lua.example for the API.
@@ -350,6 +356,7 @@ local localCfg = loadLocalConfig({
   leftHalf           = leftHalf,
   rightHalf          = rightHalf,
   fill               = fill,
+  ladder             = ladder,
 })
 
 local MAIN_SCREEN_NAME = localCfg.main_screen     or ""

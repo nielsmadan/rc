@@ -6,8 +6,8 @@
 -- placement functions exposed by init.lua) and returns a config table
 -- consumed by hammerspoon/init.lua.
 --
--- Helpers provided in `h` — each a function(sf) → frame, except leftDock
--- and rightOf (factories). Convention: "vertical" = stacked rows,
+-- Helpers provided in `h` — each a function(sf) → frame, except leftDock,
+-- rightOf and ladder (factories). Convention: "vertical" = stacked rows,
 -- "horizontal" = cols.
 --   h.centeredWithMargin                   — 10% margin all around
 --   h.leftDock(width)                      — returns function(sf); anchored left, full height
@@ -16,6 +16,7 @@
 --   h.topHalf / bottomHalf                 — full width, 1/2 height
 --   h.leftHalf / rightHalf                 — 1/2 width, full height
 --   h.fill                                 — fullscreen (fills the screen)
+--   h.ladder(n, rank)                      — returns function(sf); one step of the Hyper+j staircase, rank 1 bottom-left at full width
 --
 -- You can also write your own placement functions inline; each takes
 -- the target screen's frame `sf = {x, y, w, h}` (which already excludes
