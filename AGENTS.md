@@ -141,6 +141,8 @@ Weights land in `~/.cache/huggingface/hub/` (**not** managed by mise — mise in
 
 Tool ownership, upgrade commands, and the shell prompt bootstrap are in [docs/tooling.md](docs/tooling.md).
 
+**Default every tool to `latest`; a specific version pin needs its reason recorded** — a `#` comment on the pin's line where the file allows comments, otherwise in `docs/tooling.md`. Details there.
+
 ## Secrets management
 
 Dev API keys (e.g. `JINA_API_KEY`) live in `secrets/secrets.yaml` in this repo, encrypted with [SOPS](https://github.com/getsops/sops) using [age](https://github.com/FiloSottile/age) recipients. Each Mac has its own age identity at `~/.config/sops/age/keys.txt` (mode 600); the corresponding **public** keys are listed in `.sops.yaml` at the repo root. The encrypted file is safe to commit — that's the whole point.
