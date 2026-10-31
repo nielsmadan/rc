@@ -246,6 +246,8 @@ tailssh() {
   ssh -o "HostName=$tailscale_host" "$@"
 }
 
+alias studioadmin='ssh admin@studio'
+
 # Agent tooling (~/ac): PATH, the sandboxed claude/codex/opencode/pi wrappers,
 # and the SOPS_* paths below them. Sourced first so anything here can override
 # it — but do not redefine those four wrappers, or the sandbox stops applying.
