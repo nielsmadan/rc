@@ -238,15 +238,14 @@ tailssh() {
   local tailscale_host
   case "${1-}" in
     mini) tailscale_host=100.65.206.80 ;;
+    studio|studioadmin) tailscale_host=100.93.179.100 ;;
     *)
-      print -u2 'Usage: tailssh mini [command ...]'
+      print -u2 'Usage: tailssh mini|studio|studioadmin [command ...]'
       return 2
       ;;
   esac
   ssh -o "HostName=$tailscale_host" "$@"
 }
-
-alias studioadmin='ssh admin@studio'
 
 # Agent tooling (~/ac): PATH, the sandboxed claude/codex/opencode/pi wrappers,
 # and the SOPS_* paths below them. Sourced first so anything here can override
