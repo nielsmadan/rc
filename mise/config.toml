@@ -40,4 +40,7 @@ idiomatic_version_file_enable_tools = ["node"]
 [env]
 AGENT_DEVICE_IOS_TEAM_ID = "VED8HFWY84"
 AGENT_DEVICE_IOS_BUNDLE_ID = "com.nielsmadan.agentdevice.runner"
+# Both default to never reaping: agent-browser skips --cdp-attached browsers, agent-device keeps unclosed sessions
+AGENT_DEVICE_SESSION_IDLE_TIMEOUT_MS = "7200000"
+AGENT_BROWSER_IDLE_TIMEOUT_MS = "3600000"
 ANDROID_HOME = "{{env.HOME}}/Library/Android/sdk"
