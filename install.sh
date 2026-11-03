@@ -36,10 +36,40 @@ pending() {
   return 0
 }
 
+# Machine profile, written by bin/system-install on a Mac whose Homebrew and
+# mise tools belong to an admin account. Its skips apply on top of install.local.
+MACHINE_PROFILE=""
+{ read -r MACHINE_PROFILE < "${RC_PROFILE_FILE:-/etc/rc-profile}"; } 2>/dev/null || true
+PROFILE_SKIPS=()
+COLIMA_CONFIG=colima/colima.yaml
+case "$MACHINE_PROFILE" in
+  studio)
+    # Admin owns Homebrew and the system mise config there, the Studio has its
+    # own secrets store, and the GUI apps and the notes vault stay off it. Vim
+    # writes its plugins into ~/.vim, which would be the read-only checkout.
+    PROFILE_SKIPS=(homebrew brewfile syncthing mise secrets hammerspoon finicky librewolf wezterm obsidian-vimrc vimrc gvimrc vim githooks)
+    COLIMA_CONFIG=colima/colima.studio.yaml
+    ;;
+  "") ;;
+  *) echo "warn: unknown machine profile '$MACHINE_PROFILE' in /etc/rc-profile" ;;
+esac
+
+# A profile machine links from the checkout studio-deploy keeps in /opt/rc, which
+# is read-only for this user, so its per-machine files live in ~/.config/rc.
+LOCAL_DIR="$DOTFILES_DIR"
+if [ -n "$MACHINE_PROFILE" ]; then
+  DEPLOYED_DIR="${RC_DEPLOY_ROOT:-/opt}/rc"
+  if [ "$DOTFILES_DIR" != "$DEPLOYED_DIR" ]; then
+    echo "install.sh: the $MACHINE_PROFILE profile links from $DEPLOYED_DIR; run $DEPLOYED_DIR/install.sh" >&2
+    exit 2
+  fi
+  LOCAL_DIR="$HOME/.config/rc"
+fi
+
 # Per-machine skip list (gitignored). Each uncommented line is the alias of a
 # link target to leave alone on this machine. The file is generated at the end
 # of this script with every alias listed but commented out.
-SKIP_FILE="$DOTFILES_DIR/install.local"
+SKIP_FILE="$LOCAL_DIR/install.local"
 SKIP_KEYS=()
 if [ -f "$SKIP_FILE" ]; then
   while IFS= read -r line || [ -n "$line" ]; do
@@ -63,10 +93,18 @@ seen_key() {
 
 is_skipped() {
   local k
-  for k in "${SKIP_KEYS[@]}"; do
+  for k in "${SKIP_KEYS[@]}" "${PROFILE_SKIPS[@]}"; do
     [ "$k" = "$1" ] && return 0
   done
   return 1
+}
+
+skip_source() {
+  local k
+  for k in "${SKIP_KEYS[@]}"; do
+    [ "$k" = "$1" ] && { echo "install.local"; return; }
+  done
+  echo "the $MACHINE_PROFILE profile"
 }
 
 link() {
@@ -88,7 +126,7 @@ link() {
         echo "detach $dest (copied, now machine-local)"
       fi
     fi
-    say "skip $dest ($alias in install.local)"
+    say "skip $dest ($alias in $(skip_source "$alias"))"
     return
   fi
 
@@ -117,7 +155,9 @@ link() {
 }
 
 # Install vim-plug if not present
-if [ ! -f "$DOTFILES_DIR/.vim/autoload/plug.vim" ]; then
+if is_skipped vim; then
+  say "skip vim-plug (vim in $(skip_source vim))"
+elif [ ! -f "$DOTFILES_DIR/.vim/autoload/plug.vim" ]; then
   if pending "install vim-plug"; then
     curl -fLo "$DOTFILES_DIR/.vim/autoload/plug.vim" --create-dirs \
       https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
@@ -165,7 +205,10 @@ fi
 if ! command -v brew >/dev/null 2>&1 && [ -x /opt/homebrew/bin/brew ]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
-if command -v brew >/dev/null 2>&1; then
+seen_key homebrew
+if is_skipped homebrew; then
+  say "skip homebrew (homebrew in $(skip_source homebrew))"
+elif command -v brew >/dev/null 2>&1; then
   say "skip homebrew (already installed)"
 elif [ "$CHECK" = 0 ] && [ ! -t 0 ]; then
   say "skip homebrew (not installed; re-run install.sh from a terminal)"
@@ -179,7 +222,7 @@ fi
 # are update-tools' job. A failed package warns rather than aborting the run.
 seen_key brewfile
 if is_skipped brewfile; then
-  say "skip Brewfile (brewfile in install.local)"
+  say "skip Brewfile (brewfile in $(skip_source brewfile))"
 elif ! command -v brew >/dev/null 2>&1; then
   say "skip Brewfile (brew not on PATH)"
 elif HOMEBREW_NO_AUTO_UPDATE=1 brew bundle check --no-upgrade --file="$DOTFILES_DIR/Brewfile" >/dev/null 2>&1; then
@@ -195,7 +238,10 @@ fi
 # Install Syncthing (menu-bar app) if not present. It's the login daemon that
 # syncs the KeePass vaults in ~/syncthing/; pairing/folder setup stays manual.
 # Cask, not mise — it's a long-lived daemon, not a per-shell dev tool.
-if [ ! -d "/Applications/Syncthing.app" ]; then
+seen_key syncthing
+if is_skipped syncthing; then
+  say "skip syncthing (syncthing in $(skip_source syncthing))"
+elif [ ! -d "/Applications/Syncthing.app" ]; then
   if command -v brew >/dev/null 2>&1; then
     if pending "brew install --cask syncthing"; then
       brew install --cask syncthing
@@ -225,7 +271,11 @@ link hammerspoon      hammerspoon      ~/.hammerspoon
 link finicky          finicky/finicky.ts ~/.finicky.ts
 link librewolf        librewolf/librewolf.overrides.cfg ~/.librewolf/librewolf.overrides.cfg
 # The mounts: list in here is a security control, not a preference — see AGENTS.md.
-link colima           colima/colima.yaml ~/.colima/default/colima.yaml
+link colima           "$COLIMA_CONFIG" ~/.colima/default/colima.yaml
+# The shared user's deploy command, on a machine whose repos studio-deploy keeps in /opt.
+if [ -n "$MACHINE_PROFILE" ]; then
+  link studio-deploy  bin/studio-deploy ~/.local/bin/studio-deploy
+fi
 # Standalone helper scripts. ~/.local/bin is already on PATH from .zshrc.
 link yt-transcript    bin/yt-transcript ~/.local/bin/yt-transcript
 link video-frames     bin/video-frames  ~/.local/bin/video-frames
@@ -282,27 +332,29 @@ link hidutil launchd/com.nielsmadan.hidutil-capslock-to-f18.plist \
 # Per-machine hidutil remaps (gitignored). Empty stub if missing (so other
 # machines apply only the universal remap), symlinked to a fixed location the
 # LaunchAgent sources by absolute path. Customize from hidutil.local.sh.example.
-if [ ! -f "$DOTFILES_DIR/launchd/hidutil.local.sh" ]; then
-  if pending "create launchd/hidutil.local.sh"; then
-    cat > "$DOTFILES_DIR/launchd/hidutil.local.sh" <<'EOF'
+HIDUTIL_LOCAL="$LOCAL_DIR/launchd/hidutil.local.sh"
+if [ ! -f "$HIDUTIL_LOCAL" ]; then
+  if pending "create $HIDUTIL_LOCAL"; then
+    mkdir -p "$(dirname "$HIDUTIL_LOCAL")"
+    cat > "$HIDUTIL_LOCAL" <<'EOF'
 # Per-machine hidutil remaps (gitignored). Sourced AFTER the universal
 # Caps Lock -> F18 remap, by the LaunchAgent at login and by install.sh.
 # Add hidutil commands here for remaps specific to THIS machine.
 # See hidutil.local.sh.example for the format.
 EOF
-    echo "created launchd/hidutil.local.sh"
+    echo "created $HIDUTIL_LOCAL"
   fi
 else
-  say "skip launchd/hidutil.local.sh (already exists)"
+  say "skip $HIDUTIL_LOCAL (already exists)"
 fi
 
 HIDUTIL_LOCAL_LINK="$HOME/.config/hidutil/local.sh"
-if [ "$(readlink "$HIDUTIL_LOCAL_LINK" 2>/dev/null)" = "$DOTFILES_DIR/launchd/hidutil.local.sh" ]; then
+if [ "$(readlink "$HIDUTIL_LOCAL_LINK" 2>/dev/null)" = "$HIDUTIL_LOCAL" ]; then
   say "skip $HIDUTIL_LOCAL_LINK (already linked)"
-elif pending "link $HIDUTIL_LOCAL_LINK -> launchd/hidutil.local.sh"; then
+elif pending "link $HIDUTIL_LOCAL_LINK -> $HIDUTIL_LOCAL"; then
   mkdir -p "$HOME/.config/hidutil"
-  ln -sfn "$DOTFILES_DIR/launchd/hidutil.local.sh" "$HIDUTIL_LOCAL_LINK"
-  echo "link $HIDUTIL_LOCAL_LINK -> $DOTFILES_DIR/launchd/hidutil.local.sh"
+  ln -sfn "$HIDUTIL_LOCAL" "$HIDUTIL_LOCAL_LINK"
+  echo "link $HIDUTIL_LOCAL_LINK -> $HIDUTIL_LOCAL"
 fi
 
 # Re-applied unconditionally (hidutil's UserKeyMapping is session-scoped, so
@@ -337,7 +389,9 @@ fi
 # Obsidian vimrc. The only interactive step — gated on a tty (and off under
 # --check) so hooks and other non-interactive runs don't die on EOF here.
 seen_key obsidian-vimrc
-if [ "$CHECK" = 1 ] || [ ! -t 0 ]; then
+if is_skipped obsidian-vimrc; then
+  say "skip obsidian vimrc (obsidian-vimrc in $(skip_source obsidian-vimrc))"
+elif [ "$CHECK" = 1 ] || [ ! -t 0 ]; then
   say "skip obsidian vimrc (non-interactive run)"
 else
   read -p "Obsidian vault path (leave empty to skip): " obsidian_vault
@@ -367,7 +421,11 @@ fi
 # any Mac that already decrypts, then `sops updatekeys` re-wraps).
 if [ ! -f "$HOME/.config/sops/age/keys.txt" ]; then
   if ! command -v age-keygen >/dev/null 2>&1; then
-    echo "sops: age-keygen not on PATH — run \`mise install\` then re-run install.sh"
+    if [ -n "$MACHINE_PROFILE" ]; then
+      echo "sops: age-keygen not on PATH — have admin run bin/system-install, then re-run install.sh"
+    else
+      echo "sops: age-keygen not on PATH — run \`mise install\` then re-run install.sh"
+    fi
   elif pending "generate a sops age identity at ~/.config/sops/age/keys.txt"; then
     mkdir -p "$HOME/.config/sops/age"
     age-keygen -o "$HOME/.config/sops/age/keys.txt"
@@ -384,7 +442,9 @@ fi
 # Per-machine Hammerspoon config (gitignored). Stub returns empty config
 # so init.lua's loadfile/return-function check passes — no auto-placement
 # until customized. See hammerspoon/local.lua.example for the full API.
-if [ ! -f "$DOTFILES_DIR/hammerspoon/local.lua" ]; then
+if is_skipped hammerspoon; then
+  :
+elif [ ! -f "$DOTFILES_DIR/hammerspoon/local.lua" ]; then
   if pending "create hammerspoon/local.lua"; then
     cat > "$DOTFILES_DIR/hammerspoon/local.lua" <<'EOF'
 -- Per-machine Hammerspoon config. See local.lua.example for the API.
@@ -405,7 +465,9 @@ fi
 # Per-machine Finicky container routing (gitignored). finicky.ts imports LOCAL
 # from here; an empty stub keeps the import valid on a fresh machine (no
 # container routing until customized). See finicky/finicky.local.ts.example.
-if [ ! -f "$DOTFILES_DIR/finicky/finicky.local.ts" ]; then
+if is_skipped finicky; then
+  :
+elif [ ! -f "$DOTFILES_DIR/finicky/finicky.local.ts" ]; then
   if pending "create finicky/finicky.local.ts"; then
     cat > "$DOTFILES_DIR/finicky/finicky.local.ts" <<'EOF'
 // finicky.local.ts — GITIGNORED per-machine container routing. Imported by
@@ -433,7 +495,7 @@ if git -C "$DOTFILES_DIR" rev-parse --git-dir >/dev/null 2>&1; then
         echo "unset core.hooksPath"
       fi
     fi
-    say "skip githooks (githooks in install.local)"
+    say "skip githooks (githooks in $(skip_source githooks))"
   elif [ "$CURRENT_HOOKS" = "$HOOKS_DIR" ]; then
     say "skip core.hooksPath (already set)"
   elif pending "set core.hooksPath -> $HOOKS_DIR"; then
@@ -453,7 +515,8 @@ fi
 # left every existing machine's file silently stale — you cannot skip a target
 # you cannot see.
 if [ ! -f "$SKIP_FILE" ]; then
-  if pending "create install.local"; then
+  if pending "create $SKIP_FILE"; then
+    mkdir -p "$(dirname "$SKIP_FILE")"
     {
       echo "# install.local — per-machine install.sh skip list (gitignored)."
       echo "#"
@@ -467,7 +530,7 @@ if [ ! -f "$SKIP_FILE" ]; then
         echo "# $k"
       done
     } > "$SKIP_FILE"
-    echo "created install.local"
+    echo "created $SKIP_FILE"
   fi
 else
   MISSING_KEYS=()

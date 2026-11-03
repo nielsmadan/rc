@@ -1,3 +1,6 @@
+# /etc/rc-profile names an admin-managed machine (bin/system-install); empty elsewhere.
+studio = (File.read("/etc/rc-profile").strip rescue "") == "studio"
+
 brew "neovim"
 brew "gnupg"
 brew "pinentry"
@@ -35,26 +38,42 @@ brew "swiftlint"
 brew "xcode-build-server"
 
 brew "ffmpeg"
-brew "imagemagick"
 brew "poppler"
-brew "potrace"
-brew "typst"
+
+unless studio
+  brew "imagemagick"
+  brew "potrace"
+  brew "typst"
+end
 
 brew "perl"
 brew "pkgconf"
 brew "redis"
 
-cask "audacity"
-cask "codexbar"
-cask "finicky"
-cask "gcloud-cli"
-cask "hammerspoon"
-cask "keepassxc"
-cask "librewolf"
-cask "maccy"
-cask "neovide-app"
-cask "stats"
-cask "swiftformat-for-xcode"
-cask "ungoogled-chromium"
-cask "wezterm"
-cask "nielsmadan/tap/juggler", trusted: true
+unless studio
+  cask "audacity"
+  cask "codexbar"
+  cask "finicky"
+  cask "gcloud-cli"
+  cask "hammerspoon"
+  cask "keepassxc"
+  cask "librewolf"
+  cask "maccy"
+  cask "neovide-app"
+  cask "stats"
+  cask "swiftformat-for-xcode"
+  cask "ungoogled-chromium"
+  cask "wezterm"
+  cask "nielsmadan/tap/juggler", trusted: true
+end
+
+# The Studio's tools that the MacBook gets elsewhere: mise and uv from their own
+# installers, git from Xcode's command line tools.
+if studio
+  brew "mise"
+  brew "uv"
+  brew "git"
+  brew "context7-mcp"
+  brew "et"
+  brew "mosh"
+end

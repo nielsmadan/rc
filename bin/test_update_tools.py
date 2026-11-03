@@ -44,6 +44,7 @@ class UpdateToolsTests(unittest.TestCase):
             "PATH": str(self.bin),
             "UPDATE_TEST_LOG": str(self.log),
             "UPDATE_TEST_TOOLS": json.dumps(TOOLS),
+            "RC_PROFILE_FILE": str(root / "rc-profile"),
         }
         (self.bin / "python3").symlink_to(sys.executable)
         for name in ("mise", "brew", "uv", "pipx", "agent-browser"):
@@ -86,6 +87,13 @@ class UpdateToolsTests(unittest.TestCase):
         self.assertIn(["mise", "exec", "--", "pipx", "upgrade-all"], commands)
         self.assertIn(["mise", "exec", "--", "agent-browser", "install"], commands)
         self.assertEqual({r["cwd"] for r in records}, {str(Path.home().resolve())})
+
+    def test_machine_profile_updates_only_agent_browser_chrome(self):
+        Path(self.env["RC_PROFILE_FILE"]).write_text("studio\n")
+        result, records = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([r["command"] for r in records], [["agent-browser", "install"]])
+        self.assertIn("skip Homebrew (the studio profile", result.stdout)
 
     def test_runtime_bump_keeps_vault_pin(self):
         result, records = self.run_script("--bump-runtimes")

@@ -21,6 +21,9 @@ agent-browser's Chrome download. Missing package managers are skipped.
 CLI version pins are advanced and saved by mise. Runtime versions/ranges
 are respected unless --bump-runtimes is given. Vault's pin is always kept.
 Homebrew updates include GUI apps with their own updaters.
+On a machine with a profile in /etc/rc-profile, such as the Mac Studio, admin
+owns mise's tools, Homebrew, uv and pipx and updates them with
+`bin/system-install --upgrade`; this updates only agent-browser's Chrome.
 macOS, App Store apps, project dependencies, and git checkouts are excluded.
 Failures are collected; other updates continue. Exit 1 if any step fails.
 EOF
@@ -56,8 +59,16 @@ run() {
 
 HAS_BROWSER=0
 HAS_PIPX=0
+MACHINE_PROFILE=""
+{ read -r MACHINE_PROFILE < "${RC_PROFILE_FILE:-/etc/rc-profile}"; } 2>/dev/null || true
 
-if command -v mise >/dev/null 2>&1; then
+skip_admin_owned() {
+  printf 'skip %s (the %s profile: admin runs bin/system-install --upgrade)\n' "$1" "$MACHINE_PROFILE"
+}
+
+if [ -n "$MACHINE_PROFILE" ]; then
+  skip_admin_owned mise
+elif command -v mise >/dev/null 2>&1; then
   run mise self-update --yes
   CLI_TOOLS=()
   RUNTIME_TOOLS=()
@@ -99,7 +110,9 @@ else
   printf 'skip mise (not installed)\n'
 fi
 
-if command -v brew >/dev/null 2>&1; then
+if [ -n "$MACHINE_PROFILE" ]; then
+  skip_admin_owned Homebrew
+elif command -v brew >/dev/null 2>&1; then
   if run brew update; then
     run brew upgrade --formula
     run brew upgrade --cask --greedy
@@ -108,14 +121,18 @@ else
   printf 'skip Homebrew (not installed)\n'
 fi
 
-if command -v uv >/dev/null 2>&1; then
+if [ -n "$MACHINE_PROFILE" ]; then
+  skip_admin_owned uv
+elif command -v uv >/dev/null 2>&1; then
   run uv self update
   run uv tool upgrade --all
 else
   printf 'skip uv (not installed)\n'
 fi
 
-if [ "$HAS_PIPX" = 1 ]; then
+if [ -n "$MACHINE_PROFILE" ]; then
+  skip_admin_owned pipx
+elif [ "$HAS_PIPX" = 1 ]; then
   run mise exec -- pipx upgrade-all
 elif command -v pipx >/dev/null 2>&1; then
   run pipx upgrade-all

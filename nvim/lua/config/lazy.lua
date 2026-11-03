@@ -29,8 +29,14 @@ require("/config/opt")
 require("/config/cmd")
 require("/config/diff")
 
+-- The lockfile lives beside this config, unless that is a read-only checkout (/opt/rc on the Studio).
+local config_dir = vim.fn.stdpath("config")
+local lockfile = vim.fn.filewritable(config_dir) == 2 and config_dir .. "/lazy-lock.json"
+  or vim.fn.stdpath("state") .. "/lazy-lock.json"
+
 -- Setup lazy.nvim
 require("lazy").setup({
+  lockfile = lockfile,
   spec = {
     -- import your plugins
     { import = "plugins" },

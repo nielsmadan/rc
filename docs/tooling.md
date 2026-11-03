@@ -1,6 +1,6 @@
 # Tooling and shell prompt
 
-`mise/config.toml` (symlinked to `~/.config/mise/config.toml`) declares the global tools. `mise activate` is hooked in `.zshrc`.
+`mise/config.toml` (symlinked to `~/.config/mise/config.toml`) declares the global tools. `mise activate` is hooked in `.zshrc`. On the Mac Studio the same file is mise's system config instead, installed by admin; see Machine profiles in `AGENTS.md`.
 
 **Version pins need a recorded reason.** Every tool defaults to `latest`. Pin a specific version only when something breaks without it, and record why: a `#` comment on the pin's line in files that allow comments (`mise/config.toml`, `Brewfile`, shell), otherwise a line in this doc. A pin with no recorded reason gets unpinned. The language runtimes (node/ruby/python/rust/java/go) are pinned so project builds stay put — `update-tools` only moves them with `--bump-runtimes` — and each still needs its reason noted when it is next touched.
 
@@ -8,7 +8,7 @@ Global npm CLIs are managed through mise's `npm:` backend (`npm:wrangler`, `npm:
 
 **mise vs brew.** Default to **mise** for standalone dev CLIs and language-ecosystem tools — declared in `mise/config.toml` and auto-replicated across machines. Use **brew** for GUI casks (`.app`s like Finicky), long-running daemons/services, C libraries, and tools needing a launchd unit or absolute path. When moving a tool brew→mise, `brew uninstall` it first so the mise shim wins on `PATH`.
 
-**Brewfile.** Everything brew-managed is declared in `Brewfile` at the repo root; `install.sh` installs Homebrew itself when missing (interactive runs only — its installer prompts for sudo), then runs `brew bundle install --no-upgrade` whenever `brew bundle check` reports something missing. When you `brew install` something worth keeping, add it there; when you uninstall something, remove its line, or the next `install.sh` reinstalls it. List the tools you use directly, even when another package already pulls them in (`neovim` is a dependency of the Neovide cask), so they survive that package going away. Skip it per machine with `brewfile` in `install.local`. Syncthing keeps its own `install.sh` step, since it may be installed outside brew.
+**Brewfile.** Everything brew-managed is declared in `Brewfile` at the repo root; `install.sh` installs Homebrew itself when missing (interactive runs only — its installer prompts for sudo), then runs `brew bundle install --no-upgrade` whenever `brew bundle check` reports something missing. When you `brew install` something worth keeping, add it there; when you uninstall something, remove its line, or the next `install.sh` reinstalls it. List the tools you use directly, even when another package already pulls them in (`neovim` is a dependency of the Neovide cask), so they survive that package going away. Skip it per machine with `brewfile` in `install.local`; on the Studio the `studio` checks inside the Brewfile pick the entries, and admin installs it. Syncthing keeps its own `install.sh` step, since it may be installed outside brew.
 
 **Vault via mise/aqua:** install with an explicit pin (`aqua:hashicorp/vault@<version>`), **not** `@latest` — aqua's resolver picks bad tags (e.g. `2.0.1` has no darwin build and 404s). Pinning also sidesteps the BSL-relicense tap churn.
 

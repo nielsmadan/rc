@@ -1,0 +1,56 @@
+#!/bin/bash
+set -uo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: studio-deploy <repo> [<ref>]
+       studio-deploy --rollback <repo>
+       studio-deploy --status [<repo>]
+
+Deploys rc or ac on the Mac Studio, run as the shared user. The checkout at
+/opt/<repo> happens as the deploy user (bin/studio-checkout, through sudo);
+then this re-renders, as you, what reads it:
+  ac  /opt/ac/sync.sh --profile studio, then /opt/ac/bin/fleet-sync
+  rc  /opt/rc/install.sh
+
+<ref> defaults to origin/main, and only a commit on origin/main is accepted.
+--rollback goes back to the commit the last deploy replaced, and re-renders.
+EOF
+}
+
+ROOT="${RC_DEPLOY_ROOT:-/opt}"
+
+rebuild() {
+  local failed=0
+  case "$1" in
+    ac)
+      "$ROOT/ac/sync.sh" --profile studio || failed=1
+      "$ROOT/ac/bin/fleet-sync" || failed=1
+      ;;
+    rc) "$ROOT/rc/install.sh" || failed=1 ;;
+  esac
+  [ "$failed" = 0 ] || echo "studio-deploy: $1 is checked out, but re-rendering failed; fix it and re-run studio-deploy $1" >&2
+  return "$failed"
+}
+
+main() {
+  local repo
+  case "${1:-}" in
+    -h|--help) usage; return 0 ;;
+    --status) ;;
+    --rollback) [ $# -eq 2 ] || { usage >&2; return 2; }; repo="$2" ;;
+    ""|-*) usage >&2; return 2 ;;
+    *) [ $# -le 2 ] || { usage >&2; return 2; }; repo="$1" ;;
+  esac
+  if [ "$(id -un)" = deploy ] || [ "$(id -u)" = 0 ]; then
+    echo "studio-deploy: run this as the shared user; it re-renders that user's config" >&2
+    return 2
+  fi
+  sudo -n -u deploy "$ROOT/rc/bin/studio-checkout" "$@" || return
+  [ -n "${repo:-}" ] || return 0
+  rebuild "$repo"
+}
+
+# The checkout may replace this file while it runs; bash has parsed main by now.
+main "$@"
+exit $?

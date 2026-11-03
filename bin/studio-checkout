@@ -1,0 +1,114 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: studio-checkout <repo> [<ref>]
+       studio-checkout --rollback <repo>
+       studio-checkout --status [<repo>]
+
+The deploy user's half of bin/studio-deploy: puts a pinned checkout of <repo>
+(rc or ac) at /opt/<repo>, which is what the Mac Studio runs. It is the only
+command the shared user may run as deploy (/etc/sudoers.d/studio-deploy); run
+studio-deploy instead, which also re-renders what reads the checkout.
+
+<ref> defaults to origin/main, and only a commit on origin/main is accepted.
+Each checkout records the commit it replaced; --rollback goes back to it.
+EOF
+}
+
+ROOT="${RC_DEPLOY_ROOT:-/opt}"
+ORIGIN_BASE="${STUDIO_DEPLOY_ORIGIN_BASE:-https://github.com/nielsmadan}"
+# The caller's git config and HOME belong to the shared user, whom agents can edit.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0
+umask 022
+
+origin_url() {
+  case "$1" in
+    rc) echo "$ORIGIN_BASE/rc.git" ;;
+    ac) echo "$ORIGIN_BASE/agentic-coding.git" ;;
+    *) return 1 ;;
+  esac
+}
+
+die() { printf 'studio-checkout: %s\n' "$*" >&2; exit 1; }
+
+repo_dir() {
+  origin_url "$1" >/dev/null || die "unknown repo '$1' (known: rc, ac)"
+  echo "$ROOT/$1"
+}
+
+record() { echo "$1/.git/studio-deploy-previous"; }
+
+fetch() {
+  local dir="$1" url="$2"
+  if [ ! -d "$dir/.git" ]; then
+    [ -d "$dir" ] || die "$dir does not exist; admin creates it with bin/system-install"
+    git -C "$dir" init --quiet
+    git -C "$dir" remote add origin "$url"
+  fi
+  git -C "$dir" fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
+}
+
+switch_to() {
+  local dir="$1" commit="$2" previous
+  previous="$(git -C "$dir" rev-parse --verify --quiet HEAD || true)"
+  if [ "$previous" = "$commit" ]; then
+    echo "$dir already at $(git -C "$dir" log -1 --format='%h %s' "$commit")"
+    return
+  fi
+  git -C "$dir" checkout --quiet --force --detach "$commit"
+  git -C "$dir" clean --quiet -ffdx
+  [ -n "$previous" ] && echo "$previous" > "$(record "$dir")"
+  printf '%s %s %s -> %s\n' "$(date -u +%FT%TZ)" "${SUDO_USER:-$(id -un)}" "${previous:-none}" "$commit" \
+    >> "$dir/.git/studio-deploy.log"
+  echo "$dir now at $(git -C "$dir" log -1 --format='%h %s' "$commit") (was ${previous:-nothing})"
+}
+
+on_main() {
+  git -C "$1" merge-base --is-ancestor "$2" refs/remotes/origin/main
+}
+
+deploy() {
+  local repo="$1" ref="${2:-origin/main}" dir commit
+  case "$ref" in
+    -*|*..*) die "invalid ref '$ref'" ;;
+  esac
+  [[ "$ref" =~ ^[A-Za-z0-9._/-]+$ ]] || die "invalid ref '$ref'"
+  dir="$(repo_dir "$repo")"
+  fetch "$dir" "$(origin_url "$repo")"
+  commit="$(git -C "$dir" rev-parse --verify --quiet "$ref^{commit}")" || die "no commit '$ref' in $repo"
+  on_main "$dir" "$commit" || die "$ref ($commit) is not on origin/main; only commits on main are deployed"
+  switch_to "$dir" "$commit"
+}
+
+rollback() {
+  local dir previous
+  dir="$(repo_dir "$1")"
+  [ -f "$(record "$dir")" ] || die "no earlier deploy of $1 recorded"
+  previous="$(cat "$(record "$dir")")"
+  on_main "$dir" "$previous" || die "$previous is no longer on origin/main"
+  switch_to "$dir" "$previous"
+}
+
+status() {
+  local repo dir
+  for repo in "$@"; do
+    dir="$(repo_dir "$repo")"
+    if [ -d "$dir/.git" ]; then
+      printf '%s: %s' "$repo" "$(git -C "$dir" log -1 --format='%h %s' HEAD)"
+      [ -f "$(record "$dir")" ] && printf ' (rollback to %s)' "$(cut -c1-7 "$(record "$dir")")"
+      echo
+    else
+      echo "$repo: not deployed"
+    fi
+  done
+}
+
+case "${1:-}" in
+  -h|--help) usage ;;
+  --rollback) [ $# -eq 2 ] || { usage >&2; exit 2; }; rollback "$2" ;;
+  --status) shift; if [ $# -gt 0 ]; then status "$@"; else status rc ac; fi ;;
+  ""|-*) usage >&2; exit 2 ;;
+  *) [ $# -le 2 ] || { usage >&2; exit 2; }; deploy "$@" ;;
+esac

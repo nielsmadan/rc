@@ -1,0 +1,213 @@
+#!/bin/bash
+set -uo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PROFILE_FILE="${RC_PROFILE_FILE:-/etc/rc-profile}"
+DEPLOY_ROOT="${RC_DEPLOY_ROOT:-/opt}"
+DEPLOYED_RC="$DEPLOY_ROOT/rc"
+DEPLOY_USER=deploy
+SHARED_USER="${STUDIO_SHARED_USER:-nielsmadan}"
+DEPLOYED_REPOS=(rc ac)
+SUDOERS_FILE=/etc/sudoers.d/studio-deploy
+KNOWN_PROFILES=(studio)
+
+CHECK=0
+UPGRADE=0
+NEW_PROFILE=""
+
+usage() {
+  cat <<'EOF'
+usage: system-install [--check] [--upgrade] [--profile NAME]
+
+Sets up a Mac whose Homebrew belongs to an admin account, such as the Mac
+Studio. Run it as that admin: the first time from any clone of this repo, after
+that as /opt/rc/bin/system-install.
+
+  --profile NAME  record the machine profile in /etc/rc-profile (first run)
+  --upgrade       also upgrade Homebrew formulae and reinstall the mise tools
+  --check         print what would change without changing anything
+
+It creates the hidden deploy user, gives it /opt/rc and /opt/ac, and lets the
+shared user run bin/studio-checkout as deploy and nothing else. On the first run
+it checks out both repos from origin/main; later deploys are the shared user's
+studio-deploy, which also re-renders their config.
+Then it links /opt/rc/mise/config.toml to /etc/mise/config.toml and the
+profile's mise/<profile>.toml into /etc/mise/conf.d/, installs /opt/rc's
+Brewfile, and runs `mise install --system` and `mise reshim --system`.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check) CHECK=1 ;;
+    --upgrade) UPGRADE=1 ;;
+    --profile) NEW_PROFILE="${2:-}"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) printf 'unknown option: %s\n' "$1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+FAILURES=()
+
+run() {
+  printf '\n+'
+  printf ' %q' "$@"
+  printf '\n'
+  [ "$CHECK" = 1 ] && return 0
+  if "$@"; then
+    return 0
+  fi
+  local status=$?
+  printf 'FAILED (%s): %s\n' "$status" "$*" >&2
+  FAILURES+=("$*")
+  return "$status"
+}
+
+sudo_link() {
+  local src="$1" dest="$2"
+  if [ "$(readlink "$dest" 2>/dev/null)" = "$src" ]; then
+    printf 'skip %s (already linked)\n' "$dest"
+    return
+  fi
+  run sudo mkdir -p "$(dirname "$dest")" && run sudo ln -sfn "$src" "$dest"
+}
+
+free_service_uid() {
+  local used uid
+  used=" $(dscl . -list /Users UniqueID | awk '{print $2}' | tr '\n' ' ') "
+  for uid in $(seq 401 499); do
+    case "$used" in *" $uid "*) ;; *) echo "$uid"; return ;; esac
+  done
+  return 1
+}
+
+# A UID below 500 keeps it off the login window; no shell and no password keep
+# anyone from logging in as it.
+ensure_deploy_user() {
+  if dscl . -read "/Users/$DEPLOY_USER" UniqueID >/dev/null 2>&1; then
+    printf 'skip user %s (exists)\n' "$DEPLOY_USER"
+    return
+  fi
+  local uid
+  uid="$(free_service_uid)" || { FAILURES+=("no free UID for $DEPLOY_USER"); return 1; }
+  run sudo dscl . -create "/Users/$DEPLOY_USER" &&
+    run sudo dscl . -create "/Users/$DEPLOY_USER" UniqueID "$uid" &&
+    run sudo dscl . -create "/Users/$DEPLOY_USER" PrimaryGroupID 20 &&
+    run sudo dscl . -create "/Users/$DEPLOY_USER" UserShell /usr/bin/false &&
+    run sudo dscl . -create "/Users/$DEPLOY_USER" NFSHomeDirectory /var/empty &&
+    run sudo dscl . -create "/Users/$DEPLOY_USER" RealName "Studio deploy" &&
+    run sudo dscl . -create "/Users/$DEPLOY_USER" Password '*' &&
+    run sudo dscl . -create "/Users/$DEPLOY_USER" IsHidden 1
+}
+
+ensure_deploy_dirs() {
+  local repo dir
+  for repo in "${DEPLOYED_REPOS[@]}"; do
+    dir="$DEPLOY_ROOT/$repo"
+    if [ "$(stat -f %Su "$dir" 2>/dev/null)" = "$DEPLOY_USER" ]; then
+      printf 'skip %s (owned by %s)\n' "$dir" "$DEPLOY_USER"
+      continue
+    fi
+    run sudo install -d -o "$DEPLOY_USER" -g staff -m 755 "$dir"
+  done
+}
+
+ensure_sudoers_rule() {
+  local rule tmp
+  rule="$SHARED_USER ALL=($DEPLOY_USER) NOPASSWD: $DEPLOYED_RC/bin/studio-checkout"
+  if [ "$CHECK" = 0 ] && [ "$(sudo cat "$SUDOERS_FILE" 2>/dev/null)" = "$rule" ]; then
+    printf 'skip %s (up to date)\n' "$SUDOERS_FILE"
+    return
+  fi
+  printf '\n+ write %s: %s\n' "$SUDOERS_FILE" "$rule"
+  [ "$CHECK" = 1 ] && return
+  tmp="$(mktemp)"
+  printf '%s\n' "$rule" > "$tmp"
+  if visudo -cqf "$tmp"; then
+    run sudo install -o root -g wheel -m 440 "$tmp" "$SUDOERS_FILE"
+  else
+    FAILURES+=("$SUDOERS_FILE did not validate")
+  fi
+  rm -f "$tmp"
+}
+
+# The first run comes from a clone in admin's home, which deploy can't read, so
+# deploy runs a copy of studio-checkout.
+first_deploys() {
+  local repo script
+  script="$(mktemp /tmp/studio-checkout.XXXXXX)" || { FAILURES+=("copy studio-checkout"); return 1; }
+  cp "$DOTFILES_DIR/bin/studio-checkout" "$script" && chmod 755 "$script"
+  for repo in "${DEPLOYED_REPOS[@]}"; do
+    if [ -d "$DEPLOY_ROOT/$repo/.git" ]; then
+      printf 'skip %s (deployed; update with studio-deploy)\n' "$DEPLOY_ROOT/$repo"
+      continue
+    fi
+    run sudo -u "$DEPLOY_USER" "$script" "$repo"
+  done
+  rm -f "$script"
+}
+
+if ! command -v brew >/dev/null 2>&1 && [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+if ! command -v brew >/dev/null 2>&1; then
+  echo "system-install: Homebrew is not installed; install it as this admin user first" >&2
+  exit 1
+fi
+if [ ! -O "$(brew --prefix)" ]; then
+  echo "system-install: $(brew --prefix) belongs to $(stat -f %Su "$(brew --prefix)"), not $(id -un); run this as that user" >&2
+  exit 1
+fi
+
+PROFILE="$(cat "$PROFILE_FILE" 2>/dev/null || true)"
+if [ -n "$NEW_PROFILE" ]; then
+  case " ${KNOWN_PROFILES[*]} " in
+    *" $NEW_PROFILE "*) ;;
+    *) printf 'system-install: unknown profile %s (known: %s)\n' "$NEW_PROFILE" "${KNOWN_PROFILES[*]}" >&2; exit 2 ;;
+  esac
+  if [ "$PROFILE" != "$NEW_PROFILE" ]; then
+    printf '\n+ write %s to %s\n' "$NEW_PROFILE" "$PROFILE_FILE"
+    [ "$CHECK" = 1 ] || printf '%s\n' "$NEW_PROFILE" | sudo tee "$PROFILE_FILE" >/dev/null || FAILURES+=("write $PROFILE_FILE")
+  fi
+  PROFILE="$NEW_PROFILE"
+fi
+if [ -z "$PROFILE" ]; then
+  echo "system-install: no machine profile; pass --profile NAME on the first run" >&2
+  exit 2
+fi
+
+ensure_deploy_user
+ensure_deploy_dirs
+ensure_sudoers_rule
+first_deploys
+
+if [ "$CHECK" = 0 ] && [ ! -f "$DEPLOYED_RC/Brewfile" ]; then
+  echo "system-install: $DEPLOYED_RC is not deployed; fix the steps above and re-run" >&2
+  exit 1
+fi
+
+sudo_link "$DEPLOYED_RC/mise/config.toml" /etc/mise/config.toml
+sudo_link "$DEPLOYED_RC/mise/$PROFILE.toml" "/etc/mise/conf.d/$PROFILE.toml"
+
+if [ "$UPGRADE" = 1 ]; then
+  run brew update && run brew upgrade --formula
+fi
+run brew bundle install --no-upgrade --file="$DEPLOYED_RC/Brewfile"
+
+if command -v mise >/dev/null 2>&1 || [ "$CHECK" = 1 ]; then
+  run mise install --system
+  run mise reshim --system
+else
+  echo "FAILED: mise is not on PATH after brew bundle" >&2
+  FAILURES+=("mise not on PATH")
+fi
+
+if [ "${#FAILURES[@]}" -gt 0 ]; then
+  printf '\nFailed steps:\n' >&2
+  printf '  %s\n' "${FAILURES[@]}" >&2
+  exit 1
+fi
+printf '\nsystem-install: done (profile %s)\n' "$PROFILE"
+printf 'Then, as %s: %s/install.sh, %s/ac/sync.sh --profile studio, %s/ac/bin/fleet-sync\n' \
+  "$SHARED_USER" "$DEPLOYED_RC" "$DEPLOY_ROOT" "$DEPLOY_ROOT"

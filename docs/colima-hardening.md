@@ -20,6 +20,8 @@ mounts:
     writable: true
 ```
 
+**The Mac Studio links `colima/colima.studio.yaml` instead**, which mounts `~/fleet/work`, the agents' worktrees, in place of `~/wrksp`, and the same `/var/folders`; keep the two files identical apart from that one entry.
+
 **`~/wrksp`, not an absolute path** — this file is one symlink shared by two Macs with different homes (`/Users/nielsmadan` here, `/Users/nielsm` on the mini). Colima expands `~` per machine when it writes the lima config, so the absolute form silently mounted nothing on the other box. Verify the expansion landed with `grep -A4 '^mounts:' ~/.colima/_lima/colima/lima.yaml`.
 
 **This is the same control the Docker Desktop `filesharingDirectories` key used to provide, and it exists for the same reason.** Agents run inside a [nono](https://nono.sh) sandbox enforced by Seatbelt, but the container daemon is *outside* that boundary — so anything holding the socket can ask it to bind-mount a host path and write through it. Mounting `$HOME` would make `docker run -v /Users/nielsmadan:/h …` a one-line escape from every restriction, including the `~/.ssh` and `~/.zshrc` denies nono marks unremovable.

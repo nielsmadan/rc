@@ -1,0 +1,18 @@
+# The Mac Studio's changes to mise/config.toml. bin/system-install links this
+# into /etc/mise/conf.d/, next to the shared list in /etc/mise/config.toml.
+[settings]
+disable_tools = [
+  "github:nolabs-ai/nono",                 # agents run without a sandbox there
+  "npm:@earendil-works/pi-coding-agent",   # the deploy pins the harnesses
+  "terraform",
+  "kubectl",
+  "aqua:hashicorp/vault",
+  "railway",
+  "npm:wrangler",
+  "npm:firebase-tools",
+  "github:stripe/stripe-cli",
+]
+# Tools come only from admin's `mise install --system`, never from the shared user.
+auto_install = false
+exec_auto_install = false
+not_found_auto_install = false
