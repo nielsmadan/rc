@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nielsmadan.colima-watchdog</string>
+
+    <!-- Starts Colima at login and repairs a VM that says Running while docker is dead; see bin/colima-watchdog. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec "$HOME/.local/bin/colima-watchdog" run 2&gt;&gt;"$HOME/Library/Logs/colima-watchdog.log"</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart only on a crash; a clean exit means colima or docker is not installed. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- The VM's hostagent must outlive a reload of this job. -->
+    <key>AbandonProcessGroup</key>
+    <true/>
+</dict>
+</plist>

@@ -1,0 +1,163 @@
+#!/bin/sh
+#
+# colima-watchdog - keep the Colima VM up, judged by the docker socket.
+#
+# Usage:
+#   colima-watchdog run       # what the LaunchAgent runs: start at login, then watch
+#   colima-watchdog check     # print what the watchdog sees right now
+#
+# Run by launchd/com.nielsmadan.colima-watchdog.plist in place of
+# `brew services start colima`. Health is `docker version` against the
+# profile's socket, never Colima's own status: Lima keeps reporting Running
+# when the VZ VM has died (a logout kills it), so `colima list` cannot be
+# trusted to notice.
+#
+#   - At start (login): a Stopped VM is started.
+#   - Every interval after that: if Colima says Running (or Broken) but docker
+#     has not answered THRESHOLD checks in a row, the VM is repaired with
+#     `limactl stop --force` + `colima start`, at most once per COOLDOWN.
+#   - A VM that says Stopped after start is left alone, so `colima stop` sticks.
+#   - Nothing is done while another colima start/stop/restart is running.
+#
+# It never holds Colima in the foreground, so a manual `colima start` is fine.
+# Log: ~/Library/Logs/colima-watchdog.log. Repairs also raise a notification.
+#
+# Tunables (env): COLIMA_WATCHDOG_INTERVAL (30), COLIMA_WATCHDOG_THRESHOLD (3),
+# COLIMA_WATCHDOG_COOLDOWN (600), COLIMA_PROFILE (default).
+
+set -u
+
+PROFILE="${COLIMA_PROFILE:-default}"
+INTERVAL="${COLIMA_WATCHDOG_INTERVAL:-30}"
+THRESHOLD="${COLIMA_WATCHDOG_THRESHOLD:-3}"
+COOLDOWN="${COLIMA_WATCHDOG_COOLDOWN:-600}"
+TICKS="${COLIMA_WATCHDOG_TICKS:-0}"
+LOG="${COLIMA_WATCHDOG_LOG:-$HOME/Library/Logs/colima-watchdog.log}"
+SOCKET="${COLIMA_HOME:-$HOME/.colima}/$PROFILE/docker.sock"
+export LIMA_HOME="${COLIMA_HOME:-$HOME/.colima}/_lima"
+if [ "$PROFILE" = default ]; then INSTANCE=colima; else INSTANCE="colima-$PROFILE"; fi
+LOG_MAX_BYTES=524288
+
+log() {
+  if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt "$LOG_MAX_BYTES" ]; then
+    mv -f "$LOG" "$LOG.1"
+  fi
+  echo "$(date '+%Y-%m-%dT%H:%M:%S%z') $*" >> "$LOG"
+}
+
+notify() {
+  osascript -e "display notification \"$1\" with title \"Colima watchdog\"" >/dev/null 2>&1 || true
+}
+
+limited() {
+  secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+  else
+    perl -e 'alarm shift; exec @ARGV' "$secs" "$@"
+  fi
+}
+
+docker_healthy() {
+  limited 10 docker -H "unix://$SOCKET" version --format '{{.Server.Version}}' >/dev/null 2>&1
+}
+
+colima_status() {
+  limited 20 colima list --json --profile "$PROFILE" 2>/dev/null \
+    | sed -n 's/.*"status":"\([^"]*\)".*/\1/p' | head -n 1
+}
+
+colima_busy() {
+  pgrep -f "colima (start|stop|restart|delete)" >/dev/null 2>&1
+}
+
+start_vm() {
+  if limited 600 colima start --profile "$PROFILE" >> "$LOG" 2>&1; then
+    log "colima start: done"
+  else
+    log "colima start: FAILED"
+    notify "colima start failed; see $LOG"
+  fi
+}
+
+repair_vm() {
+  log "repair: colima says $1 but docker has not answered $THRESHOLD checks; force stop + start"
+  notify "Docker was unreachable with Colima $1; restarting the VM"
+  # colima stop --force hangs on ssh to the dead guest; limactl kills the processes directly.
+  if command -v limactl >/dev/null 2>&1; then
+    limited 60 limactl stop --force "$INSTANCE" >> "$LOG" 2>&1 || log "limactl stop --force: FAILED"
+  else
+    limited 120 colima stop --force --profile "$PROFILE" >> "$LOG" 2>&1 || log "colima stop --force: FAILED"
+  fi
+  start_vm
+}
+
+# Prints the action for one check: ok, wait, start, repair, defer or unknown.
+decide() {
+  status="$1" healthy="$2" fails="$3" busy="$4" first="$5" cooled="$6"
+  if [ "$healthy" = 1 ]; then echo ok; return; fi
+  if [ "$busy" = 1 ]; then echo wait; return; fi
+  case "$status" in
+    Stopped) if [ "$first" = 1 ]; then echo start; else echo wait; fi ;;
+    "") echo unknown ;;
+    *)
+      if [ "$fails" -lt "$THRESHOLD" ]; then echo wait
+      elif [ "$cooled" = 1 ]; then echo repair
+      else echo defer
+      fi ;;
+  esac
+}
+
+check_once() {
+  status="$(colima_status)"
+  if docker_healthy; then healthy=1; else healthy=0; fi
+  echo "profile=$PROFILE status=${status:-unknown} docker=$([ "$healthy" = 1 ] && echo up || echo down) socket=$SOCKET"
+}
+
+run() {
+  command -v colima >/dev/null 2>&1 || { log "colima not on PATH; exiting"; exit 0; }
+  command -v docker >/dev/null 2>&1 || { log "docker not on PATH; exiting"; exit 0; }
+  if launchctl print "gui/$(id -u)/sh.brew.colima" >/dev/null 2>&1; then
+    log "warning: brew service sh.brew.colima is also loaded; run 'brew services stop colima'"
+  fi
+  log "watchdog started (profile $PROFILE, every ${INTERVAL}s)"
+
+  fails=0 last_repair=0 first=1 tick=0 last_note=""
+  while :; do
+    tick=$((tick + 1))
+    status="$(colima_status)"
+    if docker_healthy; then healthy=1; else healthy=0; fi
+    if colima_busy; then busy=1; else busy=0; fi
+    if [ $(( $(date +%s) - last_repair )) -ge "$COOLDOWN" ]; then cooled=1; else cooled=0; fi
+    if [ "$healthy" = 0 ] && [ "$busy" = 0 ] && [ "$status" != Stopped ] && [ -n "$status" ]; then
+      fails=$((fails + 1))
+    else
+      fails=0
+    fi
+
+    action="$(decide "$status" "$healthy" "$fails" "$busy" "$first" "$cooled")"
+    note="$action/${status:-unknown}"
+    case "$action" in
+      ok|wait) ;;
+      start) log "VM is Stopped at start; starting it"; start_vm ;;
+      repair) repair_vm "$status"; last_repair="$(date +%s)"; fails=0 ;;
+      defer) [ "$note" = "$last_note" ] || log "docker still down, last repair under ${COOLDOWN}s ago; waiting" ;;
+      unknown) [ "$note" = "$last_note" ] || log "colima list gave no status for profile $PROFILE" ;;
+    esac
+    if [ "$action" = ok ] && [ "$last_note" != "$note" ] && [ -n "$last_note" ]; then
+      log "docker is answering (colima $status)"
+    fi
+    last_note="$note"
+    [ "$busy" = 1 ] || first=0
+
+    [ "$TICKS" -gt 0 ] && [ "$tick" -ge "$TICKS" ] && exit 0
+    sleep "$INTERVAL"
+  done
+}
+
+case "${1:-}" in
+  run) run ;;
+  check) check_once ;;
+  -h|--help) grep '^#' "$0" | grep -v '^#!' | sed 's/^# \{0,1\}//'; exit 0 ;;
+  *) echo "usage: colima-watchdog run|check  (--help for details)" >&2; exit 2 ;;
+esac

@@ -300,6 +300,32 @@ elif pending "load LaunchAgent com.nielsmadan.resource-log"; then
     echo "warn: could not load com.nielsmadan.resource-log; it starts at next login"
   fi
 fi
+
+# Colima supervisor, replacing `brew services start colima`; see docs/colima-hardening.md.
+# Both at once would fight, so brew's agent is unloaded first. That stops the VM once,
+# and the watchdog starts it again when it loads.
+link colima-watchdog  bin/colima-watchdog ~/.local/bin/colima-watchdog
+COLIMA_WATCHDOG_PLIST="$HOME/Library/LaunchAgents/com.nielsmadan.colima-watchdog.plist"
+BREW_COLIMA_PLIST="$HOME/Library/LaunchAgents/sh.brew.colima.plist"
+link colima-watchdog-agent launchd/com.nielsmadan.colima-watchdog.plist "$COLIMA_WATCHDOG_PLIST"
+if is_skipped colima-watchdog-agent; then
+  :
+else
+  if [ -e "$BREW_COLIMA_PLIST" ] && pending "unload brew service colima, replaced by colima-watchdog (restarts the VM once)"; then
+    launchctl bootout "gui/$(id -u)/sh.brew.colima" 2>/dev/null || true
+    rm -f "$BREW_COLIMA_PLIST"
+    echo "unloaded brew service colima"
+  fi
+  if launchctl print "gui/$(id -u)/com.nielsmadan.colima-watchdog" >/dev/null 2>&1; then
+    say "skip colima-watchdog agent (already loaded)"
+  elif pending "load LaunchAgent com.nielsmadan.colima-watchdog"; then
+    if launchctl bootstrap "gui/$(id -u)" "$COLIMA_WATCHDOG_PLIST"; then
+      echo "loaded LaunchAgent com.nielsmadan.colima-watchdog"
+    else
+      echo "warn: could not load com.nielsmadan.colima-watchdog; it starts at next login"
+    fi
+  fi
+fi
 # SaveWindowArrangement.py runs as an AutoLaunch daemon (auto-saves window
 # arrangements + registers the Cmd+S RPC). Drop the pre-daemon manual-script
 # symlink from the plain Scripts dir if a prior install left one there.
