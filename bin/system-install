@@ -9,6 +9,7 @@ DEPLOY_USER=deploy
 SHARED_USER="${STUDIO_SHARED_USER:-nielsmadan}"
 DEPLOYED_REPOS=(rc ac)
 SUDOERS_FILE=/etc/sudoers.d/studio-deploy
+LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
 KNOWN_PROFILES=(studio)
 SYSTEM_MISE_DIR="${MISE_SYSTEM_DATA_DIR:-/usr/local/share/mise}"
 # Admin's CARGO_HOME holds the rustup proxies every user runs (see mise/studio.toml).
@@ -32,7 +33,8 @@ that as /opt/rc/bin/system-install.
   --check         print what would change without changing anything
 
 It creates the hidden deploy user, gives it /opt/rc and /opt/ac, and lets the
-shared user run bin/studio-checkout as deploy and nothing else. On the first run
+shared user run bin/studio-checkout as deploy, and a root-owned copy of
+bin/studio-load-agent as root, which loads rc's LaunchAgents from ssh. On the first run
 it checks out both repos' default branches; later deploys are the shared user's
 studio-deploy, which also re-renders their config.
 It links this admin's ~/.zshrc to /opt/rc/zsh/admin.zshrc unless a ~/.zshrc
@@ -127,7 +129,8 @@ ensure_deploy_dirs() {
 
 ensure_sudoers_rule() {
   local rule tmp
-  rule="$SHARED_USER ALL=($DEPLOY_USER) NOPASSWD: $DEPLOYED_RC/bin/studio-checkout"
+  rule="$SHARED_USER ALL=($DEPLOY_USER) NOPASSWD: $DEPLOYED_RC/bin/studio-checkout
+$SHARED_USER ALL=(root) NOPASSWD: $LOAD_AGENT_HELPER"
   if [ "$CHECK" = 0 ] && [ "$(sudo cat "$SUDOERS_FILE" 2>/dev/null)" = "$rule" ]; then
     printf 'skip %s (up to date)\n' "$SUDOERS_FILE"
     return
@@ -158,6 +161,19 @@ first_deploys() {
     run sudo -u "$DEPLOY_USER" "$script" "$repo"
   done
   rm -f "$script"
+}
+
+# The sudoers rule names this root-owned copy, so what runs as root changes only when
+# admin re-runs system-install, never with a deploy to /opt/rc.
+ensure_load_agent_helper() {
+  local src="$DEPLOYED_RC/bin/studio-load-agent"
+  if cmp -s "$src" "$LOAD_AGENT_HELPER" &&
+    [ "$(stat -f '%Su:%Sg %Lp' "$LOAD_AGENT_HELPER" 2>/dev/null)" = "root:wheel 755" ]; then
+    printf 'skip %s (up to date)\n' "$LOAD_AGENT_HELPER"
+    return
+  fi
+  run sudo install -d -o root -g wheel -m 755 "$(dirname "$LOAD_AGENT_HELPER")" &&
+    run sudo install -o root -g wheel -m 755 "$src" "$LOAD_AGENT_HELPER"
 }
 
 # An existing ~/.zshrc is admin's own; it is reported, never replaced.
@@ -236,6 +252,7 @@ ensure_admin_zshrc
 sudo_link "$DEPLOYED_RC/mise/config.toml" /etc/mise/config.toml
 sudo_link "$DEPLOYED_RC/mise/$PROFILE.toml" "/etc/mise/conf.d/$PROFILE.toml"
 ensure_system_mise_dir
+ensure_load_agent_helper
 require "brew bundle"
 
 if [ "$UPGRADE" = 1 ]; then

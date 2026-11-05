@@ -35,6 +35,8 @@ TICKS="${COLIMA_WATCHDOG_TICKS:-0}"
 LOG="${COLIMA_WATCHDOG_LOG:-$HOME/Library/Logs/colima-watchdog.log}"
 SOCKET="${COLIMA_HOME:-$HOME/.colima}/$PROFILE/docker.sock"
 export LIMA_HOME="${COLIMA_HOME:-$HOME/.colima}/_lima"
+# colima.yaml links to rc's copy (deploy-owned on the Studio), which a start must not rewrite.
+export COLIMA_SAVE_CONFIG=0
 if [ "$PROFILE" = default ]; then INSTANCE=colima; else INSTANCE="colima-$PROFILE"; fi
 LOG_MAX_BYTES=524288
 

@@ -20,6 +20,38 @@ EOF
 }
 
 ROOT="${RC_DEPLOY_ROOT:-/opt}"
+if [ -r "$ROOT/rc/zsh/studio.zshenv" ]; then
+  . "$ROOT/rc/zsh/studio.zshenv"
+fi
+
+LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
+# Each loaded agent whose plist or program the deploy changed (label, then its files).
+# install.sh loads the ones not loaded yet.
+AGENT_FILES=(
+  "com.nielsmadan.colima-watchdog launchd/com.nielsmadan.colima-watchdog.plist bin/colima-watchdog"
+  "com.nielsmadan.resource-log launchd/com.nielsmadan.resource-log.plist"
+)
+
+head_of() { git -c safe.directory="$ROOT/$1" -C "$ROOT/$1" rev-parse --verify --quiet HEAD 2>/dev/null; }
+
+reload_changed_agents() {
+  local prev="$1" entry label failed=0
+  [ -n "$prev" ] || return 0
+  for entry in "${AGENT_FILES[@]}"; do
+    read -r label _ <<<"$entry"
+    # shellcheck disable=SC2086
+    git -c safe.directory="$ROOT/rc" -C "$ROOT/rc" diff --quiet "$prev" HEAD -- ${entry#* } && continue
+    launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1 || continue
+    if [ "$(launchctl managername 2>/dev/null)" = Aqua ]; then
+      launchctl bootout "gui/$(id -u)/$label" &&
+        launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$label.plist" &&
+        echo "reloaded $label"
+    else
+      sudo -n "$LOAD_AGENT_HELPER" reload "$label"
+    fi || { echo "studio-deploy: could not reload $label" >&2; failed=1; }
+  done
+  return "$failed"
+}
 
 rebuild() {
   local failed=0
@@ -28,14 +60,17 @@ rebuild() {
       "$ROOT/ac/sync.sh" --profile studio || failed=1
       "$ROOT/ac/bin/fleet-sync" || failed=1
       ;;
-    rc) "$ROOT/rc/install.sh" || failed=1 ;;
+    rc)
+      "$ROOT/rc/install.sh" || failed=1
+      reload_changed_agents "$2" || failed=1
+      ;;
   esac
   [ "$failed" = 0 ] || echo "studio-deploy: $1 is checked out, but re-rendering failed; fix it and re-run studio-deploy $1" >&2
   return "$failed"
 }
 
 main() {
-  local repo
+  local repo before
   case "${1:-}" in
     -h|--help) usage; return 0 ;;
     --status) ;;
@@ -47,9 +82,10 @@ main() {
     echo "studio-deploy: run this as the shared user; it re-renders that user's config" >&2
     return 2
   fi
+  [ -n "${repo:-}" ] && before="$(head_of "$repo")"
   sudo -n -u deploy "$ROOT/rc/bin/studio-checkout" "$@" || return
   [ -n "${repo:-}" ] || return 0
-  rebuild "$repo"
+  rebuild "$repo" "${before:-}"
 }
 
 # The checkout may replace this file while it runs; bash has parsed main by now.
