@@ -47,7 +47,8 @@ case "$MACHINE_PROFILE" in
     # Admin owns Homebrew and the system mise config there, the Studio has its
     # own secrets store, and the GUI apps and the notes vault stay off it. Vim
     # writes its plugins into ~/.vim, which would be the read-only checkout.
-    PROFILE_SKIPS=(homebrew brewfile syncthing mise secrets hammerspoon finicky librewolf wezterm obsidian-vimrc vimrc gvimrc vim githooks)
+    # Pure and the zsh plugins come from the Brewfile, for admin's shell too.
+    PROFILE_SKIPS=(homebrew brewfile syncthing mise secrets hammerspoon finicky librewolf wezterm obsidian-vimrc vimrc gvimrc vim githooks zsh-plugins)
     COLIMA_CONFIG=colima/colima.studio.yaml
     ;;
   "") ;;
@@ -170,7 +171,9 @@ fi
 # Install pure-prompt if not present. .zshrc references $HOME/.zsh/pure on
 # fpath; without it, `prompt pure` fails silently and zsh falls back to
 # its default %m%# prompt.
-if [ ! -d "$HOME/.zsh/pure" ]; then
+if is_skipped zsh-plugins; then
+  say "skip pure-prompt (zsh-plugins in $(skip_source zsh-plugins))"
+elif [ ! -d "$HOME/.zsh/pure" ]; then
   if pending "clone pure-prompt into ~/.zsh/pure"; then
     git clone --depth=1 https://github.com/sindresorhus/pure.git "$HOME/.zsh/pure"
     echo "installed pure-prompt"
@@ -182,7 +185,9 @@ fi
 # Install zsh-autosuggestions + zsh-syntax-highlighting if not present. .zshrc
 # sources both from $HOME/.zsh/ directly (no plugin framework — we dropped
 # oh-my-zsh); without them the trailing `source` lines error on a fresh box.
-if [ ! -d "$HOME/.zsh/zsh-autosuggestions" ]; then
+if is_skipped zsh-plugins; then
+  say "skip zsh-autosuggestions (zsh-plugins in $(skip_source zsh-plugins))"
+elif [ ! -d "$HOME/.zsh/zsh-autosuggestions" ]; then
   if pending "clone zsh-autosuggestions into ~/.zsh"; then
     git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions.git "$HOME/.zsh/zsh-autosuggestions"
     echo "installed zsh-autosuggestions"
@@ -191,7 +196,9 @@ else
   say "skip zsh-autosuggestions (already installed)"
 fi
 
-if [ ! -d "$HOME/.zsh/zsh-syntax-highlighting" ]; then
+if is_skipped zsh-plugins; then
+  say "skip zsh-syntax-highlighting (zsh-plugins in $(skip_source zsh-plugins))"
+elif [ ! -d "$HOME/.zsh/zsh-syntax-highlighting" ]; then
   if pending "clone zsh-syntax-highlighting into ~/.zsh"; then
     git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.zsh/zsh-syntax-highlighting"
     echo "installed zsh-syntax-highlighting"
@@ -275,6 +282,24 @@ link colima           "$COLIMA_CONFIG" ~/.colima/default/colima.yaml
 # The shared user's deploy command, on a machine whose repos studio-deploy keeps in /opt.
 if [ -n "$MACHINE_PROFILE" ]; then
   link studio-deploy  bin/studio-deploy ~/.local/bin/studio-deploy
+fi
+# The Studio's rustup toolchains are admin's (mise/studio.toml). CARGO_HOME stays
+# ~/.cargo, since cargo writes its registry and `cargo install` there, and mise puts
+# its bin on PATH, so that bin links the shared rustup proxies.
+if [ "$MACHINE_PROFILE" = studio ]; then
+  SHARED_CARGO_BIN="${MISE_SYSTEM_DATA_DIR:-/usr/local/share/mise}/cargo/bin"
+  [ -d "$SHARED_CARGO_BIN" ] || echo "warn: $SHARED_CARGO_BIN is missing; run system-install as admin, then re-run install.sh"
+  for proxy in "$SHARED_CARGO_BIN"/*; do
+    [ -e "$proxy" ] || continue
+    dest="$HOME/.cargo/bin/${proxy##*/}"
+    if [ "$(readlink "$dest" 2>/dev/null)" = "$proxy" ]; then
+      continue
+    elif [ -e "$dest" ] || [ -L "$dest" ]; then
+      echo "warn: $dest exists; leaving it in place of $proxy"
+    elif pending "link $dest -> $proxy"; then
+      mkdir -p "$HOME/.cargo/bin" && ln -s "$proxy" "$dest" && echo "link $dest -> $proxy"
+    fi
+  done
 fi
 # Standalone helper scripts. ~/.local/bin is already on PATH from .zshrc.
 link yt-transcript    bin/yt-transcript ~/.local/bin/yt-transcript

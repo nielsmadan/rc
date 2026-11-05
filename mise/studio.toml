@@ -16,3 +16,7 @@ disable_tools = [
 auto_install = false
 exec_auto_install = false
 not_found_auto_install = false
+# Every user's rustup reads admin's toolchains here. CARGO_HOME stays each user's
+# own, since cargo writes its registry there: admin's is the system one
+# (system-install and admin.zshrc), the shared user's ~/.cargo links its proxies.
+rust.rustup_home = "/usr/local/share/mise/rustup"
