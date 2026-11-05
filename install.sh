@@ -284,6 +284,7 @@ link img-sheet        bin/img-sheet     ~/.local/bin/img-sheet
 link update-tools     bin/update-tools  ~/.local/bin/update-tools
 link check-runtimes   bin/check-runtimes ~/.local/bin/check-runtimes
 link resource-log     bin/resource-log  ~/.local/bin/resource-log
+link iterm-agent-resume bin/iterm-agent-resume ~/.local/bin/iterm-agent-resume
 
 # Minute-by-minute memory/CPU sampler. launchd only picks up a new agent at login,
 # so load it now too; a failed load warns rather than aborting the rest of the run.

@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+# Resume the agent saved in an iTerm2 arrangement, or clear this pane's binding.
+# Usage: iterm-agent-resume --clear | --enable
+# Arrangement startup invokes --restore TOKEN automatically.
+# --clear forgets the pane's conversation and disables capture in this live pane until --enable.
+
+import argparse
+import base64
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "iterm2"))
+
+import arrangement_agents as agents
+
+
+def emit(name, value):
+    encoded = base64.b64encode(value.encode()).decode()
+    print(f"\033]1337;SetUserVar={name}={encoded}\007", end="", flush=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Manage automatic agent resume in this iTerm2 pane"
+    )
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--clear", action="store_true")
+    group.add_argument("--enable", action="store_true")
+    group.add_argument("--restore", metavar="TOKEN", help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if not args.restore:
+        if os.environ.get("TERM_PROGRAM") != "iTerm.app" or not sys.stdout.isatty():
+            parser.error("run this command in an iTerm2 pane")
+        emit("rcAgentDisabled", "1" if args.clear else "")
+        print(
+            "Agent restore disabled for this live pane; restored shells capture again."
+            if args.clear
+            else "Agent restore enabled for this pane."
+        )
+        return 0
+    try:
+        record = agents.decode_record(args.restore)
+        key = agents.signing_key(Path.home() / ".local/state/iterm-agent-resume")
+        agents.verify_record(record, key)
+        session_id = agents.pane_id(os.environ.get("ITERM_SESSION_ID"))
+        from arrangement_iterm import prepare_resume
+
+        import iterm2
+
+        prepared = []
+
+        async def prepare(connection):
+            await prepare_resume(connection, record, session_id, key)
+            prepared.append(True)
+
+        iterm2.run_until_complete(prepare)
+        if not prepared:
+            raise ValueError(
+                "could not repair the restored pane; agent was not started"
+            )
+        return agents.run_agent(record, Path.home(), os.environ)
+    except BlockingIOError:
+        print(
+            "Agent resume: this conversation is already being restored or running; opening a shell.",
+            file=sys.stderr,
+        )
+        return 1
+    except (
+        ValueError,
+        TypeError,
+        OSError,
+        RuntimeError,
+        ImportError,
+        subprocess.SubprocessError,
+        KeyboardInterrupt,
+    ) as exc:
+        print(f"Agent resume: {exc or type(exc).__name__}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
