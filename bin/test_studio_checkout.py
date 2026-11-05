@@ -22,7 +22,8 @@ class StudioCheckoutTests(unittest.TestCase):
         root = Path(self.temp.name)
         self.opt = root / "opt"
         (self.opt / "ac").mkdir(parents=True)
-        origins = root / "origins"
+        (self.opt / "rc").mkdir(parents=True)
+        origins = self.origins = root / "origins"
         work = self.work = root / "work"
         git("init", "--quiet", "--bare", "--initial-branch=main", str(origins / "agentic-coding.git"))
         git("clone", "--quiet", str(origins / "agentic-coding.git"), str(work))
@@ -45,6 +46,21 @@ class StudioCheckoutTests(unittest.TestCase):
             "RC_DEPLOY_ROOT": str(self.opt),
             "STUDIO_DEPLOY_ORIGIN_BASE": f"file://{origins}",
         }
+
+    def make_rc_origin(self):
+        git("init", "--quiet", "--bare", "--initial-branch=master", str(self.origins / "rc.git"))
+        work = Path(self.temp.name) / "rc-work"
+        git("clone", "--quiet", str(self.origins / "rc.git"), str(work))
+        git("config", "user.email", "t@example.com", cwd=work)
+        git("config", "user.name", "t", cwd=work)
+        git("commit", "--quiet", "--allow-empty", "-m", "master", cwd=work)
+        master = git("rev-parse", "HEAD", cwd=work)
+        git("push", "--quiet", "origin", "master", cwd=work)
+        git("checkout", "--quiet", "-b", "main", cwd=work)
+        git("commit", "--quiet", "--allow-empty", "-m", "main", cwd=work)
+        main = git("rev-parse", "HEAD", cwd=work)
+        git("push", "--quiet", "origin", "main", cwd=work)
+        return master, main
 
     def run_script(self, *args):
         return subprocess.run(
@@ -81,6 +97,15 @@ class StudioCheckoutTests(unittest.TestCase):
         result = self.run_script("ac", self.main[1])
         self.assertEqual(result.returncode, 1)
         self.assertIn("is not on origin/main", result.stderr)
+
+    def test_deploys_rc_from_its_master_branch(self):
+        master, main = self.make_rc_origin()
+        result = self.run_script("rc")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(git("rev-parse", "HEAD", cwd=self.opt / "rc"), master)
+        refused = self.run_script("rc", main)
+        self.assertEqual(refused.returncode, 1)
+        self.assertIn(f"no commit '{main}'", refused.stderr)
 
     def test_refuses_option_like_refs_and_unknown_repos(self):
         self.assertIn("invalid ref", self.run_script("ac", "--upload-pack=x").stderr)

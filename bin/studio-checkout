@@ -12,7 +12,8 @@ The deploy user's half of bin/studio-deploy: puts a pinned checkout of <repo>
 command the shared user may run as deploy (/etc/sudoers.d/studio-deploy); run
 studio-deploy instead, which also re-renders what reads the checkout.
 
-<ref> defaults to origin/main, and only a commit on origin/main is accepted.
+<ref> defaults to the tip of the repo's default branch (rc: master, ac: main),
+and only a commit on that branch is accepted.
 Each checkout records the commit it replaced; --rollback goes back to it.
 EOF
 }
@@ -23,10 +24,11 @@ ORIGIN_BASE="${STUDIO_DEPLOY_ORIGIN_BASE:-https://github.com/nielsmadan}"
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0
 umask 022
 
-origin_url() {
+# Each repo's URL and its default branch on GitHub.
+remote() {
   case "$1" in
-    rc) echo "$ORIGIN_BASE/rc.git" ;;
-    ac) echo "$ORIGIN_BASE/agentic-coding.git" ;;
+    rc) echo "$ORIGIN_BASE/rc.git master" ;;
+    ac) echo "$ORIGIN_BASE/agentic-coding.git main" ;;
     *) return 1 ;;
   esac
 }
@@ -34,20 +36,20 @@ origin_url() {
 die() { printf 'studio-checkout: %s\n' "$*" >&2; exit 1; }
 
 repo_dir() {
-  origin_url "$1" >/dev/null || die "unknown repo '$1' (known: rc, ac)"
+  remote "$1" >/dev/null || die "unknown repo '$1' (known: rc, ac)"
   echo "$ROOT/$1"
 }
 
 record() { echo "$1/.git/studio-deploy-previous"; }
 
 fetch() {
-  local dir="$1" url="$2"
+  local dir="$1" url="$2" branch="$3"
   if [ ! -d "$dir/.git" ]; then
     [ -d "$dir" ] || die "$dir does not exist; admin creates it with bin/system-install"
     git -C "$dir" init --quiet
     git -C "$dir" remote add origin "$url"
   fi
-  git -C "$dir" fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
+  git -C "$dir" fetch --quiet --no-tags origin "+refs/heads/$branch:refs/remotes/origin/$branch"
 }
 
 switch_to() {
@@ -65,29 +67,32 @@ switch_to() {
   echo "$dir now at $(git -C "$dir" log -1 --format='%h %s' "$commit") (was ${previous:-nothing})"
 }
 
-on_main() {
-  git -C "$1" merge-base --is-ancestor "$2" refs/remotes/origin/main
+on_branch() {
+  git -C "$1" merge-base --is-ancestor "$2" "refs/remotes/origin/$3"
 }
 
 deploy() {
-  local repo="$1" ref="${2:-origin/main}" dir commit
+  local repo="$1" dir url branch ref commit
+  dir="$(repo_dir "$repo")"
+  read -r url branch <<<"$(remote "$repo")"
+  ref="${2:-origin/$branch}"
   case "$ref" in
     -*|*..*) die "invalid ref '$ref'" ;;
   esac
   [[ "$ref" =~ ^[A-Za-z0-9._/-]+$ ]] || die "invalid ref '$ref'"
-  dir="$(repo_dir "$repo")"
-  fetch "$dir" "$(origin_url "$repo")"
+  fetch "$dir" "$url" "$branch"
   commit="$(git -C "$dir" rev-parse --verify --quiet "$ref^{commit}")" || die "no commit '$ref' in $repo"
-  on_main "$dir" "$commit" || die "$ref ($commit) is not on origin/main; only commits on main are deployed"
+  on_branch "$dir" "$commit" "$branch" || die "$ref ($commit) is not on origin/$branch; only commits on $repo's $branch are deployed"
   switch_to "$dir" "$commit"
 }
 
 rollback() {
-  local dir previous
+  local dir url branch previous
   dir="$(repo_dir "$1")"
+  read -r url branch <<<"$(remote "$1")"
   [ -f "$(record "$dir")" ] || die "no earlier deploy of $1 recorded"
   previous="$(cat "$(record "$dir")")"
-  on_main "$dir" "$previous" || die "$previous is no longer on origin/main"
+  on_branch "$dir" "$previous" "$branch" || die "$previous is no longer on origin/$branch"
   switch_to "$dir" "$previous"
 }
 

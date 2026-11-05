@@ -13,7 +13,8 @@ then this re-renders, as you, what reads it:
   ac  /opt/ac/sync.sh --profile studio, then /opt/ac/bin/fleet-sync
   rc  /opt/rc/install.sh
 
-<ref> defaults to origin/main, and only a commit on origin/main is accepted.
+<ref> defaults to the tip of the repo's default branch (rc: master, ac: main),
+and only a commit on that branch is accepted.
 --rollback goes back to the commit the last deploy replaced, and re-renders.
 EOF
 }

@@ -29,7 +29,7 @@ that as /opt/rc/bin/system-install.
 
 It creates the hidden deploy user, gives it /opt/rc and /opt/ac, and lets the
 shared user run bin/studio-checkout as deploy and nothing else. On the first run
-it checks out both repos from origin/main; later deploys are the shared user's
+it checks out both repos' default branches; later deploys are the shared user's
 studio-deploy, which also re-renders their config.
 Then it links /opt/rc/mise/config.toml to /etc/mise/config.toml and the
 profile's mise/<profile>.toml into /etc/mise/conf.d/, installs /opt/rc's
