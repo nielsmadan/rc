@@ -1,5 +1,8 @@
-# /etc/rc-profile names an admin-managed machine (bin/system-install); empty elsewhere.
-studio = (File.read("/etc/rc-profile").strip rescue "") == "studio"
+# bin/system-install passes its profile as HOMEBREW_RC_PROFILE, since brew drops
+# other variables; otherwise /etc/rc-profile names an admin-managed machine, and
+# is absent elsewhere.
+profile = ENV["HOMEBREW_RC_PROFILE"] || (File.read("/etc/rc-profile").strip rescue "")
+studio = profile == "studio"
 
 brew "neovim"
 brew "gnupg"
@@ -68,8 +71,12 @@ unless studio
 end
 
 # The Studio's tools that the MacBook gets elsewhere: mise and uv from their own
-# installers, git from Xcode's command line tools.
+# installers, git from Xcode's command line tools, pure and the zsh plugins from
+# install.sh's clones.
 if studio
+  brew "pure"
+  brew "zsh-autosuggestions"
+  brew "zsh-syntax-highlighting"
   brew "mise"
   brew "uv"
   brew "git"

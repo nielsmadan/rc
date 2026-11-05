@@ -292,7 +292,8 @@ alias dockerwhere='docker context show'
 bindkey '^[b' backward-word  # ESC+b
 bindkey '^[f' forward-word   # ESC+f
 
-# pure
+# pure: Homebrew's on the Studio (its site-functions is on fpath above), else the
+# clone install.sh makes.
 
 fpath+=("$HOME/.zsh/pure")
 autoload -U promptinit; promptinit
@@ -332,8 +333,13 @@ export PATH="$HOME/.opencode/bin:$PATH"
 # Sourced directly (no plugin framework). These MUST come last — after every
 # custom ZLE widget and bindkey above — so syntax-highlighting can wrap them
 # all. autosuggestions is sourced before syntax-highlighting.
-source "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
-source "$HOME/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+# Homebrew's copy on the Studio, else the clone install.sh makes.
+for _p in zsh-autosuggestions zsh-syntax-highlighting; do
+  for _f in "/opt/homebrew/share/$_p/$_p.zsh" "$HOME/.zsh/$_p/$_p.zsh"; do
+    [[ -f $_f ]] && { source "$_f"; break; }
+  done
+done
+unset _p _f
 
 autoload -U +X bashcompinit && bashcompinit
 # vault ships no zsh completion — it completes itself via `complete -C`. Point at
