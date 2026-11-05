@@ -21,7 +21,6 @@ tart = "latest"
 pipx = "latest"
 "npm:agent-browser" = "latest"
 "npm:firebase-tools" = "latest"
-"npm:rn-logs-cli" = { version = "latest", allow_low_downloads = true }  # reviewed; under aube's 1000 weekly downloads
 "npm:wrangler" = "latest"
 "github:stripe/stripe-cli" = "latest"
 "aqua:hashicorp/vault" = "2.0.2"  # aqua's latest resolves broken tags (2.0.1 has no darwin build)
