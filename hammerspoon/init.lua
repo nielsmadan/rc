@@ -37,6 +37,7 @@ require("hs.ipc")
 --   z / x   = left / right two-thirds (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
 --   j       = ladder all iTerm2 windows on the focused screen, most tabs widest, every title bar visible
+--   v       = join the clipboard's wrapped lines into one line, then paste
 
 -- iTerm2 sometimes pins a window's minimum size at its current grid: every
 -- smaller setFrame or edge drag snaps back while growing still works. Setting
@@ -244,6 +245,40 @@ bindHyper("x", place(1 / 3, 0, 2 / 3, 1))
 bindHyper("h", function() homeAllManagedWindows() end)
 
 bindHyper("j", ladderWindows)
+
+local joinClipboardText = require("clipboard_join").join
+local PASTE_WAIT_SECONDS = 1.5
+local pastePending = false
+
+local function modifiersHeld()
+  local mods = hs.eventtap.checkKeyboardModifiers()
+  return mods.cmd or mods.alt or mods.ctrl or mods.shift
+end
+
+-- The synthesized ⌘V has to wait for Hyper to be released: with Hyper still
+-- held it would arrive as Hyper+V and re-trigger this binding.
+hs.hotkey.bind(HYPER, "v", function()
+  if pastePending then return end
+  local text = hs.pasteboard.getContents()
+  if text then hs.pasteboard.setContents(joinClipboardText(text)) end
+  if not hs.accessibilityState() then
+    hs.alert.show("Clipboard joined — Accessibility off, paste with ⌘V")
+    return
+  end
+  pastePending = true
+  local deadline = hs.timer.secondsSinceEpoch() + PASTE_WAIT_SECONDS
+  hs.timer.waitUntil(
+    function() return not modifiersHeld() or hs.timer.secondsSinceEpoch() > deadline end,
+    function()
+      pastePending = false
+      if modifiersHeld() then
+        hs.alert.show("Clipboard joined — paste with ⌘V")
+      else
+        hs.eventtap.keyStroke({ "cmd" }, "v", 0)
+      end
+    end,
+    0.02)
+end)
 -- ──────────────────────────────────────────────────────────────────────
 
 -- Reload on save of any .lua under ~/.hammerspoon.
