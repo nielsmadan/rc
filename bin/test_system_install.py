@@ -90,6 +90,20 @@ class SystemInstallTests(unittest.TestCase):
         result, _ = self.run_script("--check", "--profile", "studio")
         self.assertIn(f"skip {self.mise} (owned by {os.environ['USER']})", result.stdout)
 
+    def test_check_installs_a_root_owned_load_agent_helper_and_its_sudoers_rule(self):
+        result, _ = self.run_script("--check", "--profile", "studio")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            f"+ sudo install -o root -g wheel -m 755 {self.opt}/rc/bin/studio-load-agent "
+            "/usr/local/libexec/studio-load-agent",
+            result.stdout,
+        )
+        self.assertIn(
+            f"NOPASSWD: {self.opt}/rc/bin/studio-checkout\n"
+            "nielsmadan ALL=(root) NOPASSWD: /usr/local/libexec/studio-load-agent\n",
+            result.stdout,
+        )
+
     def test_a_failed_profile_write_stops_before_anything_else(self):
         self.env["STUB_TEE_FAILS"] = "1"
         result, calls = self.run_script("--profile", "studio")

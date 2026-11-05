@@ -48,7 +48,8 @@ case "$MACHINE_PROFILE" in
     # own secrets store, and the GUI apps and the notes vault stay off it. Vim
     # writes its plugins into ~/.vim, which would be the read-only checkout.
     # Pure and the zsh plugins come from the Brewfile, for admin's shell too.
-    PROFILE_SKIPS=(homebrew brewfile syncthing mise secrets hammerspoon finicky librewolf wezterm obsidian-vimrc vimrc gvimrc vim githooks zsh-plugins)
+    # Caps Lock -> F18 (hidutil) only serves Hammerspoon.
+    PROFILE_SKIPS=(homebrew brewfile syncthing mise secrets hammerspoon finicky librewolf wezterm obsidian-vimrc vimrc gvimrc vim githooks zsh-plugins hidutil)
     COLIMA_CONFIG=colima/colima.studio.yaml
     ;;
   "") ;;
@@ -65,6 +66,9 @@ if [ -n "$MACHINE_PROFILE" ]; then
     exit 2
   fi
   LOCAL_DIR="$HOME/.config/rc"
+fi
+if [ "$MACHINE_PROFILE" = studio ]; then
+  . "$DOTFILES_DIR/zsh/studio.zshenv"
 fi
 
 # Per-machine skip list (gitignored). Each uncommented line is the alias of a
@@ -266,6 +270,9 @@ link gvimrc           .gvimrc          ~/.gvimrc
 link vim              .vim             ~/.vim
 link gitconfig        .gitconfig       ~/.gitconfig
 link zshrc            .zshrc           ~/.zshrc
+if [ "$MACHINE_PROFILE" = studio ]; then
+  link zshenv         zsh/studio.zshenv ~/.zshenv
+fi
 link devrc            .devrc           ~/.devrc
 link tmux             tmux/tmux.conf   ~/.tmux.conf
 link kitty            kitty/kitty.conf ~/.config/kitty/kitty.conf
@@ -311,20 +318,37 @@ link check-runtimes   bin/check-runtimes ~/.local/bin/check-runtimes
 link resource-log     bin/resource-log  ~/.local/bin/resource-log
 link iterm-agent-resume bin/iterm-agent-resume ~/.local/bin/iterm-agent-resume
 
+# Loads a gui-domain LaunchAgent now. Over ssh the session is "Background", and
+# bootstrapping into gui/<uid> from there fails with error 5 even for its owner, so
+# a profile machine goes through system-install's root helper (bin/studio-load-agent).
+LAUNCHD_SESSION="$(launchctl managername 2>/dev/null || true)"
+LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
+load_agent() {
+  local label="$1" plist="$2"
+  if launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then
+    say "skip $label agent (already loaded)"
+  elif pending "load LaunchAgent $label"; then
+    if [ "$LAUNCHD_SESSION" != Aqua ] && [ -n "$MACHINE_PROFILE" ]; then
+      sudo -n "$LOAD_AGENT_HELPER" load "$label" ||
+        echo "warn: could not load $label through $LOAD_AGENT_HELPER; have admin run bin/system-install, or run install.sh in a Terminal at the console"
+    elif [ "$LAUNCHD_SESSION" != Aqua ]; then
+      echo "warn: $label is not loaded and can't be from this ${LAUNCHD_SESSION:-unknown} session; run install.sh in a Terminal at the console (Screen Sharing works)"
+    elif launchctl bootstrap "gui/$(id -u)" "$plist"; then
+      echo "loaded LaunchAgent $label"
+    else
+      echo "warn: could not load $label; it starts at next login"
+    fi
+  fi
+}
+
 # Minute-by-minute memory/CPU sampler. launchd only picks up a new agent at login,
 # so load it now too; a failed load warns rather than aborting the rest of the run.
 RESOURCE_LOG_PLIST="$HOME/Library/LaunchAgents/com.nielsmadan.resource-log.plist"
 link resource-log-agent launchd/com.nielsmadan.resource-log.plist "$RESOURCE_LOG_PLIST"
 if is_skipped resource-log-agent; then
   :
-elif launchctl print "gui/$(id -u)/com.nielsmadan.resource-log" >/dev/null 2>&1; then
-  say "skip resource-log agent (already loaded)"
-elif pending "load LaunchAgent com.nielsmadan.resource-log"; then
-  if launchctl bootstrap "gui/$(id -u)" "$RESOURCE_LOG_PLIST"; then
-    echo "loaded LaunchAgent com.nielsmadan.resource-log"
-  else
-    echo "warn: could not load com.nielsmadan.resource-log; it starts at next login"
-  fi
+else
+  load_agent com.nielsmadan.resource-log "$RESOURCE_LOG_PLIST"
 fi
 
 # Colima supervisor, replacing `brew services start colima`; see docs/colima-hardening.md.
@@ -342,15 +366,7 @@ else
     rm -f "$BREW_COLIMA_PLIST"
     echo "unloaded brew service colima"
   fi
-  if launchctl print "gui/$(id -u)/com.nielsmadan.colima-watchdog" >/dev/null 2>&1; then
-    say "skip colima-watchdog agent (already loaded)"
-  elif pending "load LaunchAgent com.nielsmadan.colima-watchdog"; then
-    if launchctl bootstrap "gui/$(id -u)" "$COLIMA_WATCHDOG_PLIST"; then
-      echo "loaded LaunchAgent com.nielsmadan.colima-watchdog"
-    else
-      echo "warn: could not load com.nielsmadan.colima-watchdog; it starts at next login"
-    fi
-  fi
+  load_agent com.nielsmadan.colima-watchdog "$COLIMA_WATCHDOG_PLIST"
 fi
 # SaveWindowArrangement.py runs as an AutoLaunch daemon (auto-saves window
 # arrangements + registers the Cmd+S RPC). Drop the pre-daemon manual-script
@@ -378,14 +394,28 @@ link iterm2-profile   iterm2/dynamic-profile.json     "$HOME/Library/Application
 #      device. See launchd/hidutil.local.sh.example.
 # Both the plist and the immediate-apply below run the universal set, then
 # source the local file if present, so the mapping is live without a logout.
-link hidutil launchd/com.nielsmadan.hidutil-capslock-to-f18.plist \
-  "$HOME/Library/LaunchAgents/com.nielsmadan.hidutil-capslock-to-f18.plist"
+HIDUTIL_PLIST="$HOME/Library/LaunchAgents/com.nielsmadan.hidutil-capslock-to-f18.plist"
+# A profile drops the remap outright; link() would keep the agent as a detached copy.
+if is_skipped hidutil && [ "$(skip_source hidutil)" != install.local ]; then
+  if [ "$(readlink "$HIDUTIL_PLIST" 2>/dev/null)" != "$DOTFILES_DIR/launchd/com.nielsmadan.hidutil-capslock-to-f18.plist" ]; then
+    say "skip $HIDUTIL_PLIST (hidutil in $(skip_source hidutil))"
+  elif pending "remove $HIDUTIL_PLIST and clear the Caps Lock remap (hidutil in $(skip_source hidutil))"; then
+    launchctl bootout "gui/$(id -u)/com.nielsmadan.hidutil-capslock-to-f18" 2>/dev/null || true
+    rm "$HIDUTIL_PLIST"
+    hidutil property --set '{"UserKeyMapping":[]}' >/dev/null
+    echo "removed $HIDUTIL_PLIST and cleared the Caps Lock remap"
+  fi
+else
+  link hidutil launchd/com.nielsmadan.hidutil-capslock-to-f18.plist "$HIDUTIL_PLIST"
+fi
 
 # Per-machine hidutil remaps (gitignored). Empty stub if missing (so other
 # machines apply only the universal remap), symlinked to a fixed location the
 # LaunchAgent sources by absolute path. Customize from hidutil.local.sh.example.
 HIDUTIL_LOCAL="$LOCAL_DIR/launchd/hidutil.local.sh"
-if [ ! -f "$HIDUTIL_LOCAL" ]; then
+if is_skipped hidutil; then
+  :
+elif [ ! -f "$HIDUTIL_LOCAL" ]; then
   if pending "create $HIDUTIL_LOCAL"; then
     mkdir -p "$(dirname "$HIDUTIL_LOCAL")"
     cat > "$HIDUTIL_LOCAL" <<'EOF'
@@ -401,7 +431,9 @@ else
 fi
 
 HIDUTIL_LOCAL_LINK="$HOME/.config/hidutil/local.sh"
-if [ "$(readlink "$HIDUTIL_LOCAL_LINK" 2>/dev/null)" = "$HIDUTIL_LOCAL" ]; then
+if is_skipped hidutil; then
+  :
+elif [ "$(readlink "$HIDUTIL_LOCAL_LINK" 2>/dev/null)" = "$HIDUTIL_LOCAL" ]; then
   say "skip $HIDUTIL_LOCAL_LINK (already linked)"
 elif pending "link $HIDUTIL_LOCAL_LINK -> $HIDUTIL_LOCAL"; then
   mkdir -p "$HOME/.config/hidutil"
@@ -412,7 +444,7 @@ fi
 # Re-applied unconditionally (hidutil's UserKeyMapping is session-scoped, so
 # this is a no-op in effect, not a pending change) — but never under --check,
 # which must not touch the running system or report spurious work.
-if [ "$CHECK" = 0 ]; then
+if [ "$CHECK" = 0 ] && ! is_skipped hidutil; then
   hidutil property --set \
     '{"UserKeyMapping":[{"HIDKeyboardModifierMappingSrc":0x700000039,"HIDKeyboardModifierMappingDst":0x70000006D}]}' \
     >/dev/null
@@ -474,7 +506,7 @@ fi
 if [ ! -f "$HOME/.config/sops/age/keys.txt" ]; then
   if ! command -v age-keygen >/dev/null 2>&1; then
     if [ -n "$MACHINE_PROFILE" ]; then
-      echo "sops: age-keygen not on PATH — have admin run bin/system-install, then re-run install.sh"
+      echo "sops: age-keygen is not in admin's mise tools (${MISE_SYSTEM_DATA_DIR:-/usr/local/share/mise}/shims) — have admin run bin/system-install, then re-run install.sh"
     else
       echo "sops: age-keygen not on PATH — run \`mise install\` then re-run install.sh"
     fi

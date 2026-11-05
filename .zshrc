@@ -7,6 +7,10 @@
 # Keep brew auto-update, but silence the env-hint footer it prints
 export HOMEBREW_NO_ENV_HINTS=1
 
+# ~/.colima/default/colima.yaml links into rc, and `colima start` would rewrite it in
+# its own format (on the Studio the link is read-only, so the start fails instead).
+export COLIMA_SAVE_CONFIG=0
+
 # Keep PATH de-duplicated. Several dirs get prepended more than once (here, in
 # ~/.zprofile, and by third-party installers), and a nested shell re-runs the lot,
 # so without this they accumulate. Set before the first assignment to cover them all.

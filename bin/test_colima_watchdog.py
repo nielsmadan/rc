@@ -13,6 +13,7 @@ case "$1" in
   stop) echo "stop $*" >> "$d/calls"; echo Stopped > "$d/status.seq" ;;
   start)
     echo "start $*" >> "$d/calls"; echo Running > "$d/status.seq"
+    echo "${COLIMA_SAVE_CONFIG-unset}" > "$d/save_config"
     [ -f "$d/start_heals" ] && echo ok > "$d/docker.seq"
     exit "$(cat "$d/start_exit" 2>/dev/null || echo 0)" ;;
 esac
@@ -90,6 +91,10 @@ class ColimaWatchdogTests(unittest.TestCase):
 
     def test_stopped_vm_is_started_at_login(self):
         self.assertEqual(self.run_watchdog("Stopped", ["fail"], ticks=1), ["start start --profile default"])
+
+    def test_start_leaves_the_linked_config_unwritten(self):
+        self.run_watchdog("Stopped", ["fail"], ticks=1)
+        self.assertEqual((self.dir / "save_config").read_text(), "0\n")
 
     def test_vm_stopped_after_login_stays_stopped(self):
         self.assertEqual(self.run_watchdog(["Running", "Stopped"], ["ok", "fail"], ticks=6), [])

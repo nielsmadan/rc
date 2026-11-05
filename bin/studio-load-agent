@@ -1,0 +1,66 @@
+#!/bin/bash
+# Loads one of rc's LaunchAgents into the sudo caller's GUI login, which only root can
+# do from outside it (ssh). system-install installs a root-owned copy for the sudoers
+# rule. launchd.plist(5): "for agents, the UserName key is ignored", so none runs as root.
+set -euo pipefail
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+# Trusted constants; the tests rewrite these in a copy.
+PLIST_DIR=/opt/rc/launchd
+TRUSTED_OWNERS="root deploy"
+LAUNCHCTL=/bin/launchctl
+REQUIRED_EUID=0
+
+usage() {
+  echo "usage: sudo $0 load|reload|unload <label>" >&2
+  echo "labels: com.nielsmadan.resource-log com.nielsmadan.colima-watchdog" >&2
+  exit 2
+}
+
+die() { echo "studio-load-agent: $*" >&2; exit 1; }
+
+[ $# -eq 2 ] || usage
+action="$1" label="$2"
+case "$action" in load|reload|unload) ;; *) usage ;; esac
+case "$label" in
+  com.nielsmadan.resource-log|com.nielsmadan.colima-watchdog) ;;
+  *) usage ;;
+esac
+
+[ "$(id -u)" = "$REQUIRED_EUID" ] || die "run it through sudo"
+uid="${SUDO_UID:-}"
+case "$uid" in ''|*[!0-9]*) die "SUDO_UID is not a uid: '$uid'" ;; esac
+[ "$uid" != 0 ] || die "root has no agents of rc's"
+id -un "$uid" >/dev/null 2>&1 || die "no user with uid $uid"
+
+# The plist and its directory must be ones the caller can't change.
+for path in "$PLIST_DIR" "$PLIST_DIR/$label.plist"; do
+  [ ! -L "$path" ] || die "$path is a symlink"
+  [ -e "$path" ] || die "$path is missing"
+  read -r owner mode <<<"$(stat -f '%Su %Lp' "$path")"
+  case " $TRUSTED_OWNERS " in *" $owner "*) ;; *) die "$path belongs to $owner, not one of: $TRUSTED_OWNERS" ;; esac
+  case "$mode" in *[2367]?|*[2367]) die "$path is writable by group or others ($mode)" ;; esac
+done
+plist="$PLIST_DIR/$label.plist"
+[ -f "$plist" ] || die "$plist is not a file"
+
+domain="gui/$uid"
+loaded() { "$LAUNCHCTL" print "$domain/$label" >/dev/null 2>&1; }
+
+case "$action" in
+  unload|reload)
+    if loaded; then
+      "$LAUNCHCTL" bootout "$domain/$label" || die "could not boot out $domain/$label"
+    fi
+    ;;
+esac
+case "$action" in
+  load|reload)
+    if [ "$action" = load ] && loaded; then
+      echo "$label is already loaded in $domain"
+      exit 0
+    fi
+    "$LAUNCHCTL" bootstrap "$domain" "$plist" || die "could not bootstrap $plist into $domain (is $(id -un "$uid") logged in at the console?)"
+    echo "loaded $label into $domain"
+    ;;
+esac
