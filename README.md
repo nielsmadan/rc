@@ -1,21 +1,115 @@
-Welcome to my dotfiles and small scripts!
+# rc
 
-## SSH over Tailscale
+My macOS dotfiles, plus a handful of small scripts I keep on `PATH`.
 
-`tailssh mini` (or `studio`, `studioadmin`) forces the host's Tailscale IP while
-retaining its SSH user, forwarding settings, and terminal integration. Ordinary
-`ssh` continues to prefer the local network. Tailscale must be connected.
+This is a personal setup, published so others can read it and borrow from it.
+It is not a framework meant to be installed as-is. It assumes an Apple Silicon
+Mac, Homebrew, [mise](https://mise.jdx.dev), zsh, and the apps I happen to use.
+Take what is useful; read anything before you run it.
+
+## What's here
+
+| Path | What it configures |
+| --- | --- |
+| `.zshrc`, `zsh/`, `.devrc` | zsh with no framework: [pure](https://github.com/sindresorhus/pure) prompt, autosuggestions, syntax highlighting, cached completions |
+| `.vimrc`, `.gvimrc`, `.vim/`, `ultisnips/` | Vim / MacVim |
+| `nvim/` | Neovim (lazy.nvim) |
+| `.gitconfig`, `git/ignore` | git aliases, Neovide/MacVim as diff and merge tool, global gitignore |
+| `tmux/`, `kitty/`, `wezterm/`, `iterm2/` | terminals; iTerm2 also gets a dynamic profile and AutoLaunch scripts |
+| `hammerspoon/` | window placement and hotkeys (Caps Lock is remapped to F18 as a hyper key) |
+| `finicky/`, `librewolf/` | browser routing and browser prefs |
+| `mise/`, `Brewfile` | global CLI tools (mise) and Homebrew formulae and casks |
+| `colima/`, `launchd/` | Docker via Colima, plus the LaunchAgents that supervise it and log resource use |
+| `secrets/`, `.sops.yaml` | dev API keys encrypted with [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age) |
+| `bin/` | standalone scripts, linked into `~/.local/bin` |
+| `githooks/` | hooks that warn when a pull leaves a symlink stale |
+| `docs/` | notes on individual parts of the setup |
+
+The keybindings are written up in [VIM_KEYBINDINGS.md](VIM_KEYBINDINGS.md) and
+[NVIM_KEYBINDINGS.md](NVIM_KEYBINDINGS.md). The other notes are in `docs/`:
+[editor config](docs/editor-config.md), [Hammerspoon](docs/hammerspoon.md),
+[iTerm2](docs/iterm2.md), [SSH and tmux](docs/ssh-tmux.md),
+[Finicky](docs/finicky.md), [Colima](docs/colima.md) and its
+[hardening](docs/colima-hardening.md), [tool versions](docs/tooling.md),
+[environment variables](docs/env-vars.md), and
+[slow-Mac triage](docs/machine-triage.md).
+
+## Installing
 
 ```sh
-tailssh mini
-tailssh studio hostname
+git clone https://github.com/nielsmadan/rc.git ~/rc
+cd ~/rc
+./install.sh --check   # dry run: lists every change, makes none
+./install.sh
 ```
 
-The Tailscale IPs are mapped in `.zshrc`; keep them aligned with `~/.ssh/config`
-if an address changes. Open a new shell or run `source ~/.zshrc`
-after updating.
+`install.sh` symlinks each config from the repo to where its app expects it, so
+editing a file in the repo edits the live config. It also:
 
-## Updating tools
+- installs Homebrew if it is missing, then everything in the `Brewfile`
+- clones pure, zsh-autosuggestions, and zsh-syntax-highlighting into `~/.zsh`, and installs vim-plug
+- remaps Caps Lock to F18 with `hidutil` and loads the LaunchAgents in `launchd/`
+- writes a few iTerm2 preferences (quit iTerm2 first)
+- generates an age identity for SOPS at `~/.config/sops/age/keys.txt`
+- sets `core.hooksPath` to `githooks/`
+
+Running it again is safe: every step checks whether its work is already done.
+
+> [!WARNING]
+> When a target already exists as a real file or directory, `install.sh`
+> deletes it and puts the symlink in its place, without a backup. `--check`
+> marks these as `(REPLACES EXISTING FILE)` or `(REPLACES EXISTING DIRECTORY)`.
+> Back up your own `~/.zshrc`, `~/.config/nvim` and so on first.
+
+### Skipping parts
+
+The first run writes `install.local` (gitignored), which lists every target by a
+short alias, all commented out. Uncomment an alias to leave that target alone on
+this machine, for example `hammerspoon`, `secrets`, or `homebrew`. If a skipped
+target is already a symlink into the repo, it is replaced by a local copy you can
+edit freely.
+
+### Machine-local overrides
+
+These files are sourced or included when they exist, and are not in the repo:
+
+- `~/.zshrc.local`, sourced by `.zshrc`
+- `~/.gitconfig-local`, included at the end of `.gitconfig`. `.gitconfig` sets my own name and email, so set yours here to override them.
+- `hammerspoon/local.lua` and `finicky/finicky.local.ts` (gitignored, stubbed on first run; see the `.example` files next to them)
+
+`.zshrc` also sources `~/.airc`, which comes from a separate private repo. If the
+file isn't there, the line does nothing.
+
+### Secrets
+
+`secrets/secrets.yaml` holds my encrypted API keys. Only the age keys listed in
+`.sops.yaml` can decrypt it, so on your machine it is opaque. Skip it with the
+`secrets` alias, or replace it with your own SOPS file and recipients.
+
+### Shared-Mac profile
+
+`bin/system-install`, `studio-deploy`, and the `studio` branches in `install.sh`
+and the `Brewfile` set up one specific Mac, where Homebrew belongs to an admin
+account and the repo is deployed read-only to `/opt/rc`. They only take effect
+when `/etc/rc-profile` exists, so you can ignore them.
+
+## Scripts
+
+`install.sh` links these into `~/.local/bin`. Each prints its usage with `--help`.
+
+- `yt-transcript <url>`: metadata and cleaned captions for anything `yt-dlp` supports
+- `transcribe <file-or-url>`: local Whisper transcription for audio or video without captions
+- `video-frames`: contact sheets, motion scans, and single frames from a video
+- `img-sheet <out.jpg> <images...>`: tile a pile of screenshots into one labelled image
+- `update-tools`: update globally installed tools (see below)
+- `check-runtimes`: compare configured language runtimes with the latest stable and LTS releases (see below)
+- `resource-log`: per-minute memory and CPU sampler, run by a LaunchAgent
+- `colima-watchdog`: keeps the Colima VM up, run by a LaunchAgent
+
+`tailssh <host>` is a zsh function, not a script. It runs `ssh` to one of my own
+machines through its Tailscale IP, which is hard-coded in `.zshrc`.
+
+### update-tools
 
 `bin/update-tools` updates global mise CLI tools, Homebrew packages and GUI apps,
 uv tools, standalone pipx tools, and agent-browser's Chrome download. It also
@@ -48,7 +142,7 @@ pick up new executable paths.
 
 Run the script's checks with `python3 bin/test_update_tools.py`.
 
-## Checking runtime versions
+### check-runtimes
 
 `check-runtimes` reports new stable releases for globally configured mise language
 runtimes, including releases beyond existing pins. It only queries metadata;
