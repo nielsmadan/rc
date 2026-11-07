@@ -15,6 +15,7 @@ Runs as an AutoLaunch script. Two jobs:
 import asyncio
 import fcntl
 import logging
+from logging.handlers import RotatingFileHandler
 import sys
 from pathlib import Path
 
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 DEBOUNCE_SECONDS = 1.5
 RETRY_SECONDS = 2
 MAX_RETRY_SECONDS = 30
+MAX_SAVE_DELAY_SECONDS = 5
 
 connection = None
 app = None
@@ -40,6 +42,10 @@ _tab_monitors = {}  # tab_id    -> asyncio.Task
 _rpc_saves = {}
 _save_requests = {}
 _save_errors = {}
+_first_requests = {}
+_urgent = set()
+_layouts = {}
+_wakeups = {}
 
 
 async def save_window(window, *, allow_prompt):
@@ -78,13 +84,24 @@ async def _delayed_save(window_id):
     retry = RETRY_SECONDS
     try:
         while window_id in _save_requests:
-            delay = DEBOUNCE_SECONDS - (
-                asyncio.get_running_loop().time() - _save_requests[window_id]
-            )
+            now = asyncio.get_running_loop().time()
+            delay = min(
+                _save_requests[window_id] + DEBOUNCE_SECONDS,
+                _first_requests[window_id] + MAX_SAVE_DELAY_SECONDS,
+            ) - now
+            if window_id in _urgent:
+                delay = 0
             if delay > 0:
-                await asyncio.sleep(delay)
+                wakeup = _wakeups[window_id]
+                wakeup.clear()
+                try:
+                    await asyncio.wait_for(wakeup.wait(), delay)
+                except TimeoutError:
+                    pass
                 continue
             del _save_requests[window_id]
+            _first_requests.pop(window_id, None)
+            _urgent.discard(window_id)
             window = next((w for w in app.windows if w.window_id == window_id), None)
             if window:
                 try:
@@ -96,21 +113,54 @@ async def _delayed_save(window_id):
                     if _save_errors.get(window_id) != message:
                         logger.exception("auto-save failed for window %s", window_id)
                         _save_errors[window_id] = message
-                    _save_requests.setdefault(
-                        window_id, asyncio.get_running_loop().time()
-                    )
+                    now = asyncio.get_running_loop().time()
+                    _save_requests.setdefault(window_id, now)
+                    _first_requests.setdefault(window_id, now)
                     await asyncio.sleep(retry)
                     retry = min(retry * 2, MAX_RETRY_SECONDS)
+            else:
+                logger.warning("save dropped: window %s closed before save", window_id)
     finally:
         _debounce.pop(window_id, None)
+        _wakeups.pop(window_id, None)
         if not any(w.window_id == window_id for w in app.windows):
             _save_errors.pop(window_id, None)
 
 
-def schedule_save(window_id):
-    _save_requests[window_id] = asyncio.get_running_loop().time()
+def schedule_save(window_id, *, immediate=False, reason="agent binding"):
+    now = asyncio.get_running_loop().time()
+    if window_id not in _save_requests:
+        logger.info("save queued: window=%s reason=%s", window_id, reason)
+    _save_requests[window_id] = now
+    _first_requests.setdefault(window_id, now)
+    if immediate:
+        _urgent.add(window_id)
+    _wakeups.setdefault(window_id, asyncio.Event()).set()
     if window_id not in _debounce:
         _debounce[window_id] = asyncio.create_task(_delayed_save(window_id))
+
+
+def window_layout(window):
+    return (
+        iterm2.util.frame_str(window.frame),
+        tuple(
+            (
+                tab.tab_id,
+                tab.root.to_protobuf().SerializeToString(),
+                tuple((s.session_id, iterm2.util.frame_str(s.frame)) for s in tab.sessions),
+            )
+            for tab in window.tabs
+        ),
+    )
+
+
+def schedule_layout_changes():
+    current = {w.window_id: window_layout(w) for w in app.windows}
+    for window_id, layout in current.items():
+        if _layouts.get(window_id) != layout:
+            schedule_save(window_id, immediate=True, reason="layout changed")
+    _layouts.clear()
+    _layouts.update(current)
 
 
 def _window_for_tab(tab_id):
@@ -131,7 +181,7 @@ async def _watch_tab_title(tab_id):
                 await mon.async_get()
                 window = _window_for_tab(tab_id)
                 if window:
-                    schedule_save(window.window_id)
+                    schedule_save(window.window_id, reason="tab title changed")
     except asyncio.CancelledError:
         return
     except Exception:
@@ -155,19 +205,26 @@ def reconcile_tab_monitors():
 # A transient iTerm2 API error must not kill a monitor loop — that would
 # silently stop auto-saving with no visible signal. Log and carry on; the
 # short sleep keeps a persistent failure from becoming a tight error loop.
-async def _layout_loop():
-    async with iterm2.LayoutChangeMonitor(connection) as mon:
+async def _layout_loop(monitor_type):
+    async with monitor_type(connection) as mon:
+        pending = False
+        retry = RETRY_SECONDS
         while True:
             try:
-                await mon.async_get()
+                if not pending:
+                    await mon.async_get()
+                    pending = True
+                await app.async_refresh()
                 reconcile_tab_monitors()
-                for w in app.windows:
-                    schedule_save(w.window_id)
+                schedule_layout_changes()
+                pending = False
+                retry = RETRY_SECONDS
             except asyncio.CancelledError:
                 raise
             except Exception:
-                logger.exception("layout monitor error")
-                await asyncio.sleep(1)
+                logger.exception("layout monitor error; retrying")
+                await asyncio.sleep(retry)
+                retry = min(retry * 2, MAX_RETRY_SECONDS)
 
 
 async def _focus_loop():
@@ -179,7 +236,7 @@ async def _focus_loop():
                 update = await mon.async_get_next_update()
                 changed = update.window_changed
                 if changed is not None:
-                    schedule_save(changed.window_id)
+                    schedule_save(changed.window_id, reason="window focus changed")
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -206,7 +263,15 @@ async def main(_connection):
     await save_window_arrangement.async_register(connection)
 
     reconcile_tab_monitors()
-    await asyncio.gather(_layout_loop(), _focus_loop(), agents.watch())
+    _layouts.update({w.window_id: window_layout(w) for w in app.windows})
+    logger.info("arrangement saver started: windows=%d", len(app.windows))
+    await asyncio.gather(
+        _layout_loop(iterm2.LayoutChangeMonitor),
+        _layout_loop(iterm2.NewSessionMonitor),
+        _layout_loop(iterm2.SessionTerminationMonitor),
+        _focus_loop(),
+        agents.watch(),
+    )
 
 
 if __name__ == "__main__":
@@ -217,4 +282,15 @@ if __name__ == "__main__":
             fcntl.flock(daemon_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             sys.exit("Arrangement saver is already running.")
+        handler = RotatingFileHandler(
+            lock_dir / "saver.log", maxBytes=2_000_000, backupCount=3
+        )
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
+        logging.basicConfig(
+            level=logging.WARNING, handlers=[handler, logging.StreamHandler()]
+        )
+        logger.setLevel(logging.INFO)
+        logging.getLogger("arrangement_iterm").setLevel(logging.INFO)
         iterm2.run_until_complete(main)

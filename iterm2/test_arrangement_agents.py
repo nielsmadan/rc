@@ -264,7 +264,7 @@ class Session:
 class Window:
     def __init__(self, session, connection, window_id="one"):
         self.window_id = window_id
-        self.tabs = [types.SimpleNamespace(sessions=[session])]
+        self.tabs = [types.SimpleNamespace(tab_id="tab-one", sessions=[session])]
         self.connection = connection
         self.saved = None
         self.error = None
@@ -513,6 +513,191 @@ class SaveTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(calls), 2)
             self.assertEqual(daemon._save_requests, {})
             self.assertEqual(daemon._save_errors, {})
+        finally:
+            sys.modules.pop("SaveWindowArrangement", None)
+
+    async def test_continuous_events_cannot_postpone_save_past_deadline(self):
+        import SaveWindowArrangement as daemon
+
+        daemon.app = self.app
+        daemon.DEBOUNCE_SECONDS = 1
+        daemon.MAX_SAVE_DELAY_SECONDS = 0.05
+        clock = types.SimpleNamespace(now=0.0)
+        saves = []
+        events = []
+
+        async def save(*_, **__):
+            saves.append(clock.now)
+
+        async def event_during_wait(awaitable, timeout):
+            awaitable.close()
+            clock.now += min(timeout, 0.01)
+            self.assertLessEqual(clock.now, 0.2, "continuous events starved the save")
+            events.append(clock.now)
+            daemon.schedule_save("one")
+
+        scheduler = types.SimpleNamespace(
+            get_running_loop=lambda: types.SimpleNamespace(time=lambda: clock.now),
+            create_task=asyncio.create_task,
+            Event=asyncio.Event,
+            wait_for=event_during_wait,
+        )
+        try:
+            with patch.object(daemon, "save_window", save), patch.object(daemon, "asyncio", scheduler):
+                daemon.schedule_save("one")
+                await asyncio.wait_for(daemon._debounce["one"], 1)
+            self.assertEqual(saves, [daemon.MAX_SAVE_DELAY_SECONDS])
+            self.assertEqual(events[-1], saves[0])
+        finally:
+            sys.modules.pop("SaveWindowArrangement", None)
+
+    async def test_layout_change_saves_only_changed_window_without_debounce(self):
+        import SaveWindowArrangement as daemon
+
+        second = Window(Session(), self.connection, "two")
+        self.app.windows.append(second)
+        daemon.app = self.app
+        daemon.DEBOUNCE_SECONDS = 10
+        calls = []
+
+        async def save(window, **_):
+            calls.append(window.window_id)
+
+        def layout(window):
+            return tuple(tab.tab_id for tab in window.tabs)
+
+        try:
+            with patch.object(daemon, "window_layout", layout), patch.object(daemon, "save_window", save):
+                daemon._layouts.update({w.window_id: layout(w) for w in self.app.windows})
+                self.window.tabs.append(types.SimpleNamespace(tab_id="new-tab"))
+                daemon.schedule_layout_changes()
+                await asyncio.wait_for(asyncio.gather(*daemon._debounce.values()), 0.5)
+                self.assertEqual(calls, ["one"])
+                self.window.tabs.pop()
+                daemon.schedule_layout_changes()
+                await asyncio.wait_for(asyncio.gather(*daemon._debounce.values()), 0.5)
+                self.assertEqual(calls, ["one", "one"])
+                daemon.schedule_layout_changes()
+                self.assertEqual(daemon._save_requests, {})
+        finally:
+            sys.modules.pop("SaveWindowArrangement", None)
+
+    async def test_lifecycle_event_refreshes_windows_before_scheduling(self):
+        import SaveWindowArrangement as daemon
+
+        calls = []
+
+        class Monitor:
+            def __init__(self, _):
+                self.delivered = False
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                pass
+
+            async def async_get(self):
+                if self.delivered:
+                    raise asyncio.CancelledError
+                self.delivered = True
+
+        async def refresh():
+            calls.append("refresh")
+
+        daemon.app = types.SimpleNamespace(async_refresh=refresh)
+        try:
+            with (
+                patch.object(daemon, "reconcile_tab_monitors", lambda: calls.append("monitors")),
+                patch.object(daemon, "schedule_layout_changes", lambda: calls.append("schedule")),
+                self.assertRaises(asyncio.CancelledError),
+            ):
+                await daemon._layout_loop(Monitor)
+            self.assertEqual(calls, ["refresh", "monitors", "schedule"])
+        finally:
+            sys.modules.pop("SaveWindowArrangement", None)
+
+    async def test_failed_refresh_retries_consumed_event_without_new_notification(self):
+        import SaveWindowArrangement as daemon
+
+        calls = []
+
+        class Monitor:
+            def __init__(self, _):
+                self.delivered = False
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                pass
+
+            async def async_get(self):
+                if self.delivered:
+                    raise asyncio.CancelledError
+                self.delivered = True
+                calls.append("event")
+
+        async def refresh():
+            calls.append("refresh")
+            if calls.count("refresh") == 1:
+                raise RuntimeError("temporary refresh failure")
+
+        async def sleep(delay):
+            calls.append(("retry", delay))
+
+        daemon.app = types.SimpleNamespace(async_refresh=refresh)
+        try:
+            with (
+                patch.object(daemon, "asyncio", types.SimpleNamespace(
+                    sleep=sleep, CancelledError=asyncio.CancelledError,
+                )),
+                patch.object(daemon, "reconcile_tab_monitors", lambda: calls.append("monitors")),
+                patch.object(daemon, "schedule_layout_changes", lambda: calls.append("schedule")),
+                self.assertLogs(daemon.logger, level="ERROR"),
+                self.assertRaises(asyncio.CancelledError),
+            ):
+                await daemon._layout_loop(Monitor)
+            self.assertEqual(calls, [
+                "event", "refresh", ("retry", daemon.RETRY_SECONDS),
+                "refresh", "monitors", "schedule",
+            ])
+        finally:
+            sys.modules.pop("SaveWindowArrangement", None)
+
+    async def test_layout_change_wakes_an_existing_delayed_save(self):
+        import SaveWindowArrangement as daemon
+
+        daemon.app = self.app
+        daemon.DEBOUNCE_SECONDS = 10
+        saved = asyncio.Event()
+
+        async def save(*_, **__):
+            saved.set()
+
+        try:
+            with patch.object(daemon, "save_window", save):
+                daemon.schedule_save("one")
+                await asyncio.sleep(0)
+                daemon.schedule_save("one", immediate=True, reason="layout changed")
+                await asyncio.wait_for(saved.wait(), 0.5)
+                await asyncio.gather(*daemon._debounce.values())
+        finally:
+            sys.modules.pop("SaveWindowArrangement", None)
+
+    async def test_closed_window_logs_dropped_pending_update(self):
+        import SaveWindowArrangement as daemon
+
+        daemon.app = self.app
+        daemon.DEBOUNCE_SECONDS = 0.001
+        try:
+            with self.assertLogs(daemon.logger, level="WARNING") as logs:
+                daemon.schedule_save("one")
+                self.app.windows.clear()
+                await asyncio.wait_for(daemon._debounce["one"], 0.5)
+            self.assertIn("closed before save", logs.output[0])
+            self.assertEqual(daemon._save_requests, {})
+            self.assertEqual(daemon._first_requests, {})
         finally:
             sys.modules.pop("SaveWindowArrangement", None)
 

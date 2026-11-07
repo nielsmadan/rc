@@ -79,8 +79,8 @@ class ArrangementAgents:
         except (TimeoutError, OSError, TypeError, ValueError, RuntimeError) as exc:
             message = str(exc) or type(exc).__name__
             if self.last_error != message:
-                print(
-                    f"agent presence unavailable; retaining saved bindings: {message}"
+                logger.warning(
+                    "agent presence unavailable; retaining saved bindings: %s", message
                 )
                 self.last_error = message
         self.snapshot = (rows, parents)
@@ -108,8 +108,9 @@ class ArrangementAgents:
                             window, session, rows, parents, launches
                         )
                     except (OSError, TypeError, ValueError, iterm2.RPCException) as exc:
-                        print(
-                            f"agent binding unchanged for pane {session.session_id}: {exc}"
+                        logger.warning(
+                            "agent binding unchanged for pane %s: %s",
+                            session.session_id, exc,
                         )
 
     async def _reconcile_session(self, window, session, rows, parents, launches):
@@ -218,6 +219,11 @@ class ArrangementAgents:
                             },
                         )
                     await window.async_save_window_as_arrangement(name)
+                    logger.info(
+                        "saved arrangement=%r window=%s tabs=%d panes=%d tab_ids=%s",
+                        name, window.window_id, len(window.tabs), len(sessions),
+                        [tab.tab_id for tab in window.tabs],
+                    )
                 finally:
                     failures = []
                     for session, original in changed:
