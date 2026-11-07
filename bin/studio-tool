@@ -10,12 +10,13 @@ usage: studio-tool install <tool> <version>
 The deploy user's half of `studio-deploy <tool> <version>`, run through
 bin/studio-checkout. Installs an exact release of one of these tools under
 /opt/tools/<tool>/<version>, from that tool's own release files only:
-  loadout  GitHub release wheel, dependencies locked by its uv.lock
-  claude   Anthropic's signed release manifest and binary
-  codex    OpenAI's GitHub release package
-  pi       pi.dev's release lockfile, through npm ci
-current and previous link to the live and the replaced version; /opt/bin/<tool>
-goes through current, so a deploy or a rollback is one link switch.
+  loadout, pratfall  GitHub release wheel, dependencies locked by its uv.lock
+  hooklinesinker     GitHub release binary, checked against SHA256SUMS too
+  claude             Anthropic's signed release manifest and binary
+  codex              OpenAI's GitHub release package
+  pi                 pi.dev's release lockfile, through npm ci
+current and previous link to the live and the replaced version; the commands in
+/opt/bin go through current, so a deploy or a rollback is one link switch.
 EOF
 }
 
@@ -35,7 +36,7 @@ GPG="${STUDIO_TOOL_GPG:-/opt/homebrew/bin/gpg}"
 GPGV="${STUDIO_TOOL_GPGV:-/opt/homebrew/bin/gpgv}"
 CODESIGN="${STUDIO_TOOL_CODESIGN:-/usr/bin/codesign}"
 
-TOOL_NAMES="loadout claude codex pi"
+TOOL_NAMES="loadout pratfall hooklinesinker claude codex pi"
 # Anthropic's release signing key and the publishers' Apple team IDs.
 CLAUDE_KEY_FPR=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
 CLAUDE_TEAM=Q6L2SF6YDW
@@ -55,6 +56,13 @@ PATH=/usr/bin:/bin:/usr/sbin:/sbin
 umask 022
 
 die() { printf 'studio-tool: %s\n' "$*" >&2; exit 1; }
+
+command_of() {
+  case "$1" in
+    pratfall) echo prat ;;
+    *) echo "$1" ;;
+  esac
+}
 
 known() {
   case " $TOOL_NAMES " in
@@ -94,18 +102,26 @@ check_team() {
   [ "$team" = "$want" ] || die "$file is signed by team '$team', expected $want"
 }
 
-install_loadout() {
-  local v="$1" dir="$2" wheel sdist
-  wheel="loadout-$v-py3-none-any.whl" sdist="loadout-$v.tar.gz"
+# A Python tool's GitHub release: its wheel in its own venv, and the dependencies its
+# pyproject.toml names, pinned by hash from the uv.lock in the same release's sdist.
+install_wheel() {
+  local repo="$1" dist="$2" v="$3" dir="$4" wheel sdist
+  wheel="$dist-$v-py3-none-any.whl" sdist="$dist-$v.tar.gz"
   for f in "$wheel" "$sdist"; do
-    fetch "$GITHUB/nielsmadan/loadout/releases/download/v$v/$f" "$WORK/$f" || die "no $f in loadout's v$v release"
-    check_sha256 "$(github_digest nielsmadan/loadout "v$v" "$f")" "$WORK/$f"
+    fetch "$GITHUB/$repo/releases/download/v$v/$f" "$WORK/$f" || die "no $f in $dist's v$v release"
+    check_sha256 "$(github_digest "$repo" "v$v" "$f")" "$WORK/$f"
   done
-  tar -xzf "$WORK/$sdist" -C "$WORK" "loadout-$v/uv.lock" || die "$sdist has no uv.lock"
-  "$PYTHON" -I - "$WORK/loadout-$v/uv.lock" > "$WORK/requirements.txt" <<'PY'
-import sys, tomllib
-packages = {p["name"]: p for p in tomllib.load(open(sys.argv[1], "rb"))["package"]}
-seen, todo = set(), ["loadout"]
+  tar -xzf "$WORK/$sdist" -C "$WORK" "$dist-$v/pyproject.toml" || die "$sdist has no pyproject.toml"
+  tar -xzf "$WORK/$sdist" -C "$WORK" "$dist-$v/uv.lock" 2>/dev/null || true
+  "$PYTHON" -I - "$WORK/$dist-$v" "$dist" > "$WORK/requirements.txt" <<'PY'
+import os, sys, tomllib
+root, dist = sys.argv[1:3]
+if not tomllib.load(open(os.path.join(root, "pyproject.toml"), "rb"))["project"].get("dependencies"):
+    sys.exit(0)
+if not os.path.exists(os.path.join(root, "uv.lock")):
+    sys.exit(f"studio-tool: {dist} has dependencies but its sdist has no uv.lock")
+packages = {p["name"]: p for p in tomllib.load(open(os.path.join(root, "uv.lock"), "rb"))["package"]}
+seen, todo = set(), [dist]
 while todo:
     name = todo.pop()
     for dep in packages[name].get("dependencies", []):
@@ -128,7 +144,32 @@ PY
   fi
   "$dir/bin/python" -I -m pip --isolated install --quiet --no-cache-dir --disable-pip-version-check \
     --no-deps --no-index "$WORK/$wheel"
-  [ -x "$dir/bin/loadout" ] || die "the loadout wheel installed no loadout command"
+}
+
+install_loadout() {
+  install_wheel nielsmadan/loadout loadout "$@"
+}
+
+install_pratfall() {
+  install_wheel nielsmadan/pratfall pratfall "$@"
+}
+
+# The binary is ad-hoc signed, so the checksums are all there is to check.
+install_hooklinesinker() {
+  local v="$1" dir="$2" asset=hooklinesinker-macos-universal sum listed
+  fetch "$GITHUB/nielsmadan/hooklinesinker/releases/download/v$v/SHA256SUMS" "$WORK/SHA256SUMS" ||
+    die "no hooklinesinker release $v"
+  check_sha256 "$(github_digest nielsmadan/hooklinesinker "v$v" SHA256SUMS)" "$WORK/SHA256SUMS"
+  sum="$(github_digest nielsmadan/hooklinesinker "v$v" "$asset")"
+  listed="$(awk -v a="$asset" '$2 == a || $2 == "*"a {print $1}' "$WORK/SHA256SUMS")"
+  [ -n "$sum" ] && [ "$sum" = "$listed" ] || die "SHA256SUMS lists '$listed' for $asset, the release '$sum'"
+  mkdir -p "$dir/bin"
+  fetch "$GITHUB/nielsmadan/hooklinesinker/releases/download/v$v/$asset" "$dir/bin/hooklinesinker"
+  check_sha256 "$sum" "$dir/bin/hooklinesinker"
+  chmod 755 "$dir/bin/hooklinesinker"
+  # Only the arm64 slice carries the linker's ad-hoc signature.
+  "$CODESIGN" --verify --strict --arch arm64 "$dir/bin/hooklinesinker" 2>/dev/null ||
+    die "hooklinesinker $v has a broken arm64 code signature"
 }
 
 install_claude() {
@@ -257,7 +298,7 @@ prune() {
 switch_to() {
   local tool="$1" v="$2" dir="$TOOLS/$1" was
   was="$(readlink "$dir/current" 2>/dev/null || true)"
-  relink "$BIN/$tool" "$dir/current/bin/$tool"
+  relink "$BIN/$(command_of "$tool")" "$dir/current/bin/$(command_of "$tool")"
   if [ "$was" = "$v" ]; then
     echo "$tool already at $v"
     return
@@ -283,6 +324,7 @@ install_tool() {
     WORK="$(mktemp -d "$TOOLS/.work.XXXXXX")"
     PARTIAL="$dir"
     "install_$tool" "$v" "$dir"
+    [ -x "$dir/bin/$(command_of "$tool")" ] || die "$tool $v installed no $(command_of "$tool") command"
     touch "$(complete_marker "$tool" "$v")"
     PARTIAL=""
   fi

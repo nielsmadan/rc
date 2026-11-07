@@ -8,12 +8,14 @@ usage: studio-deploy <repo> [<ref>]
        studio-deploy --rollback <repo|tool>
        studio-deploy --status [<repo|tool>...]
 
-Deploys rc or ac, or an exact release of loadout, claude, codex or pi, on the
-Mac Studio, run as the shared user. The checkout at /opt/<repo>, or the install
-under /opt/tools/<tool>, happens as the deploy user (bin/studio-checkout,
-through sudo); then this re-renders, as you, what reads it:
-  ac, loadout  /opt/ac/sync.sh --profile studio, then /opt/ac/bin/fleet-sync
-  rc           /opt/rc/install.sh
+Deploys rc or ac, or an exact release of loadout, pratfall, hooklinesinker,
+claude, codex or pi, on the Mac Studio, run as the shared user. The checkout at
+/opt/<repo>, or the install under /opt/tools/<tool>, happens as the deploy user
+(bin/studio-checkout, through sudo); then this re-renders, as you, what reads it:
+  ac, loadout     /opt/ac/sync.sh --profile studio, then /opt/ac/bin/fleet-sync
+  rc              /opt/rc/install.sh
+  hooklinesinker  registers Juggler's consumer, whose sink is the MacBook's
+                  Juggler through ssh's RemoteForward 7483
 
 <ref> defaults to the tip of the repo's default branch (rc: master, ac: main),
 and only a commit on that branch is accepted.
@@ -28,6 +30,7 @@ if [ -r "$ROOT/rc/zsh/studio.zshenv" ]; then
 fi
 
 LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
+JUGGLER_SINK=http://127.0.0.1:7483/hook
 # Each loaded agent whose plist or program the deploy changed (label, then its files).
 # install.sh loads the ones not loaded yet.
 AGENT_FILES=(
@@ -66,6 +69,9 @@ rebuild() {
     rc)
       "$ROOT/rc/install.sh" || failed=1
       reload_changed_agents "$2" || failed=1
+      ;;
+    hooklinesinker)
+      "$ROOT/bin/hooklinesinker" install --consumer juggler --sink "$JUGGLER_SINK" || failed=1
       ;;
   esac
   [ "$failed" = 0 ] || echo "studio-deploy: $1 is deployed, but re-rendering failed; fix it and deploy $1 again" >&2
