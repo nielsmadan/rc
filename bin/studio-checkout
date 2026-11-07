@@ -16,7 +16,8 @@ studio-deploy instead, which also re-renders what reads the checkout.
 <ref> defaults to the tip of the repo's default branch (rc: master, ac: main),
 and only a commit on that branch is accepted.
 Each checkout records the commit it replaced; --rollback goes back to it.
-A tool (loadout, claude, codex, pi) is handed to bin/studio-tool, which installs
+A tool (loadout, pratfall, hooklinesinker, claude, codex, pi) is handed to
+bin/studio-tool, which installs
 that exact release under /opt/tools.
 EOF
 }

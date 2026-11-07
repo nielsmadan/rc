@@ -84,6 +84,17 @@ class StudioDeployTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(calls[1:], ["studio-checkout loadout 0.9.4", "sync.sh --profile studio", "fleet-sync "])
 
+    def test_hooklinesinker_registers_jugglers_consumer(self):
+        (self.opt / "bin").mkdir()
+        (self.opt / "bin/hooklinesinker").write_text(LOGGER)
+        (self.opt / "bin/hooklinesinker").chmod(0o755)
+        result, calls = self.run_script("hooklinesinker", "1.4.1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls[1:], [
+            "studio-checkout hooklinesinker 1.4.1",
+            "hooklinesinker install --consumer juggler --sink http://127.0.0.1:7483/hook",
+        ])
+
     def test_a_harness_deploy_renders_nothing(self):
         result, calls = self.run_script("claude", "2.1.319")
         self.assertEqual(result.returncode, 0, result.stderr)

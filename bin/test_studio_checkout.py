@@ -121,7 +121,7 @@ class StudioCheckoutTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), [
             "rc: not deployed", "ac: " + git("log", "-1", "--format=%h %s", cwd=self.opt / "ac"),
-            "loadout: not deployed", "claude: not deployed", "codex: not deployed", "pi: not deployed",
+            *(f"{tool}: not deployed" for tool in ("loadout", "pratfall", "hooklinesinker", "claude", "codex", "pi")),
         ])
 
     def test_removes_untracked_files_on_deploy(self):

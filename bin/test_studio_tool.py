@@ -51,14 +51,14 @@ def tarball(files):
     return buffer.getvalue()
 
 
-def loadout_wheel(version):
+def python_wheel(dist, version, command):
     buffer = io.BytesIO()
-    info = f"loadout-{version}.dist-info"
+    info = f"{dist}-{version}.dist-info"
     with zipfile.ZipFile(buffer, "w") as wheel:
-        wheel.writestr("loadout/__init__.py", f"def main():\n    print('loadout {version}')\n")
-        wheel.writestr(f"{info}/METADATA", f"Metadata-Version: 2.1\nName: loadout\nVersion: {version}\n")
+        wheel.writestr(f"{dist}/__init__.py", f"def main():\n    print('{command} {version}')\n")
+        wheel.writestr(f"{info}/METADATA", f"Metadata-Version: 2.1\nName: {dist}\nVersion: {version}\n")
         wheel.writestr(f"{info}/WHEEL", "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n")
-        wheel.writestr(f"{info}/entry_points.txt", "[console_scripts]\nloadout = loadout:main\n")
+        wheel.writestr(f"{info}/entry_points.txt", f"[console_scripts]\n{command} = {dist}:main\n")
         wheel.writestr(f"{info}/RECORD", "")
     return buffer.getvalue()
 
@@ -122,14 +122,23 @@ class StudioToolTests(unittest.TestCase):
         archive = tarball({"codex-package.json": json.dumps(package).encode(), "bin/codex": b"#!/bin/sh\n"})
         self.release("openai/codex", f"rust-v{version}", {"codex-package-aarch64-apple-darwin.tar.gz": archive})
 
-    def publish_loadout(self, version, dependencies=()):
-        lock = f'version = 1\n\n[[package]]\nname = "loadout"\nversion = "{version}"\n'
-        lock += f'source = {{ editable = "." }}\ndependencies = [{", ".join(dependencies)}]\n'
-        sdist = tarball({f"loadout-{version}/uv.lock": lock.encode()})
-        self.release("nielsmadan/loadout", f"v{version}", {
-            f"loadout-{version}-py3-none-any.whl": loadout_wheel(version),
-            f"loadout-{version}.tar.gz": sdist,
+    def publish_wheel(self, repo, dist, version, command, lock_dependencies=None):
+        files = {f"{dist}-{version}/pyproject.toml":
+                 f'[project]\nname = "{dist}"\ndependencies = [{"\"x\"" if lock_dependencies else ""}]\n'.encode()}
+        if lock_dependencies is not None:
+            lock = f'version = 1\n\n[[package]]\nname = "{dist}"\nversion = "{version}"\n'
+            lock += f'source = {{ editable = "." }}\ndependencies = [{", ".join(lock_dependencies)}]\n'
+            files[f"{dist}-{version}/uv.lock"] = lock.encode()
+        self.release(repo, f"v{version}", {
+            f"{dist}-{version}-py3-none-any.whl": python_wheel(dist, version, command),
+            f"{dist}-{version}.tar.gz": tarball(files),
         })
+
+    def publish_hooklinesinker(self, version, listed=None):
+        binary = b"#!/bin/sh\necho hooklinesinker\n"
+        sums = f"{listed or sha256(binary)}  hooklinesinker-macos-universal\n".encode()
+        self.release("nielsmadan/hooklinesinker", f"v{version}",
+                     {"hooklinesinker-macos-universal": binary, "SHA256SUMS": sums})
 
     def publish_pi(self, version, resolved="https://registry.npmjs.org/@earendil-works/pi-coding-agent/-/x.tgz"):
         pi = "@earendil-works/pi-coding-agent"
@@ -252,17 +261,49 @@ class StudioToolTests(unittest.TestCase):
         self.assertIn(f"sha256 {sha256(b'tampered')}", result.stderr)
 
     def test_installs_the_loadout_wheel_into_its_own_venv(self):
-        self.publish_loadout("1.0.0")
+        self.publish_wheel("nielsmadan/loadout", "loadout", "1.0.0", "loadout", lock_dependencies=[])
         result = self.run_tool("install", "loadout", "1.0.0")
         self.assertEqual(result.returncode, 0, result.stderr)
         run = subprocess.run([str(self.opt / "bin/loadout")], capture_output=True, text=True)
         self.assertEqual(run.stdout, "loadout 1.0.0\n")
 
     def test_refuses_a_loadout_lock_it_cannot_read_fully(self):
-        self.publish_loadout("1.0.0", dependencies=['{ name = "colorama", marker = "sys_platform == \'win32\'" }'])
+        self.publish_wheel("nielsmadan/loadout", "loadout", "1.0.0", "loadout",
+                           lock_dependencies=['{ name = "colorama", marker = "sys_platform == \'win32\'" }'])
         result = self.run_tool("install", "loadout", "1.0.0")
         self.assertEqual(result.returncode, 1)
         self.assertIn("gives colorama a marker", result.stderr)
+
+    def test_installs_pratfall_without_a_lock_and_links_prat(self):
+        self.publish_wheel("nielsmadan/pratfall", "pratfall", "1.1.0", "prat")
+        result = self.run_tool("install", "pratfall", "1.1.0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = subprocess.run([str(self.opt / "bin/prat")], capture_output=True, text=True)
+        self.assertEqual(run.stdout, "prat 1.1.0\n")
+
+    def test_refuses_dependencies_without_a_lock(self):
+        self.publish_wheel("nielsmadan/pratfall", "pratfall", "1.1.0", "prat")
+        sdist = tarball({"pratfall-1.1.0/pyproject.toml": b'[project]\nname = "pratfall"\ndependencies = ["x"]\n'})
+        self.release("nielsmadan/pratfall", "v1.1.0", {
+            "pratfall-1.1.0-py3-none-any.whl": python_wheel("pratfall", "1.1.0", "prat"),
+            "pratfall-1.1.0.tar.gz": sdist,
+        })
+        result = self.run_tool("install", "pratfall", "1.1.0")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("pratfall has dependencies but its sdist has no uv.lock", result.stderr)
+
+    def test_installs_hooklinesinker(self):
+        self.publish_hooklinesinker("1.4.1")
+        result = self.run_tool("install", "hooklinesinker", "1.4.1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = subprocess.run([str(self.opt / "bin/hooklinesinker")], capture_output=True, text=True)
+        self.assertEqual(run.stdout, "hooklinesinker\n")
+
+    def test_refuses_hooklinesinker_when_sha256sums_disagrees_with_the_release(self):
+        self.publish_hooklinesinker("1.4.1", listed="f" * 64)
+        result = self.run_tool("install", "hooklinesinker", "1.4.1")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"SHA256SUMS lists '{'f' * 64}'", result.stderr)
 
     def test_installs_pi_from_its_lock_with_pis_own_integrity_filled_in(self):
         self.publish_pi("1.4.0")
@@ -283,8 +324,8 @@ class StudioToolTests(unittest.TestCase):
         self.assertFalse(self.log.exists())
 
     def test_status_lists_every_tool(self):
-        self.assertEqual(self.run_tool("status").stdout,
-                         "loadout: not deployed\nclaude: not deployed\ncodex: not deployed\npi: not deployed\n")
+        self.assertEqual(self.run_tool("status").stdout.splitlines(), [
+            f"{tool}: not deployed" for tool in ("loadout", "pratfall", "hooklinesinker", "claude", "codex", "pi")])
 
 
 if __name__ == "__main__":
