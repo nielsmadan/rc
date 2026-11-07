@@ -79,6 +79,16 @@ class StudioDeployTests(unittest.TestCase):
             "fleet-sync ",
         ])
 
+    def test_loadout_installs_as_deploy_then_renders_both_profiles(self):
+        result, calls = self.run_script("loadout", "0.9.4")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls[1:], ["studio-checkout loadout 0.9.4", "sync.sh --profile studio", "fleet-sync "])
+
+    def test_a_harness_deploy_renders_nothing(self):
+        result, calls = self.run_script("claude", "2.1.319")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(calls[1:], ["studio-checkout claude 2.1.319"])
+
     def test_rc_rollback_reruns_install(self):
         result, calls = self.run_script("--rollback", "rc")
         self.assertEqual(result.returncode, 0, result.stderr)

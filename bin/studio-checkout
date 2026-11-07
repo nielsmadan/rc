@@ -4,8 +4,9 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 usage: studio-checkout <repo> [<ref>]
-       studio-checkout --rollback <repo>
-       studio-checkout --status [<repo>]
+       studio-checkout <tool> <version>
+       studio-checkout --rollback <repo|tool>
+       studio-checkout --status [<repo|tool>...]
 
 The deploy user's half of bin/studio-deploy: puts a pinned checkout of <repo>
 (rc or ac) at /opt/<repo>, which is what the Mac Studio runs. It is the only
@@ -15,6 +16,8 @@ studio-deploy instead, which also re-renders what reads the checkout.
 <ref> defaults to the tip of the repo's default branch (rc: master, ac: main),
 and only a commit on that branch is accepted.
 Each checkout records the commit it replaced; --rollback goes back to it.
+A tool (loadout, claude, codex, pi) is handed to bin/studio-tool, which installs
+that exact release under /opt/tools.
 EOF
 }
 
@@ -34,6 +37,10 @@ remote() {
 }
 
 die() { printf 'studio-checkout: %s\n' "$*" >&2; exit 1; }
+
+# Anything that isn't a repo is studio-tool's to accept or refuse.
+TOOL="${BASH_SOURCE[0]%/*}/studio-tool"
+is_repo() { remote "$1" >/dev/null; }
 
 repo_dir() {
   remote "$1" >/dev/null || die "unknown repo '$1' (known: rc, ac)"
@@ -99,6 +106,10 @@ rollback() {
 status() {
   local repo dir
   for repo in "$@"; do
+    if ! is_repo "$repo"; then
+      "$TOOL" status "$repo"
+      continue
+    fi
     dir="$(repo_dir "$repo")"
     if [ -d "$dir/.git" ]; then
       printf '%s: %s' "$repo" "$(git -C "$dir" log -1 --format='%h %s' HEAD)"
@@ -112,8 +123,17 @@ status() {
 
 case "${1:-}" in
   -h|--help) usage ;;
-  --rollback) [ $# -eq 2 ] || { usage >&2; exit 2; }; rollback "$2" ;;
-  --status) shift; if [ $# -gt 0 ]; then status "$@"; else status rc ac; fi ;;
+  --rollback)
+    [ $# -eq 2 ] || { usage >&2; exit 2; }
+    if is_repo "$2"; then rollback "$2"; else exec "$TOOL" rollback "$2"; fi
+    ;;
+  --status)
+    shift
+    if [ $# -gt 0 ]; then status "$@"; else status rc ac; "$TOOL" status; fi
+    ;;
   ""|-*) usage >&2; exit 2 ;;
-  *) [ $# -le 2 ] || { usage >&2; exit 2; }; deploy "$@" ;;
+  *)
+    [ $# -le 2 ] || { usage >&2; exit 2; }
+    if is_repo "$1"; then deploy "$@"; else exec "$TOOL" install "$@"; fi
+    ;;
 esac

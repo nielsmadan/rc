@@ -109,7 +109,20 @@ class StudioCheckoutTests(unittest.TestCase):
 
     def test_refuses_option_like_refs_and_unknown_repos(self):
         self.assertIn("invalid ref", self.run_script("ac", "--upload-pack=x").stderr)
-        self.assertIn("unknown repo 'notes'", self.run_script("notes").stderr)
+        self.assertIn("unknown repo or tool 'notes'", self.run_script("notes", "1.2.3").stderr)
+
+    def test_hands_tools_to_studio_tool(self):
+        self.assertIn("'latest' is not an exact version", self.run_script("claude", "latest").stderr)
+        self.assertIn("claude is not deployed", self.run_script("--rollback", "claude").stderr)
+
+    def test_status_lists_the_repos_then_the_tools(self):
+        self.run_script("ac")
+        result = self.run_script("--status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            "rc: not deployed", "ac: " + git("log", "-1", "--format=%h %s", cwd=self.opt / "ac"),
+            "loadout: not deployed", "claude: not deployed", "codex: not deployed", "pi: not deployed",
+        ])
 
     def test_removes_untracked_files_on_deploy(self):
         self.run_script("ac", self.main[0])

@@ -1,0 +1,323 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: studio-tool install <tool> <version>
+       studio-tool rollback <tool>
+       studio-tool status [<tool>...]
+
+The deploy user's half of `studio-deploy <tool> <version>`, run through
+bin/studio-checkout. Installs an exact release of one of these tools under
+/opt/tools/<tool>/<version>, from that tool's own release files only:
+  loadout  GitHub release wheel, dependencies locked by its uv.lock
+  claude   Anthropic's signed release manifest and binary
+  codex    OpenAI's GitHub release package
+  pi       pi.dev's release lockfile, through npm ci
+current and previous link to the live and the replaced version; /opt/bin/<tool>
+goes through current, so a deploy or a rollback is one link switch.
+EOF
+}
+
+ROOT="${RC_DEPLOY_ROOT:-/opt}"
+TOOLS="$ROOT/tools"
+BIN="$ROOT/bin"
+# Test seams. sudo resets the environment, so the shared user can't set them.
+GITHUB="${STUDIO_TOOL_GITHUB:-https://github.com}"
+GITHUB_API="${STUDIO_TOOL_GITHUB_API:-https://api.github.com}"
+CLAUDE_BASE="${STUDIO_TOOL_CLAUDE_BASE:-https://downloads.claude.ai}"
+PI_BASE="${STUDIO_TOOL_PI_BASE:-https://pi.dev/api/installer/releases}"
+# pi.dev serves a release's record at <base>/<version>, its files below it.
+PI_RECORDS="${STUDIO_TOOL_PI_RECORDS:-$PI_BASE}"
+PYTHON="${STUDIO_TOOL_PYTHON:-/usr/local/share/mise/installs/python/3.14/bin/python3}"
+NODE_BIN="${STUDIO_TOOL_NODE_BIN:-/usr/local/share/mise/installs/node/24/bin}"
+GPG="${STUDIO_TOOL_GPG:-/opt/homebrew/bin/gpg}"
+GPGV="${STUDIO_TOOL_GPGV:-/opt/homebrew/bin/gpgv}"
+CODESIGN="${STUDIO_TOOL_CODESIGN:-/usr/bin/codesign}"
+
+TOOL_NAMES="loadout claude codex pi"
+# Anthropic's release signing key and the publishers' Apple team IDs.
+CLAUDE_KEY_FPR=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
+CLAUDE_TEAM=Q6L2SF6YDW
+CODEX_TEAM=2DC432GLL2
+PI_PACKAGE=@earendil-works/pi-coding-agent
+VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'
+KEEP=3
+
+# macOS sudo keeps the caller's HOME, which the agents can edit.
+export HOME="$TOOLS/.home"
+export XDG_CONFIG_HOME="$HOME/.config" XDG_CACHE_HOME="$TOOLS/.cache"
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0
+export NPM_CONFIG_USERCONFIG="$HOME/.npmrc" NPM_CONFIG_GLOBALCONFIG=/dev/null
+export NPM_CONFIG_CACHE="$TOOLS/.cache/npm" NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
+export NPM_CONFIG_UPDATE_NOTIFIER=false
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+umask 022
+
+die() { printf 'studio-tool: %s\n' "$*" >&2; exit 1; }
+
+known() {
+  case " $TOOL_NAMES " in
+    *" $1 "*) ;;
+    *) die "unknown repo or tool '$1' (repos: rc, ac; tools: ${TOOL_NAMES// /, })" ;;
+  esac
+}
+
+fetch() { curl -q --fail --silent --show-error --location --proto '=https,file' --retry 2 -o "$2" "$1"; }
+
+sha256_of() { shasum -a 256 "$1" | cut -d' ' -f1; }
+
+check_sha256() {
+  local want="$1" file="$2" got
+  got="$(sha256_of "$file")"
+  [ "$got" = "$want" ] || die "$(basename "$file"): sha256 $got, expected $want"
+}
+
+# The sha256 GitHub records for a release asset.
+github_digest() {
+  local repo="$1" tag="$2" asset="$3" json="$WORK/release-$2.json"
+  fetch "$GITHUB_API/repos/$repo/releases/tags/$tag" "$json" || die "no release $tag in $repo"
+  "$PYTHON" -I - "$json" "$asset" <<'PY'
+import json, sys
+assets = json.load(open(sys.argv[1]))["assets"]
+digest = next((a.get("digest") or "" for a in assets if a["name"] == sys.argv[2]), "")
+if not digest.startswith("sha256:"):
+    sys.exit(f"studio-tool: the release lists no sha256 for {sys.argv[2]}")
+print(digest.removeprefix("sha256:"))
+PY
+}
+
+check_team() {
+  local file="$1" want="$2" team
+  "$CODESIGN" --verify --strict "$file" 2>/dev/null || die "$file has no valid code signature"
+  team="$("$CODESIGN" -dv "$file" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+  [ "$team" = "$want" ] || die "$file is signed by team '$team', expected $want"
+}
+
+install_loadout() {
+  local v="$1" dir="$2" wheel sdist
+  wheel="loadout-$v-py3-none-any.whl" sdist="loadout-$v.tar.gz"
+  for f in "$wheel" "$sdist"; do
+    fetch "$GITHUB/nielsmadan/loadout/releases/download/v$v/$f" "$WORK/$f" || die "no $f in loadout's v$v release"
+    check_sha256 "$(github_digest nielsmadan/loadout "v$v" "$f")" "$WORK/$f"
+  done
+  tar -xzf "$WORK/$sdist" -C "$WORK" "loadout-$v/uv.lock" || die "$sdist has no uv.lock"
+  "$PYTHON" -I - "$WORK/loadout-$v/uv.lock" > "$WORK/requirements.txt" <<'PY'
+import sys, tomllib
+packages = {p["name"]: p for p in tomllib.load(open(sys.argv[1], "rb"))["package"]}
+seen, todo = set(), ["loadout"]
+while todo:
+    name = todo.pop()
+    for dep in packages[name].get("dependencies", []):
+        if "marker" in dep or "extra" in dep:
+            sys.exit(f"studio-tool: uv.lock gives {dep['name']} a marker or extra; teach studio-tool to read it")
+        if dep["name"] not in seen:
+            seen.add(dep["name"])
+            todo.append(dep["name"])
+for name in sorted(seen):
+    p = packages[name]
+    hashes = [w["hash"] for w in p.get("wheels", [])] + ([p["sdist"]["hash"]] if "sdist" in p else [])
+    if not hashes:
+        sys.exit(f"studio-tool: uv.lock has no hashes for {name}")
+    print(f"{name}=={p['version']} " + " ".join(f"--hash={h}" for h in hashes))
+PY
+  "$PYTHON" -I -m venv "$dir"
+  if [ -s "$WORK/requirements.txt" ]; then
+    "$dir/bin/python" -I -m pip --isolated install --quiet --no-cache-dir --disable-pip-version-check \
+      --require-hashes --only-binary=:all: --no-deps -r "$WORK/requirements.txt"
+  fi
+  "$dir/bin/python" -I -m pip --isolated install --quiet --no-cache-dir --disable-pip-version-check \
+    --no-deps --no-index "$WORK/$wheel"
+  [ -x "$dir/bin/loadout" ] || die "the loadout wheel installed no loadout command"
+}
+
+install_claude() {
+  local v="$1" dir="$2" base="$CLAUDE_BASE/claude-code-releases/$1" sum status
+  fetch "$base/manifest.json" "$WORK/manifest.json" || die "no claude release $v"
+  fetch "$base/manifest.json.sig" "$WORK/manifest.json.sig" || die "claude $v has no manifest signature"
+  fetch "$CLAUDE_BASE/keys/claude-code.asc" "$WORK/claude-code.asc"
+  # gpgv against a keyring file needs no gpg-agent.
+  mkdir -m 700 "$WORK/gnupg"
+  "$GPG" --homedir "$WORK/gnupg" --batch --dearmor < "$WORK/claude-code.asc" > "$WORK/claude-code.gpg" ||
+    die "could not read Anthropic's signing key"
+  status="$("$GPGV" --homedir "$WORK/gnupg" --keyring "$WORK/claude-code.gpg" --status-fd 1 \
+    "$WORK/manifest.json.sig" "$WORK/manifest.json" 2>/dev/null)" ||
+    die "claude $v: the manifest signature does not verify"
+  grep -Eq "^\[GNUPG:\] VALIDSIG .* $CLAUDE_KEY_FPR\$" <<<"$status" ||
+    die "claude $v: the manifest is not signed by $CLAUDE_KEY_FPR"
+  sum="$("$PYTHON" -I - "$WORK/manifest.json" "$v" <<'PY'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+if manifest.get("version") != sys.argv[2]:
+    sys.exit(f"studio-tool: the manifest is for {manifest.get('version')}, not {sys.argv[2]}")
+print(manifest["platforms"]["darwin-arm64"]["checksum"])
+PY
+)"
+  mkdir -p "$dir/bin"
+  fetch "$base/darwin-arm64/claude" "$dir/bin/claude"
+  check_sha256 "$sum" "$dir/bin/claude"
+  chmod 755 "$dir/bin/claude"
+  check_team "$dir/bin/claude" "$CLAUDE_TEAM"
+}
+
+install_codex() {
+  local v="$1" dir="$2" asset=codex-package-aarch64-apple-darwin.tar.gz
+  fetch "$GITHUB/openai/codex/releases/download/rust-v$v/$asset" "$WORK/$asset" || die "no codex release $v"
+  check_sha256 "$(github_digest openai/codex "rust-v$v" "$asset")" "$WORK/$asset"
+  mkdir -p "$dir"
+  tar -xzf "$WORK/$asset" -C "$dir"
+  "$PYTHON" -I - "$dir/codex-package.json" "$v" <<'PY'
+import json, sys
+package = json.load(open(sys.argv[1]))
+want = {"version": sys.argv[2], "target": "aarch64-apple-darwin", "entrypoint": "bin/codex"}
+wrong = {k: package.get(k) for k, v in want.items() if package.get(k) != v}
+if wrong:
+    sys.exit(f"studio-tool: codex-package.json says {wrong}, expected {want}")
+PY
+  check_team "$dir/bin/codex" "$CODEX_TEAM"
+}
+
+install_pi() {
+  local v="$1" dir="$2" cli
+  fetch "$PI_RECORDS/$v" "$WORK/release.json" || die "no pi release $v"
+  mkdir -p "$dir/bin"
+  fetch "$PI_BASE/$v/package.json" "$dir/package.json"
+  fetch "$PI_BASE/$v/package-lock.json" "$WORK/package-lock.json"
+  # pi.dev's lockfile leaves pi's own packages without integrity; its release record has them.
+  "$PYTHON" -I - "$WORK/release.json" "$dir/package.json" "$WORK/package-lock.json" "$PI_PACKAGE" "$v" \
+    > "$dir/package-lock.json" <<'PY'
+import json, sys
+release, package, lock = (json.load(open(p)) for p in sys.argv[1:4])
+pi, version = sys.argv[4], sys.argv[5]
+root = lock.get("packages", {}).get("", {})
+if release.get("version") != version or package.get("dependencies", {}).get(pi) != version:
+    sys.exit(f"studio-tool: pi.dev's release files are not for {pi}@{version}")
+if lock.get("lockfileVersion") != 3 or root.get("dependencies", {}).get(pi) != version:
+    sys.exit(f"studio-tool: pi.dev's package-lock.json is not a v3 lock of {pi}@{version}")
+published = {(p["name"], p["version"]): p["integrity"] for p in release.get("packages", [])}
+for path, entry in lock["packages"].items():
+    if not path:
+        continue
+    name = path.rsplit("node_modules/", 1)[1]
+    if "integrity" not in entry:
+        entry["integrity"] = published.get((name, entry.get("version")))
+    if not entry["integrity"] or not entry.get("resolved", "").startswith("https://registry.npmjs.org/"):
+        sys.exit(f"studio-tool: {name} in pi's lock has no integrity or comes from outside npm's registry")
+json.dump(lock, sys.stdout, indent=2)
+PY
+  (cd "$dir" && PATH="$NODE_BIN:$PATH" "$NODE_BIN/npm" ci --ignore-scripts --omit=dev --include=optional \
+    --no-fund --no-audit --loglevel=error)
+  cli="$("$PYTHON" -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["bin"]["pi"])' \
+    "$dir/node_modules/$PI_PACKAGE/package.json")"
+  [ -f "$dir/node_modules/$PI_PACKAGE/$cli" ] || die "pi $v has no $cli"
+  printf '#!/bin/sh\nexec '\''%s'\'' '\''%s'\'' "$@"\n' "$NODE_BIN/node" "$dir/node_modules/$PI_PACKAGE/$cli" > "$dir/bin/pi"
+  chmod 755 "$dir/bin/pi"
+}
+
+complete_marker() { echo "$TOOLS/$1/$2/.studio-tool-complete"; }
+
+lock() {
+  LOCK="$TOOLS/$1/.lock"
+  mkdir "$LOCK" 2>/dev/null || die "another deploy of $1 is running (or one died: remove $LOCK)"
+}
+
+# An install that stops halfway leaves no version directory behind.
+cleanup() {
+  [ -n "${PARTIAL:-}" ] && rm -rf "$PARTIAL"
+  [ -n "${WORK:-}" ] && rm -rf "$WORK"
+  [ -n "${LOCK:-}" ] && rmdir "$LOCK" 2>/dev/null
+  return 0
+}
+
+relink() {
+  local link="$1" target="$2"
+  [ "$(readlink "$link" 2>/dev/null)" = "$target" ] && return
+  ln -s "$target" "$link.new.$$"
+  mv -fh "$link.new.$$" "$link"
+}
+
+# Keeps current, previous and the newest others, up to KEEP versions in all.
+prune() {
+  local tool="$1" dir="$TOOLS/$1" current previous kept=0 v
+  current="$(readlink "$dir/current" 2>/dev/null || true)"
+  previous="$(readlink "$dir/previous" 2>/dev/null || true)"
+  [ -n "$current" ] && kept=$((kept + 1))
+  [ -n "$previous" ] && kept=$((kept + 1))
+  for v in $(ls -t "$dir"); do
+    case "$v" in current|previous|"$current"|"$previous"|deploy.log) continue ;; esac
+    [ -d "$dir/$v" ] || continue
+    if [ "$kept" -lt "$KEEP" ] && [ -f "$(complete_marker "$tool" "$v")" ]; then
+      kept=$((kept + 1))
+    else
+      rm -rf "${dir:?}/$v"
+    fi
+  done
+}
+
+switch_to() {
+  local tool="$1" v="$2" dir="$TOOLS/$1" was
+  was="$(readlink "$dir/current" 2>/dev/null || true)"
+  relink "$BIN/$tool" "$dir/current/bin/$tool"
+  if [ "$was" = "$v" ]; then
+    echo "$tool already at $v"
+    return
+  fi
+  relink "$dir/current" "$v"
+  [ -n "$was" ] && relink "$dir/previous" "$was"
+  printf '%s %s %s %s -> %s\n' "$(date -u +%FT%TZ)" "${SUDO_USER:-$(id -un)}" "$tool" "${was:-none}" "$v" \
+    >> "$dir/deploy.log"
+  prune "$tool"
+  echo "$tool now at $v (was ${was:-nothing})"
+}
+
+install_tool() {
+  local tool="$1" v="$2" dir
+  known "$tool"
+  [[ "$v" =~ $VERSION_RE ]] || die "'$v' is not an exact version like 1.2.3"
+  [ -d "$TOOLS" ] && [ -d "$BIN" ] || die "$TOOLS or $BIN does not exist; admin creates them with bin/system-install"
+  mkdir -p "$TOOLS/$tool" "$HOME" "$XDG_CACHE_HOME"
+  lock "$tool"
+  dir="$TOOLS/$tool/$v"
+  if [ ! -f "$(complete_marker "$tool" "$v")" ]; then
+    rm -rf "$dir"
+    WORK="$(mktemp -d "$TOOLS/.work.XXXXXX")"
+    PARTIAL="$dir"
+    "install_$tool" "$v" "$dir"
+    touch "$(complete_marker "$tool" "$v")"
+    PARTIAL=""
+  fi
+  switch_to "$tool" "$v"
+}
+
+rollback() {
+  local tool="$1" previous
+  known "$tool"
+  [ -d "$TOOLS/$tool" ] || die "$tool is not deployed"
+  lock "$tool"
+  previous="$(readlink "$TOOLS/$tool/previous" 2>/dev/null)" || die "no earlier deploy of $tool recorded"
+  [ -f "$(complete_marker "$tool" "$previous")" ] || die "$tool $previous is no longer installed"
+  switch_to "$tool" "$previous"
+}
+
+status() {
+  local tool current previous
+  for tool in "$@"; do
+    known "$tool"
+    current="$(readlink "$TOOLS/$tool/current" 2>/dev/null || true)"
+    previous="$(readlink "$TOOLS/$tool/previous" 2>/dev/null || true)"
+    if [ -z "$current" ]; then
+      echo "$tool: not deployed"
+    else
+      printf '%s: %s%s\n' "$tool" "$current" "${previous:+ (rollback to $previous)}"
+    fi
+  done
+}
+
+trap cleanup EXIT
+case "${1:-}" in
+  -h|--help) usage ;;
+  install) [ $# -eq 3 ] || die "usage: studio-deploy <tool> <version> (an exact version)"; install_tool "$2" "$3" ;;
+  rollback) [ $# -eq 2 ] || { usage >&2; exit 2; }; rollback "$2" ;;
+  status) shift; if [ $# -gt 0 ]; then status "$@"; else status $TOOL_NAMES; fi ;;
+  *) usage >&2; exit 2 ;;
+esac

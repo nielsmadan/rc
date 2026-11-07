@@ -66,6 +66,19 @@ class SystemInstallTests(unittest.TestCase):
         self.assertIn(f"+ ln -s {self.opt}/rc/zsh/admin.zshrc {self.home}/.zshrc", result.stdout)
         self.assertIn("+ env HOMEBREW_RC_PROFILE=studio brew bundle install", result.stdout)
 
+    def test_check_gives_deploy_the_tool_dirs_and_links_the_update_locks(self):
+        result, _ = self.run_script("--check", "--profile", "studio")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for name in ("tools", "bin"):
+            self.assertIn(f"+ sudo install -d -o deploy -g staff -m 755 {self.opt}/{name}", result.stdout)
+        self.assertIn(
+            f"+ sudo ln -sfn {self.opt}/rc/studio/claude-updates.json "
+            "/Library/Application\\ Support/ClaudeCode/managed-settings.d/50-studio-updates.json",
+            result.stdout,
+        )
+        self.assertIn(f"+ sudo ln -sfn {self.opt}/rc/studio/codex-requirements.toml /etc/codex/requirements.toml",
+                      result.stdout)
+
     def test_check_keeps_an_existing_zshrc(self):
         (self.home / ".zshrc").write_text("# admin's own\n")
         result, _ = self.run_script("--check", "--profile", "studio")

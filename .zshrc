@@ -331,6 +331,9 @@ fi
 # opencode
 export PATH="$HOME/.opencode/bin:$PATH"
 
+# The Mac Studio's deployed tools (studio-deploy <tool>) stay ahead of ~/.local/bin.
+[[ -d /opt/bin ]] && path=(/opt/bin $path)
+
 # ---------------------------------------------------------------------------
 #  zsh-autosuggestions + zsh-syntax-highlighting
 # ---------------------------------------------------------------------------

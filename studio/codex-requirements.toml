@@ -1,0 +1,2 @@
+# The Mac Studio deploys an exact codex release (studio-deploy codex <version>).
+check_for_update_on_startup = false
