@@ -8,6 +8,10 @@ DEPLOYED_RC="$DEPLOY_ROOT/rc"
 DEPLOY_USER=deploy
 SHARED_USER="${STUDIO_SHARED_USER:-nielsmadan}"
 DEPLOYED_REPOS=(rc ac)
+# studio-deploy <tool> installs into tools/ and links the commands in bin/.
+DEPLOY_DIRS=(rc ac tools bin)
+CLAUDE_MANAGED_DIR="/Library/Application Support/ClaudeCode/managed-settings.d"
+CODEX_REQUIREMENTS=/etc/codex/requirements.toml
 SUDOERS_FILE=/etc/sudoers.d/studio-deploy
 LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
 KNOWN_PROFILES=(studio)
@@ -32,14 +36,15 @@ that as /opt/rc/bin/system-install.
   --upgrade       also upgrade Homebrew formulae and reinstall the mise tools
   --check         print what would change without changing anything
 
-It creates the hidden deploy user, gives it /opt/rc and /opt/ac, and lets the
+It creates the hidden deploy user, gives it /opt/rc, /opt/ac, /opt/tools and /opt/bin, and lets the
 shared user run bin/studio-checkout as deploy, and a root-owned copy of
 bin/studio-load-agent as root, which loads rc's LaunchAgents from ssh. On the first run
 it checks out both repos' default branches; later deploys are the shared user's
 studio-deploy, which also re-renders their config.
 It links this admin's ~/.zshrc to /opt/rc/zsh/admin.zshrc unless a ~/.zshrc
 already exists. Then it links /opt/rc/mise/config.toml to /etc/mise/config.toml and the
-profile's mise/<profile>.toml into /etc/mise/conf.d/, installs /opt/rc's
+profile's mise/<profile>.toml into /etc/mise/conf.d/, links the settings that turn
+off Claude Code's and Codex's own updates (the deploy pins them), installs /opt/rc's
 Brewfile, gives this admin /usr/local/share/mise, and runs `mise install --system`
 and `mise reshim --system` without sudo.
 EOF
@@ -116,9 +121,9 @@ ensure_deploy_user() {
 }
 
 ensure_deploy_dirs() {
-  local repo dir
-  for repo in "${DEPLOYED_REPOS[@]}"; do
-    dir="$DEPLOY_ROOT/$repo"
+  local name dir
+  for name in "${DEPLOY_DIRS[@]}"; do
+    dir="$DEPLOY_ROOT/$name"
     if [ "$(stat -f %Su "$dir" 2>/dev/null)" = "$DEPLOY_USER" ]; then
       printf 'skip %s (owned by %s)\n' "$dir" "$DEPLOY_USER"
       continue
@@ -251,6 +256,8 @@ fi
 ensure_admin_zshrc
 sudo_link "$DEPLOYED_RC/mise/config.toml" /etc/mise/config.toml
 sudo_link "$DEPLOYED_RC/mise/$PROFILE.toml" "/etc/mise/conf.d/$PROFILE.toml"
+sudo_link "$DEPLOYED_RC/studio/claude-updates.json" "$CLAUDE_MANAGED_DIR/50-studio-updates.json"
+sudo_link "$DEPLOYED_RC/studio/codex-requirements.toml" "$CODEX_REQUIREMENTS"
 ensure_system_mise_dir
 ensure_load_agent_helper
 require "brew bundle"

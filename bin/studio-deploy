@@ -4,18 +4,21 @@ set -uo pipefail
 usage() {
   cat <<'EOF'
 usage: studio-deploy <repo> [<ref>]
-       studio-deploy --rollback <repo>
-       studio-deploy --status [<repo>]
+       studio-deploy <tool> <version>
+       studio-deploy --rollback <repo|tool>
+       studio-deploy --status [<repo|tool>...]
 
-Deploys rc or ac on the Mac Studio, run as the shared user. The checkout at
-/opt/<repo> happens as the deploy user (bin/studio-checkout, through sudo);
-then this re-renders, as you, what reads it:
-  ac  /opt/ac/sync.sh --profile studio, then /opt/ac/bin/fleet-sync
-  rc  /opt/rc/install.sh
+Deploys rc or ac, or an exact release of loadout, claude, codex or pi, on the
+Mac Studio, run as the shared user. The checkout at /opt/<repo>, or the install
+under /opt/tools/<tool>, happens as the deploy user (bin/studio-checkout,
+through sudo); then this re-renders, as you, what reads it:
+  ac, loadout  /opt/ac/sync.sh --profile studio, then /opt/ac/bin/fleet-sync
+  rc           /opt/rc/install.sh
 
 <ref> defaults to the tip of the repo's default branch (rc: master, ac: main),
 and only a commit on that branch is accepted.
---rollback goes back to the commit the last deploy replaced, and re-renders.
+--rollback goes back to the commit or version the last deploy replaced, and
+re-renders.
 EOF
 }
 
@@ -56,7 +59,7 @@ reload_changed_agents() {
 rebuild() {
   local failed=0
   case "$1" in
-    ac)
+    ac|loadout)
       "$ROOT/ac/sync.sh" --profile studio || failed=1
       "$ROOT/ac/bin/fleet-sync" || failed=1
       ;;
@@ -65,7 +68,7 @@ rebuild() {
       reload_changed_agents "$2" || failed=1
       ;;
   esac
-  [ "$failed" = 0 ] || echo "studio-deploy: $1 is checked out, but re-rendering failed; fix it and re-run studio-deploy $1" >&2
+  [ "$failed" = 0 ] || echo "studio-deploy: $1 is deployed, but re-rendering failed; fix it and deploy $1 again" >&2
   return "$failed"
 }
 
