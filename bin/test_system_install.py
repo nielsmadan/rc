@@ -78,6 +78,11 @@ class SystemInstallTests(unittest.TestCase):
         )
         self.assertIn(f"+ sudo ln -sfn {self.opt}/rc/studio/codex-requirements.toml /etc/codex/requirements.toml",
                       result.stdout)
+        self.assertIn(
+            f"+ sudo ln -sfn {self.opt}/rc/studio/droid-settings.json "
+            "/Library/Application\\ Support/Factory/settings.json",
+            result.stdout,
+        )
 
     def test_check_keeps_an_existing_zshrc(self):
         (self.home / ".zshrc").write_text("# admin's own\n")

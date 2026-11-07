@@ -12,5 +12,6 @@ unset _d
 export PATH
 # ~/.colima/default/colima.yaml links to the deploy-owned copy, which `colima start` would rewrite.
 export COLIMA_SAVE_CONFIG=0
-# The deploy pins pi; this stops its startup check for a newer release.
+# The deploy pins pi and opencode; these stop their startup checks for a newer release.
 export PI_SKIP_VERSION_CHECK=1
+export OPENCODE_DISABLE_AUTOUPDATE=1

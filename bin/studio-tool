@@ -15,6 +15,8 @@ bin/studio-checkout. Installs an exact release of one of these tools under
   claude             Anthropic's signed release manifest and binary
   codex              OpenAI's GitHub release package
   pi                 pi.dev's release lockfile, through npm ci
+  droid              Factory's release binary and its published sha256
+  opencode           Anomaly's GitHub release zip
 current and previous link to the live and the replaced version; the commands in
 /opt/bin go through current, so a deploy or a rollback is one link switch.
 EOF
@@ -30,17 +32,20 @@ CLAUDE_BASE="${STUDIO_TOOL_CLAUDE_BASE:-https://downloads.claude.ai}"
 PI_BASE="${STUDIO_TOOL_PI_BASE:-https://pi.dev/api/installer/releases}"
 # pi.dev serves a release's record at <base>/<version>, its files below it.
 PI_RECORDS="${STUDIO_TOOL_PI_RECORDS:-$PI_BASE}"
+DROID_BASE="${STUDIO_TOOL_DROID_BASE:-https://downloads.factory.ai/factory-cli/releases}"
 PYTHON="${STUDIO_TOOL_PYTHON:-/usr/local/share/mise/installs/python/3.14/bin/python3}"
 NODE_BIN="${STUDIO_TOOL_NODE_BIN:-/usr/local/share/mise/installs/node/24/bin}"
 GPG="${STUDIO_TOOL_GPG:-/opt/homebrew/bin/gpg}"
 GPGV="${STUDIO_TOOL_GPGV:-/opt/homebrew/bin/gpgv}"
 CODESIGN="${STUDIO_TOOL_CODESIGN:-/usr/bin/codesign}"
 
-TOOL_NAMES="loadout pratfall hooklinesinker claude codex pi"
+TOOL_NAMES="loadout pratfall hooklinesinker claude codex pi droid opencode"
 # Anthropic's release signing key and the publishers' Apple team IDs.
 CLAUDE_KEY_FPR=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
 CLAUDE_TEAM=Q6L2SF6YDW
 CODEX_TEAM=2DC432GLL2
+DROID_TEAM=SW6TL4V6Q5
+OPENCODE_TEAM=5NZ4Q7NXJ4
 PI_PACKAGE=@earendil-works/pi-coding-agent
 VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'
 KEEP=3
@@ -253,6 +258,29 @@ PY
   [ -f "$dir/node_modules/$PI_PACKAGE/$cli" ] || die "pi $v has no $cli"
   printf '#!/bin/sh\nexec '\''%s'\'' '\''%s'\'' "$@"\n' "$NODE_BIN/node" "$dir/node_modules/$PI_PACKAGE/$cli" > "$dir/bin/pi"
   chmod 755 "$dir/bin/pi"
+}
+
+# The sha256 sits next to the binary on Factory's host, so the team ID is what ties it to Factory.
+install_droid() {
+  local v="$1" dir="$2" base="$DROID_BASE/$1/darwin/arm64" sum
+  fetch "$base/droid.sha256" "$WORK/droid.sha256" || die "no droid release $v"
+  sum="$(awk 'NR == 1 {print $1}' "$WORK/droid.sha256")"
+  [[ "$sum" =~ ^[0-9a-f]{64}$ ]] || die "droid $v: droid.sha256 holds no sha256"
+  mkdir -p "$dir/bin"
+  fetch "$base/droid" "$dir/bin/droid"
+  check_sha256 "$sum" "$dir/bin/droid"
+  chmod 755 "$dir/bin/droid"
+  check_team "$dir/bin/droid" "$DROID_TEAM"
+}
+
+install_opencode() {
+  local v="$1" dir="$2" asset=opencode-darwin-arm64.zip
+  fetch "$GITHUB/anomalyco/opencode/releases/download/v$v/$asset" "$WORK/$asset" || die "no opencode release $v"
+  check_sha256 "$(github_digest anomalyco/opencode "v$v" "$asset")" "$WORK/$asset"
+  mkdir -p "$dir/bin"
+  /usr/bin/unzip -q "$WORK/$asset" opencode -d "$dir/bin" || die "$asset has no opencode binary"
+  chmod 755 "$dir/bin/opencode"
+  check_team "$dir/bin/opencode" "$OPENCODE_TEAM"
 }
 
 complete_marker() { echo "$TOOLS/$1/$2/.studio-tool-complete"; }

@@ -87,6 +87,7 @@ class StudioToolTests(unittest.TestCase):
             "STUDIO_TOOL_CLAUDE_BASE": f"file://{self.sources}/claude",
             "STUDIO_TOOL_PI_BASE": f"file://{self.sources}/pi",
             "STUDIO_TOOL_PI_RECORDS": f"file://{self.sources}/pi-records",
+            "STUDIO_TOOL_DROID_BASE": f"file://{self.sources}/factory",
             "STUDIO_TOOL_PYTHON": sys.executable,
             "STUDIO_TOOL_NODE_BIN": str(stubs),
             "STUDIO_TOOL_GPG": str(stubs / "gpg"),
@@ -139,6 +140,19 @@ class StudioToolTests(unittest.TestCase):
         sums = f"{listed or sha256(binary)}  hooklinesinker-macos-universal\n".encode()
         self.release("nielsmadan/hooklinesinker", f"v{version}",
                      {"hooklinesinker-macos-universal": binary, "SHA256SUMS": sums})
+
+    def publish_droid(self, version, binary=b"droid binary", checksum=None):
+        self.env["FAKE_TEAM"] = "SW6TL4V6Q5"
+        self.write(f"factory/{version}/darwin/arm64/droid", binary)
+        self.write(f"factory/{version}/darwin/arm64/droid.sha256", f"{checksum or sha256(binary)}\n")
+
+    def publish_opencode(self, version, members=None):
+        self.env["FAKE_TEAM"] = "5NZ4Q7NXJ4"
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            for name, data in (members or {"opencode": b"opencode binary"}).items():
+                archive.writestr(name, data)
+        self.release("anomalyco/opencode", f"v{version}", {"opencode-darwin-arm64.zip": buffer.getvalue()})
 
     def publish_pi(self, version, resolved="https://registry.npmjs.org/@earendil-works/pi-coding-agent/-/x.tgz"):
         pi = "@earendil-works/pi-coding-agent"
@@ -323,9 +337,50 @@ class StudioToolTests(unittest.TestCase):
         self.assertIn("comes from outside npm's registry", result.stderr)
         self.assertFalse(self.log.exists())
 
+    def test_installs_droid_signed_by_factory(self):
+        self.publish_droid("1.1.0")
+        result = self.run_tool("install", "droid", "1.1.0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.opt / "bin/droid").read_bytes(), b"droid binary")
+
+    def test_refuses_droid_whose_binary_misses_its_sha256(self):
+        self.publish_droid("1.1.0", checksum="0" * 64)
+        result = self.run_tool("install", "droid", "1.1.0")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("expected " + "0" * 64, result.stderr)
+        self.assertEqual(sorted(p.name for p in (self.opt / "tools/droid").iterdir()), [])
+
+    def test_refuses_a_droid_sha256_file_without_a_sha256(self):
+        self.publish_droid("1.1.0")
+        self.write("factory/1.1.0/darwin/arm64/droid.sha256", "<html>not found</html>\n")
+        result = self.run_tool("install", "droid", "1.1.0")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("droid.sha256 holds no sha256", result.stderr)
+
+    def test_installs_opencode_signed_by_anomaly(self):
+        self.publish_opencode("2.2.5")
+        result = self.run_tool("install", "opencode", "2.2.5")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.opt / "bin/opencode").read_bytes(), b"opencode binary")
+        self.assertEqual((self.opt / "tools/opencode/2.2.5/bin/opencode").stat().st_mode & 0o777, 0o755)
+
+    def test_refuses_an_opencode_zip_whose_digest_does_not_match(self):
+        self.publish_opencode("2.2.5")
+        self.write("github/anomalyco/opencode/releases/download/v2.2.5/opencode-darwin-arm64.zip", b"tampered")
+        result = self.run_tool("install", "opencode", "2.2.5")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(f"sha256 {sha256(b'tampered')}", result.stderr)
+
+    def test_refuses_an_opencode_zip_without_the_binary(self):
+        self.publish_opencode("2.2.5", members={"README.md": b"hi"})
+        result = self.run_tool("install", "opencode", "2.2.5")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("opencode-darwin-arm64.zip has no opencode binary", result.stderr)
+
     def test_status_lists_every_tool(self):
         self.assertEqual(self.run_tool("status").stdout.splitlines(), [
-            f"{tool}: not deployed" for tool in ("loadout", "pratfall", "hooklinesinker", "claude", "codex", "pi")])
+            f"{tool}: not deployed"
+            for tool in ("loadout", "pratfall", "hooklinesinker", "claude", "codex", "pi", "droid", "opencode")])
 
 
 if __name__ == "__main__":

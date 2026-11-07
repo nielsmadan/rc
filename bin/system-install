@@ -12,6 +12,7 @@ DEPLOYED_REPOS=(rc ac)
 DEPLOY_DIRS=(rc ac tools bin)
 CLAUDE_MANAGED_DIR="/Library/Application Support/ClaudeCode/managed-settings.d"
 CODEX_REQUIREMENTS=/etc/codex/requirements.toml
+DROID_MANAGED_SETTINGS="/Library/Application Support/Factory/settings.json"
 SUDOERS_FILE=/etc/sudoers.d/studio-deploy
 LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
 KNOWN_PROFILES=(studio)
@@ -44,7 +45,7 @@ studio-deploy, which also re-renders their config.
 It links this admin's ~/.zshrc to /opt/rc/zsh/admin.zshrc unless a ~/.zshrc
 already exists. Then it links /opt/rc/mise/config.toml to /etc/mise/config.toml and the
 profile's mise/<profile>.toml into /etc/mise/conf.d/, links the settings that turn
-off Claude Code's and Codex's own updates (the deploy pins them), installs /opt/rc's
+off Claude Code's, Codex's and Droid's own updates (the deploy pins them), installs /opt/rc's
 Brewfile, gives this admin /usr/local/share/mise, and runs `mise install --system`
 and `mise reshim --system` without sudo.
 EOF
@@ -258,6 +259,7 @@ sudo_link "$DEPLOYED_RC/mise/config.toml" /etc/mise/config.toml
 sudo_link "$DEPLOYED_RC/mise/$PROFILE.toml" "/etc/mise/conf.d/$PROFILE.toml"
 sudo_link "$DEPLOYED_RC/studio/claude-updates.json" "$CLAUDE_MANAGED_DIR/50-studio-updates.json"
 sudo_link "$DEPLOYED_RC/studio/codex-requirements.toml" "$CODEX_REQUIREMENTS"
+sudo_link "$DEPLOYED_RC/studio/droid-settings.json" "$DROID_MANAGED_SETTINGS"
 ensure_system_mise_dir
 ensure_load_agent_helper
 require "brew bundle"

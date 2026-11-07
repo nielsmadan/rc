@@ -153,8 +153,9 @@ to tell it where the repo lives.
   <cmd>` and non-login shells there start with `/usr/bin:/bin:/usr/sbin:/sbin`, so
   `install.sh` links its `~/.zshenv` to `zsh/studio.zshenv`, which only prepends Homebrew,
   admin's mise shims, `~/.local/bin` and `/opt/bin` (the deployed tools, so they come first),
-  without forking, and sets `COLIMA_SAVE_CONFIG=0` and `PI_SKIP_VERSION_CHECK=1`. `install.sh`
-  and `studio-deploy` source the same file, so they don't depend on their caller's PATH.
+  without forking, and sets `COLIMA_SAVE_CONFIG=0`, `PI_SKIP_VERSION_CHECK=1` and
+  `OPENCODE_DISABLE_AUTOUPDATE=1`. `install.sh` and `studio-deploy` source the same file, so
+  they don't depend on their caller's PATH.
   `.zshrc` prepends `/opt/bin` again where it exists, after its own `~/.local/bin`.
 - **`~/.zprofile` and `~/.zshenv` are untracked, but `.zshrc` is not.** Third-party
   installers append PATH lines to whichever of the three they find, and `~/.zshrc` is a

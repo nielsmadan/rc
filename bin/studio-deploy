@@ -9,9 +9,10 @@ usage: studio-deploy <repo> [<ref>]
        studio-deploy --status [<repo|tool>...]
 
 Deploys rc or ac, or an exact release of loadout, pratfall, hooklinesinker,
-claude, codex or pi, on the Mac Studio, run as the shared user. The checkout at
-/opt/<repo>, or the install under /opt/tools/<tool>, happens as the deploy user
-(bin/studio-checkout, through sudo); then this re-renders, as you, what reads it:
+claude, codex, pi, droid or opencode, on the Mac Studio, run as the shared user.
+The checkout at /opt/<repo>, or the install under /opt/tools/<tool>, happens as
+the deploy user (bin/studio-checkout, through sudo); then this re-renders, as
+you, what reads it:
   ac, loadout     /opt/ac/sync.sh --profile studio, then /opt/ac/bin/fleet-sync
   rc              /opt/rc/install.sh
   hooklinesinker  registers Juggler's consumer, whose sink is the MacBook's
