@@ -15,6 +15,7 @@ CODEX_REQUIREMENTS=/etc/codex/requirements.toml
 DROID_MANAGED_SETTINGS="/Library/Application Support/Factory/settings.json"
 SUDOERS_FILE=/etc/sudoers.d/studio-deploy
 LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
+SSHD_TERMINAL_ENV=/etc/ssh/sshd_config.d/200-terminal-env.conf
 KNOWN_PROFILES=(studio)
 SYSTEM_MISE_DIR="${MISE_SYSTEM_DATA_DIR:-/usr/local/share/mise}"
 # Admin's CARGO_HOME holds the rustup proxies every user runs (see mise/studio.toml).
@@ -45,7 +46,8 @@ studio-deploy, which also re-renders their config.
 It links this admin's ~/.zshrc to /opt/rc/zsh/admin.zshrc unless a ~/.zshrc
 already exists. Then it links /opt/rc/mise/config.toml to /etc/mise/config.toml and the
 profile's mise/<profile>.toml into /etc/mise/conf.d/, links the settings that turn
-off Claude Code's, Codex's and Droid's own updates (the deploy pins them), installs /opt/rc's
+off Claude Code's, Codex's and Droid's own updates (the deploy pins them), lets sshd accept
+the terminal's pane ID from ssh clients (for Juggler on the MacBook), installs /opt/rc's
 Brewfile, gives this admin /usr/local/share/mise, and runs `mise install --system`
 and `mise reshim --system` without sudo.
 EOF
@@ -169,17 +171,17 @@ first_deploys() {
   rm -f "$script"
 }
 
-# The sudoers rule names this root-owned copy, so what runs as root changes only when
-# admin re-runs system-install, never with a deploy to /opt/rc.
-ensure_load_agent_helper() {
-  local src="$DEPLOYED_RC/bin/studio-load-agent"
-  if cmp -s "$src" "$LOAD_AGENT_HELPER" &&
-    [ "$(stat -f '%Su:%Sg %Lp' "$LOAD_AGENT_HELPER" 2>/dev/null)" = "root:wheel 755" ]; then
-    printf 'skip %s (up to date)\n' "$LOAD_AGENT_HELPER"
+# Root-owned copies, so what root runs or reads changes only when admin re-runs
+# system-install, never with a deploy to /opt/rc.
+sudo_install() {
+  local src="$1" dest="$2" mode="$3"
+  if cmp -s "$src" "$dest" &&
+    [ "$(stat -f '%Su:%Sg %Lp' "$dest" 2>/dev/null)" = "root:wheel $mode" ]; then
+    printf 'skip %s (up to date)\n' "$dest"
     return
   fi
-  run sudo install -d -o root -g wheel -m 755 "$(dirname "$LOAD_AGENT_HELPER")" &&
-    run sudo install -o root -g wheel -m 755 "$src" "$LOAD_AGENT_HELPER"
+  run sudo install -d -o root -g wheel -m 755 "$(dirname "$dest")" &&
+    run sudo install -o root -g wheel -m "$mode" "$src" "$dest"
 }
 
 # An existing ~/.zshrc is admin's own; it is reported, never replaced.
@@ -261,7 +263,8 @@ sudo_link "$DEPLOYED_RC/studio/claude-updates.json" "$CLAUDE_MANAGED_DIR/50-stud
 sudo_link "$DEPLOYED_RC/studio/codex-requirements.toml" "$CODEX_REQUIREMENTS"
 sudo_link "$DEPLOYED_RC/studio/droid-settings.json" "$DROID_MANAGED_SETTINGS"
 ensure_system_mise_dir
-ensure_load_agent_helper
+sudo_install "$DEPLOYED_RC/bin/studio-load-agent" "$LOAD_AGENT_HELPER" 755
+sudo_install "$DEPLOYED_RC/studio/sshd-terminal-env.conf" "$SSHD_TERMINAL_ENV" 644
 require "brew bundle"
 
 if [ "$UPGRADE" = 1 ]; then

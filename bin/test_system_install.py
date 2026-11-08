@@ -122,6 +122,15 @@ class SystemInstallTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_check_installs_a_root_owned_sshd_terminal_env_drop_in(self):
+        result, _ = self.run_script("--check", "--profile", "studio")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            f"+ sudo install -o root -g wheel -m 644 {self.opt}/rc/studio/sshd-terminal-env.conf "
+            "/etc/ssh/sshd_config.d/200-terminal-env.conf",
+            result.stdout,
+        )
+
     def test_a_failed_profile_write_stops_before_anything_else(self):
         self.env["STUB_TEE_FAILS"] = "1"
         result, calls = self.run_script("--profile", "studio")
