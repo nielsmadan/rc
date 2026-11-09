@@ -263,6 +263,7 @@ tailssh() {
 export SOPS_EDITOR=nvim
 
 alias sec='sops edit $SOPS_SECRETS'
+alias secx='sops-exec'
 
 # Dev helper functions (mksim, etc.)
 [ -f ~/.devrc ] && source ~/.devrc
