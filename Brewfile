@@ -84,3 +84,5 @@ if studio
   brew "et"
   brew "mosh"
 end
+
+# request-flow test 2026-11-11: close without merging
