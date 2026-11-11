@@ -334,6 +334,16 @@ export PATH="$HOME/.opencode/bin:$PATH"
 # The Mac Studio's deployed tools (studio-deploy <tool>) stay ahead of ~/.local/bin.
 [[ -d /opt/bin ]] && path=(/opt/bin $path)
 
+# The Studio's weekly system-upgrade (bin/system-upgrade): say so once it has run
+# but not succeeded for 8 days.
+_upgrade=/usr/local/var/studio-upgrade
+if [[ -o interactive && -r $_upgrade/last-run ]]; then
+  if [[ ! -e $_upgrade/last-success || -n $(find $_upgrade/last-success -mtime +8 2>/dev/null) ]]; then
+    print -u2 "system-upgrade: no successful run in 8 days; last: $(<$_upgrade/last-run) (log: $_upgrade/upgrade.log)"
+  fi
+fi
+unset _upgrade
+
 # ---------------------------------------------------------------------------
 #  zsh-autosuggestions + zsh-syntax-highlighting
 # ---------------------------------------------------------------------------

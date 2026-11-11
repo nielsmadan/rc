@@ -18,6 +18,10 @@ LOAD_AGENT_HELPER=/usr/local/libexec/studio-load-agent
 SSHD_TERMINAL_ENV=/etc/ssh/sshd_config.d/200-terminal-env.conf
 KNOWN_PROFILES=(studio)
 SYSTEM_MISE_DIR="${MISE_SYSTEM_DATA_DIR:-/usr/local/share/mise}"
+UPGRADE_STATE_DIR="${STUDIO_UPGRADE_STATE:-/usr/local/var/studio-upgrade}"
+UPGRADE_HELPER=/usr/local/libexec/studio-upgrade
+UPGRADE_LABEL=com.nielsmadan.studio-upgrade
+UPGRADE_PLIST="/Library/LaunchDaemons/$UPGRADE_LABEL.plist"
 # Admin's CARGO_HOME holds the rustup proxies every user runs (see mise/studio.toml).
 # mise never needs sudo, since admin owns SYSTEM_MISE_DIR.
 MISE_SYSTEM_ENV=(MISE_CARGO_HOME="$SYSTEM_MISE_DIR/cargo" MISE_SYSTEM_PACKAGES_SUDO=false)
@@ -35,7 +39,7 @@ Studio. Run it as that admin: the first time from any clone of this repo, after
 that as /opt/rc/bin/system-install.
 
   --profile NAME  record the machine profile in /etc/rc-profile (first run)
-  --upgrade       also upgrade Homebrew formulae and reinstall the mise tools
+  --upgrade       also run bin/system-upgrade (Homebrew formulae and mise tools)
   --check         print what would change without changing anything
 
 It creates the hidden deploy user, gives it /opt/rc, /opt/ac, /opt/tools and /opt/bin, and lets the
@@ -49,7 +53,9 @@ profile's mise/<profile>.toml into /etc/mise/conf.d/, links the settings that tu
 off Claude Code's, Codex's and Droid's own updates (the deploy pins them), lets sshd accept
 the terminal's pane ID from ssh clients (for Juggler on the MacBook), installs /opt/rc's
 Brewfile, gives this admin /usr/local/share/mise, and runs `mise install --system`
-and `mise reshim --system` without sudo.
+and `mise reshim --system` without sudo. Last it installs root-owned copies of
+bin/system-upgrade and the LaunchDaemon that runs it weekly as this admin, gives
+this admin its state directory, and loads the daemon.
 EOF
 }
 
@@ -65,6 +71,7 @@ while [ $# -gt 0 ]; do
 done
 
 FAILURES=()
+INSTALLED=0
 
 run() {
   printf '\n+'
@@ -181,7 +188,8 @@ sudo_install() {
     return
   fi
   run sudo install -d -o root -g wheel -m 755 "$(dirname "$dest")" &&
-    run sudo install -o root -g wheel -m "$mode" "$src" "$dest"
+    run sudo install -o root -g wheel -m "$mode" "$src" "$dest" &&
+    INSTALLED=1
 }
 
 # An existing ~/.zshrc is admin's own; it is reported, never replaced.
@@ -206,6 +214,36 @@ ensure_system_mise_dir() {
     return
   fi
   run sudo mkdir -p "$SYSTEM_MISE_DIR" && run sudo chown -R "$me:staff" "$SYSTEM_MISE_DIR"
+}
+
+ensure_upgrade_state_dir() {
+  local me
+  me="$(id -un)"
+  if [ "$(stat -f %Su "$UPGRADE_STATE_DIR" 2>/dev/null)" = "$me" ]; then
+    printf 'skip %s (owned by %s)\n' "$UPGRADE_STATE_DIR" "$me"
+    return
+  fi
+  run sudo install -d -o "$me" -g staff -m 755 "$UPGRADE_STATE_DIR"
+}
+
+# The plist names this admin and its home, so it is rendered from the template.
+install_upgrade_daemon() {
+  local plist
+  plist="$(mktemp)" || { FAILURES+=("render $UPGRADE_PLIST"); return 1; }
+  sed -e "s|@ADMIN@|$(id -un)|" -e "s|@HOME@|$HOME|" "$DEPLOYED_RC/studio/$UPGRADE_LABEL.plist" > "$plist"
+  sudo_install "$DEPLOYED_RC/bin/system-upgrade" "$UPGRADE_HELPER" 755
+  INSTALLED=0
+  sudo_install "$plist" "$UPGRADE_PLIST" 644
+  local changed="$INSTALLED"
+  rm -f "$plist"
+  if [ "$CHECK" = 0 ] && sudo launchctl print "system/$UPGRADE_LABEL" >/dev/null 2>&1; then
+    if [ "$changed" = 0 ]; then
+      printf 'skip %s (loaded)\n' "$UPGRADE_LABEL"
+      return
+    fi
+    run sudo launchctl bootout "system/$UPGRADE_LABEL"
+  fi
+  run sudo launchctl bootstrap system "$UPGRADE_PLIST"
 }
 
 if ! command -v brew >/dev/null 2>&1 && [ -x /opt/homebrew/bin/brew ]; then
@@ -263,12 +301,19 @@ sudo_link "$DEPLOYED_RC/studio/claude-updates.json" "$CLAUDE_MANAGED_DIR/50-stud
 sudo_link "$DEPLOYED_RC/studio/codex-requirements.toml" "$CODEX_REQUIREMENTS"
 sudo_link "$DEPLOYED_RC/studio/droid-settings.json" "$DROID_MANAGED_SETTINGS"
 ensure_system_mise_dir
+ensure_upgrade_state_dir
 sudo_install "$DEPLOYED_RC/bin/studio-load-agent" "$LOAD_AGENT_HELPER" 755
 sudo_install "$DEPLOYED_RC/studio/sshd-terminal-env.conf" "$SSHD_TERMINAL_ENV" 644
 require "brew bundle"
 
-if [ "$UPGRADE" = 1 ]; then
-  run brew update && run brew upgrade --formula
+# Shared with system-upgrade, so the weekly run never overlaps this one; holding it
+# also means no upgrade is running when the daemon is reloaded below.
+if [ "$CHECK" = 0 ]; then
+  exec 9>"$UPGRADE_STATE_DIR/lock"
+  if ! flock -w 3600 9; then
+    echo "system-install: system-upgrade has held $UPGRADE_STATE_DIR/lock for an hour; try again later" >&2
+    exit 1
+  fi
 fi
 run env HOMEBREW_RC_PROFILE="$PROFILE" brew bundle install --no-upgrade --file="$DEPLOYED_RC/Brewfile"
 
@@ -279,6 +324,12 @@ else
   echo "FAILED: mise is not on PATH after brew bundle" >&2
   FAILURES+=("mise not on PATH")
 fi
+
+if [ "$UPGRADE" = 1 ]; then
+  run env STUDIO_UPGRADE_LOCKED=1 STUDIO_UPGRADE_STATE="$UPGRADE_STATE_DIR" "$DEPLOYED_RC/bin/system-upgrade"
+fi
+require "the upgrade daemon"
+install_upgrade_daemon
 
 if [ "${#FAILURES[@]}" -gt 0 ]; then
   printf '\nFailed steps:\n' >&2

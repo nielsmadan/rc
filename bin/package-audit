@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Lists the tools installed into this user's home outside rc, and what changed since the last run."""
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+# Globs under $HOME where user-level installs and one-off runners leave something.
+LOCATIONS = {
+    "bin": [
+        ".local/bin/*", ".cargo/bin/*", "go/bin/*", ".bun/bin/*", ".deno/bin/*",
+        ".npm-global/bin/*", "Library/Python/*/bin/*", "Library/pnpm/*",
+    ],
+    "env": [
+        ".local/share/uv/tools/*", ".local/pipx/venvs/*", ".local/share/pipx/venvs/*",
+        ".local/share/mise/installs/*/*",
+    ],
+    "runner": [".npm/_npx/*", ".cache/uv/environments-v2/*", "Library/Caches/pnpm/dlx/*"],
+    "config": [
+        ".npmrc", ".config/mise/config.toml", ".config/mise/conf.d/*", "Library/LaunchAgents/*",
+    ],
+}
+# Links install.sh and system-install make point here.
+MANAGED_TARGETS = ("/opt/", "/usr/local/share/mise/")
+
+
+def runner_detail(path):
+    package_json = path / "package.json"
+    if package_json.is_file():
+        try:
+            return ", ".join(sorted(json.loads(package_json.read_text()).get("dependencies", {})))
+        except (OSError, ValueError):
+            return "unreadable package.json"
+    names = sorted({p.name.split("-")[0] for p in path.glob("*/lib/python*/site-packages/*.dist-info")})
+    return f"{len(names)} packages: {', '.join(names[:6])}" if names else ""
+
+
+def describe(path, kind):
+    stat = path.lstat()
+    if path.is_symlink():
+        target = os.readlink(path)
+        return {"kind": kind, "sig": f"link:{target}", "detail": f"-> {target}",
+                "managed": target.startswith(MANAGED_TARGETS)}
+    if path.is_dir():
+        detail = runner_detail(path) if kind == "runner" else ""
+        return {"kind": kind, "sig": f"dir:{int(stat.st_mtime)}:{detail}", "detail": detail, "managed": False}
+    return {"kind": kind, "sig": f"file:{stat.st_size}:{int(stat.st_mtime)}", "detail": "", "managed": False}
+
+
+def scan(home):
+    entries = {}
+    for kind, patterns in LOCATIONS.items():
+        for pattern in patterns:
+            for path in home.glob(pattern):
+                try:
+                    entries[str(path.relative_to(home))] = describe(path, kind)
+                except OSError:
+                    continue
+    crontab = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    if crontab.returncode == 0 and crontab.stdout.strip():
+        entries["crontab"] = {"kind": "config", "sig": f"crontab:{crontab.stdout}", "detail": "", "managed": False}
+    return entries
+
+
+def merge(inventory, entries, now):
+    items = inventory.get("items", {})
+    gone = dict(inventory.get("gone", {}))
+    merged, changes = {}, []
+    for path, entry in sorted(entries.items()):
+        old = items.get(path)
+        if old is None:
+            merged[path] = {**entry, "first_seen": now, "changed": now}
+            changes.append(("new", path, merged[path]))
+            gone.pop(path, None)
+        elif old["sig"] != entry["sig"]:
+            merged[path] = {**entry, "first_seen": old["first_seen"], "changed": now}
+            changes.append(("changed", path, merged[path]))
+        else:
+            merged[path] = old
+    for path in sorted(set(items) - set(entries)):
+        gone[path] = {**items[path], "gone": now}
+        changes.append(("gone", path, gone[path]))
+    return {"items": merged, "gone": gone, "last_run": now}, changes
+
+
+def render(changes, inventory, since, show_all):
+    unmanaged = {p: i for p, i in inventory["items"].items() if not i["managed"]}
+    lines = [f"package-audit: {len(unmanaged)} unmanaged items in the home"
+             + (f"; changes since {since}:" if since else " (first run: recorded as the baseline)")]
+    if since:
+        relevant = [c for c in changes if not c[2]["managed"]]
+        lines += [f"  {status:7} {path}  {item['detail']}".rstrip() for status, path, item in relevant]
+        if not relevant:
+            lines.append("  none")
+    if show_all:
+        lines.append("all unmanaged items (first seen):")
+        lines += [f"  {item['first_seen'][:10]}  {path}  {item['detail']}".rstrip()
+                  for path, item in sorted(unmanaged.items(), key=lambda kv: kv[1]["first_seen"])]
+    return "\n".join(lines)
+
+
+def state_file(env):
+    base = Path(env.get("XDG_STATE_HOME") or Path(env["HOME"]) / ".local/state")
+    return base / "package-audit" / "inventory.json"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--all", action="store_true", help="also list every unmanaged item with when it was first seen")
+    args = parser.parse_args()
+
+    home = Path(os.environ["HOME"])
+    path = state_file(os.environ)
+    inventory = json.loads(path.read_text()) if path.exists() else {}
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    updated, changes = merge(inventory, scan(home), now)
+    print(render(changes, updated, inventory.get("last_run"), args.all))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(updated, indent=1, sort_keys=True))
+    tmp.replace(path)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

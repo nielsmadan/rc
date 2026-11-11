@@ -289,6 +289,7 @@ link colima           "$COLIMA_CONFIG" ~/.colima/default/colima.yaml
 # The shared user's deploy command, on a machine whose repos studio-deploy keeps in /opt.
 if [ -n "$MACHINE_PROFILE" ]; then
   link studio-deploy  bin/studio-deploy ~/.local/bin/studio-deploy
+  link package-audit bin/package-audit ~/.local/bin/package-audit
 fi
 # The Studio's rustup toolchains are admin's (mise/studio.toml). CARGO_HOME stays
 # ~/.cargo, since cargo writes its registry and `cargo install` there, and mise puts

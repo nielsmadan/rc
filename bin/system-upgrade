@@ -1,0 +1,139 @@
+#!/bin/bash
+set -uo pipefail
+
+STATE_DIR="${STUDIO_UPGRADE_STATE:-/usr/local/var/studio-upgrade}"
+SYSTEM_MISE_DIR="${MISE_SYSTEM_DATA_DIR:-/usr/local/share/mise}"
+LOG="$STATE_DIR/upgrade.log"
+LOG_MAX_BYTES=1048576
+MAX_BACKUP_AGE=$((2 * 3600))
+RELEASE_AGE=3d
+# Upgrading these under a running server, VM or session breaks it: they change
+# deliberately, with a restart (see AGENTS.md).
+PINNED_FORMULAE=(tmux colima lima et mosh)
+# Pi runs on node 24, and agent-browser needs `agent-browser install` as the
+# shared user afterwards: both change through rc and a deploy.
+MISE_EXCLUDED=(node npm:agent-browser)
+
+usage() {
+  cat <<'EOF'
+usage: system-upgrade [--check]
+
+Upgrades the Mac Studio's Homebrew formulae and system-wide mise tools, as the
+admin account that owns them. A weekly LaunchDaemon runs it (system-install
+installs it); system-install --upgrade runs it too.
+
+It skips the run unless Time Machine finished a backup in the last two hours,
+the way back from a bad upgrade. Homebrew keeps old versions (no cleanup) and
+mise keeps the versions it upgraded away from (--no-prune).
+
+  --check   print the steps without running them
+EOF
+}
+
+CHECK=0
+case "${1:-}" in
+  --check) CHECK=1 ;;
+  -h|--help) usage; exit 0 ;;
+  "") ;;
+  *) printf 'unknown option: %s\n' "$1" >&2; exit 2 ;;
+esac
+
+limited() {
+  local secs="$1"; shift
+  perl -e 'alarm shift; exec @ARGV' "$secs" "$@"
+}
+
+log() {
+  printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"
+}
+
+FAILURES=()
+
+step() {
+  local secs="$1"; shift
+  log "+ $*"
+  [ "$CHECK" = 1 ] && return 0
+  limited "$secs" "$@" </dev/null && return 0
+  local status=$?
+  log "FAILED ($status): $*"
+  FAILURES+=("$*")
+  return "$status"
+}
+
+# Prints the age in seconds of the newest Time Machine backup, from its
+# YYYY-MM-DD-HHMMSS name.
+backup_age() {
+  local latest stamp taken
+  latest="$(tmutil latestbackup 2>/dev/null)" || return 1
+  stamp="$(basename "$latest" .backup)"
+  taken="$(date -j -f '%Y-%m-%d-%H%M%S' "$stamp" +%s 2>/dev/null)" || return 1
+  echo $(( $(date +%s) - taken ))
+}
+
+finish() {
+  local result="$1"
+  [ "$CHECK" = 1 ] && return
+  printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$result" > "$STATE_DIR/last-run"
+  [ "$result" = ok ] && cp "$STATE_DIR/last-run" "$STATE_DIR/last-success"
+}
+
+if [ "$CHECK" = 0 ]; then
+  if [ ! -d "$STATE_DIR" ] || [ ! -w "$STATE_DIR" ]; then
+    echo "system-upgrade: $STATE_DIR is missing or not writable; run system-install" >&2
+    exit 1
+  fi
+  if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt "$LOG_MAX_BYTES" ]; then
+    mv -f "$LOG" "$LOG.1"
+  fi
+  [ -t 1 ] || exec >>"$LOG" 2>&1
+fi
+
+# system-install holds the lock already when it calls this.
+if [ "$CHECK" = 0 ] && [ -z "${STUDIO_UPGRADE_LOCKED:-}" ]; then
+  exec 9>"$STATE_DIR/lock"
+  if ! flock -n 9; then
+    log "skip: another system-install or system-upgrade is running"
+    finish "skipped: locked"
+    exit 1
+  fi
+fi
+
+log "system-upgrade: start"
+
+if [ "$CHECK" = 0 ]; then
+  age="$(backup_age)" || age=""
+  if [ -z "$age" ] || [ "$age" -gt "$MAX_BACKUP_AGE" ]; then
+    log "skip: no Time Machine backup in the last $((MAX_BACKUP_AGE / 3600))h (latest: $(tmutil latestbackup 2>&1))"
+    finish "skipped: no recent backup"
+    exit 1
+  fi
+fi
+
+if ! command -v brew >/dev/null 2>&1 && [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+export HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ASK=1 HOMEBREW_NO_ENV_HINTS=1
+step 900 brew update
+for formula in "${PINNED_FORMULAE[@]}"; do
+  if brew list --formula "$formula" >/dev/null 2>&1 && ! brew list --pinned | grep -qx "$formula"; then
+    step 120 brew pin "$formula"
+  fi
+done
+step 3600 brew upgrade --formula --yes
+
+excludes=()
+for tool in "${MISE_EXCLUDED[@]}"; do excludes+=(-x "$tool"); done
+mise_env=(MISE_DATA_DIR="$SYSTEM_MISE_DIR" MISE_CARGO_HOME="$SYSTEM_MISE_DIR/cargo" MISE_SYSTEM_PACKAGES_SUDO=false)
+cd / || exit 1
+step 3600 env "${mise_env[@]}" mise upgrade --global --no-prune --minimum-release-age "$RELEASE_AGE" "${excludes[@]}"
+# The shims follow whatever mise installed, even after a failed upgrade.
+step 300 env "${mise_env[@]}" mise reshim --system
+
+if [ "${#FAILURES[@]}" -gt 0 ]; then
+  log "system-upgrade: failed: ${FAILURES[*]}"
+  finish "failed: ${FAILURES[*]}"
+  exit 1
+fi
+log "system-upgrade: done"
+finish ok

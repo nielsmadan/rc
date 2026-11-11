@@ -37,6 +37,7 @@ class SystemInstallTests(unittest.TestCase):
         self.profile = root / "rc-profile"
         self.log = root / "log"
         self.mise = root / "mise"
+        self.upgrade_state = root / "upgrade"
         stubs = root / "stubs"
         stubs.mkdir()
         (stubs / "sudo").write_text(SUDO)
@@ -48,6 +49,7 @@ class SystemInstallTests(unittest.TestCase):
             "RC_DEPLOY_ROOT": str(self.opt),
             "RC_PROFILE_FILE": str(self.profile),
             "MISE_SYSTEM_DATA_DIR": str(self.mise),
+            "STUDIO_UPGRADE_STATE": str(self.upgrade_state),
             "STUB_LOG": str(self.log),
             "HOMEBREW_NO_AUTO_UPDATE": "1",
         }
@@ -130,6 +132,29 @@ class SystemInstallTests(unittest.TestCase):
             "/etc/ssh/sshd_config.d/200-terminal-env.conf",
             result.stdout,
         )
+
+    def test_check_installs_and_loads_the_weekly_upgrade_daemon(self):
+        result, _ = self.run_script("--check", "--profile", "studio")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            f"+ sudo install -o root -g wheel -m 755 {self.opt}/rc/bin/system-upgrade /usr/local/libexec/studio-upgrade",
+            result.stdout,
+        )
+        self.assertIn(
+            f"+ sudo install -d -o {os.environ['USER']} -g staff -m 755 {self.upgrade_state}", result.stdout
+        )
+        self.assertIn(
+            "+ sudo launchctl bootstrap system /Library/LaunchDaemons/com.nielsmadan.studio-upgrade.plist",
+            result.stdout,
+        )
+
+    def test_check_upgrade_runs_system_upgrade_after_the_mise_install(self):
+        result, _ = self.run_script("--check", "--upgrade", "--profile", "studio")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        upgrade = (f"+ env STUDIO_UPGRADE_LOCKED=1 STUDIO_UPGRADE_STATE={self.upgrade_state} "
+                   f"{self.opt}/rc/bin/system-upgrade")
+        self.assertIn(upgrade, result.stdout)
+        self.assertLess(result.stdout.index("mise install --system"), result.stdout.index(upgrade))
 
     def test_a_failed_profile_write_stops_before_anything_else(self):
         self.env["STUB_TEE_FAILS"] = "1"
