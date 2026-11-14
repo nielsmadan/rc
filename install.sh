@@ -280,6 +280,7 @@ link wezterm          wezterm/wezterm.lua ~/.config/wezterm/wezterm.lua
 link nvim             nvim             ~/.config/nvim
 link mise             mise/config.toml ~/.config/mise/config.toml
 link gitignore        git/ignore       ~/.config/git/ignore
+link gradle-rn-arch   gradle/init.d/rn-debug-arch.gradle ~/.gradle/init.d/rn-debug-arch.gradle
 link secrets          secrets/secrets.yaml ~/.config/sops/secrets.yaml
 link hammerspoon      hammerspoon      ~/.hammerspoon
 link finicky          finicky/finicky.ts ~/.finicky.ts

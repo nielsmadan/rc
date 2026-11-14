@@ -1,0 +1,6 @@
+// React Native debug builds compile native code for arm64 only; release bundles keep every ABI for Play.
+def start = gradle.startParameter
+def releaseBuild = start.taskNames.any { it.toLowerCase().contains('release') }
+if (!releaseBuild && !start.projectProperties.containsKey('reactNativeArchitectures')) {
+    gradle.beforeProject { it.ext.reactNativeArchitectures = 'arm64-v8a' }
+}
