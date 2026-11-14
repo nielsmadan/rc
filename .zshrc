@@ -302,6 +302,8 @@ bindkey '^[f' forward-word   # ESC+f
 
 fpath+=("$HOME/.zsh/pure")
 autoload -U promptinit; promptinit
+zstyle :prompt:pure:user color yellow
+zstyle :prompt:pure:host color yellow
 prompt pure
 
 ## [Completion]
