@@ -241,8 +241,8 @@ bindHyper("s", place(1 / 2, 0, 1 / 2, 1))
 bindHyper("z", place(0,     0, 2 / 3, 1))
 bindHyper("x", place(1 / 3, 0, 2 / 3, 1))
 
--- Manual re-home: same placement pass that fires on screen change / wake.
-bindHyper("h", function() homeAllManagedWindows() end)
+local homeShortcut = require("home_shortcut")
+bindHyper("h", function() homeShortcut.run(hs, setFrameUnstuck, homeAllManagedWindows) end)
 
 bindHyper("j", ladderWindows)
 
