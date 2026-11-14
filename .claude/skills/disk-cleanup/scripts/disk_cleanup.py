@@ -2,7 +2,7 @@
 """Find obsolete developer caches and leftovers, and optionally delete them.
 
 Default is a dry run that prints the plan. --apply deletes every DELETE item;
-REVIEW items are only ever reported.
+a REVIEW item is deleted only when its label is passed to --apply-review.
 """
 
 import argparse
@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,8 +22,14 @@ HOME = Path.home()
 DERIVED_DATA = HOME / "Library/Developer/Xcode/DerivedData"
 SIM_DEVICES = HOME / "Library/Developer/CoreSimulator/Devices"
 DEVICE_SUPPORT_ROOT = HOME / "Library/Developer/Xcode"
-CATEGORIES = ("simulators", "runtimes", "derived-data", "device-support", "rust-targets", "archive-artifacts")
+GRADLE_HOME = HOME / ".gradle"
+YARN_V1_CACHE = HOME / "Library/Caches/Yarn"
+NPM_CACHE = HOME / ".npm/_cacache"
+CATEGORIES = ("simulators", "runtimes", "derived-data", "device-support", "rust-targets", "archive-artifacts",
+              "idle-checkouts", "package-caches")
 REVIEW_MIN_BYTES = 5 * 1024**3
+IDLE_CHECKOUT_MIN_BYTES = 1024**3
+CACHE_MIN_BYTES = 1024**3
 
 
 @dataclass(frozen=True)
@@ -33,7 +40,7 @@ class Item:
     size: int
     reason: str
     kind: str
-    target: str
+    target: object
 
 
 def run(cmd):
@@ -42,9 +49,8 @@ def run(cmd):
 
 def sizes_of(paths):
     existing = [str(p) for p in paths if Path(p).exists()]
-    if not existing:
-        return {}
-    out = subprocess.run(["du", "-sk", *existing], capture_output=True, text=True).stdout
+    chunks = [existing[i:i + 500] for i in range(0, len(existing), 500)]
+    out = "".join(subprocess.run(["du", "-sk", *c], capture_output=True, text=True).stdout for c in chunks)
     return {
         line.split("\t", 1)[1]: int(line.split("\t", 1)[0]) * 1024
         for line in out.splitlines()
@@ -179,14 +185,23 @@ def classify_rust_targets(entries, now, stale_days):
     ]
 
 
-def archive_artifact_reason(path, siblings):
+def artifact_reason(path, siblings):
     name = path.name
+    gradle_project = bool({"build.gradle", "build.gradle.kts"} & siblings)
     if name == "node_modules":
         return "npm dependencies"
     if name == "Pods" and "Podfile" in siblings:
         return "CocoaPods dependencies; pod install restores them"
-    if name == "build" and {"build.gradle", "build.gradle.kts"} & siblings:
+    if name == "build" and gradle_project:
         return "Gradle build output"
+    if name == ".cxx" and gradle_project:
+        return "Android native build output"
+    if name == "build" and any(s.endswith((".xcodeproj", ".xcworkspace")) for s in siblings):
+        return "Xcode build output"
+    if name in ("build", ".dart_tool") and "pubspec.yaml" in siblings:
+        return "Flutter build output"
+    if name == ".build" and "Package.swift" in siblings:
+        return "SwiftPM build output"
     if name == ".gradle":
         return "Gradle cache"
     if name == "cache" and path.parent.name == ".yarn":
@@ -198,11 +213,73 @@ def archive_artifact_reason(path, siblings):
     return None
 
 
+def matched_artifacts(parent, dirs, siblings):
+    return {d: reason for d in dirs
+            if not (parent / d).is_symlink() and (reason := artifact_reason(parent / d, siblings))}
+
+
 def classify_archive_artifacts(entries):
     return [
         Item("archive-artifacts", "DELETE", str(e["path"]), e["size"], e["reason"], "path", str(e["path"]))
         for e in entries
     ]
+
+
+def classify_idle_checkouts(entries, now, stale_days):
+    def describe(e):
+        counts = Counter(path.name for path, _ in e["artifacts"])
+        return ", ".join(f"{name} x{n}" if n > 1 else name for name, n in counts.most_common())
+
+    def idle(e):
+        return (now - e["last_activity"]).days
+
+    return [
+        Item("idle-checkouts", "REVIEW", str(e["path"]), e["size"], f"idle {idle(e)} days: {describe(e)}", "paths",
+             tuple(str(path) for path, _ in e["artifacts"]))
+        for e in entries
+        if idle(e) >= stale_days and e["size"] >= IDLE_CHECKOUT_MIN_BYTES
+    ]
+
+
+def gradle_version(name):
+    version = re.sub(r"-(?:bin|all)$", "", name.removeprefix("gradle-"))
+    return version if re.fullmatch(r"\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?", version) else None
+
+
+def classify_package_caches(caches, gradle_dirs, gradle_in_use, pnpm_stores):
+    tools = [
+        Item("package-caches", "DELETE", name, size, reason, kind, target)
+        for name, size, reason, kind, target in caches
+        if size >= CACHE_MIN_BYTES
+    ]
+    by_version = {}
+    for path, size in gradle_dirs:
+        version = gradle_version(path.name)
+        if version:
+            paths, total = by_version.get(version, ((), 0))
+            by_version[version] = (paths + (str(path),), total + size)
+    gradle = [
+        Item("package-caches", "DELETE", f"Gradle {version}", total,
+             "no gradle-wrapper.properties under the workspace uses it", "paths", paths)
+        for version, (paths, total) in sorted(by_version.items())
+        if gradle_in_use and version not in gradle_in_use
+    ]
+    pnpm = []
+    for root, layouts in pnpm_stores:
+        current = max(layouts, key=lambda l: version_tuple(l[0].name))[0].name if layouts else None
+        pnpm += [
+            Item("package-caches", "DELETE", f"pnpm store {path}", size,
+                 f"store layout {path.name}; the installed pnpm uses {current}, an older pinned pnpm re-downloads",
+                 "path", str(path))
+            for path, size in layouts if path.name != current
+        ]
+        pnpm += [
+            Item("package-caches", "DELETE", f"pnpm store prune {root}", size,
+                 "pnpm store prune; frees only packages no project links to", "command",
+                 ("pnpm", "store", "prune", "--store-dir", str(root)))
+            for path, size in layouts if path.name == current and size >= CACHE_MIN_BYTES
+        ]
+    return tools + gradle + pnpm
 
 
 def collect_simulators(workspace, now, stale_days):
@@ -269,20 +346,146 @@ def collect_rust_targets(workspace):
     ]
 
 
-def find_archive_artifacts(root):
-    found = []
+def walk_artifacts(root, skip=frozenset({".git"}), max_depth=None, stop_at_repos=False):
+    found, repos = [], []
     for parent, dirs, files in os.walk(root):
+        here = Path(parent)
         siblings = set(dirs) | set(files)
-        matched = {d: reason for d in dirs if (reason := archive_artifact_reason(Path(parent) / d, siblings))}
-        found += [(Path(parent) / d, reason) for d, reason in matched.items()]
-        dirs[:] = [d for d in dirs if d not in matched and d != ".git"]
-    return found
+        nested = [d for d in dirs if stop_at_repos and not (here / d).is_symlink() and (here / d / ".git").exists()]
+        repos += [here / d for d in nested]
+        candidates = [d for d in dirs if d not in nested]
+        matched = matched_artifacts(here, candidates, siblings)
+        found += [(here / d, reason) for d, reason in matched.items()]
+        depth = len(here.relative_to(root).parts)
+        dirs[:] = [] if max_depth is not None and depth >= max_depth else [
+            d for d in candidates if d not in matched and d not in skip]
+    return found, repos
+
+
+def find_archive_artifacts(root):
+    return walk_artifacts(root)[0]
 
 
 def collect_archive_artifacts(archive):
     found = find_archive_artifacts(archive)
     sizes = sizes_of(path for path, _ in found)
     return [{"path": path, "reason": reason, "size": sizes.get(str(path), 0)} for path, reason in found]
+
+
+def find_checkouts(workspace, max_depth=3):
+    found = []
+    for root, dirs, files in os.walk(workspace):
+        rel = Path(root).relative_to(workspace)
+        if rel.parts and (".git" in dirs or ".git" in files):
+            found.append(Path(root))
+            dirs[:] = []
+            continue
+        top = not rel.parts
+        dirs[:] = [] if len(rel.parts) >= max_depth else [
+            d for d in dirs if not d.startswith(".") and d != "node_modules" and not (top and d == "_archive")]
+    return found
+
+
+def git_dir(checkout):
+    dot_git = checkout / ".git"
+    if dot_git.is_file():
+        line = dot_git.read_text().strip()
+        return (checkout / line.split(":", 1)[1].strip()).resolve() if line.startswith("gitdir:") else dot_git
+    return dot_git
+
+
+def mtime(path):
+    return dt.datetime.fromtimestamp(path.stat().st_mtime, dt.timezone.utc)
+
+
+def last_git_activity(checkout):
+    gd = git_dir(checkout)
+    stamps = [mtime(p) for p in (gd / "index", gd / "logs" / "HEAD", gd / "HEAD") if p.exists()]
+    return max(stamps) if stamps else mtime(checkout)
+
+
+def find_checkout_artifacts(checkout, max_depth=6):
+    return walk_artifacts(checkout, skip=frozenset({".git", "target"}), max_depth=max_depth, stop_at_repos=True)
+
+
+def untracked(checkout, artifacts):
+    rels = [str(path.relative_to(checkout)) for path, _ in artifacts]
+    if not rels:
+        return []
+    out = subprocess.run(["git", "-C", str(checkout), "ls-files", "-z", "--", *rels], capture_output=True, text=True)
+    if out.returncode != 0:
+        return []
+    tracked = [t for t in out.stdout.split("\0") if t]
+    return [a for a, rel in zip(artifacts, rels) if not any(t == rel or t.startswith(rel + "/") for t in tracked)]
+
+
+def collect_idle_checkouts(workspace, now, stale_days):
+    queue = find_checkouts(workspace)
+    found = []
+    while queue:
+        checkout = queue.pop()
+        activity = last_git_activity(checkout)
+        if (now - activity).days < stale_days:
+            continue
+        artifacts, nested = find_checkout_artifacts(checkout)
+        queue += nested
+        found.append((checkout, activity, untracked(checkout, artifacts)))
+    sizes = sizes_of(path for _, _, artifacts in found for path, _ in artifacts)
+    return [
+        {"path": c, "artifacts": artifacts,
+         "size": sum(sizes.get(str(path), 0) for path, _ in artifacts),
+         "last_activity": max([git_activity] + [mtime(path) for path, _ in artifacts if path.exists()])}
+        for c, git_activity, artifacts in found
+        if artifacts
+    ]
+
+
+def gradle_versions_in_use(workspace, max_depth=7):
+    skip = {".git", "node_modules", "Pods", "build", "target", ".build", ".venv", "venv", "dist", ".gradle", ".cxx"}
+    found = set()
+    for root, dirs, files in os.walk(workspace):
+        if "gradle-wrapper.properties" in files:
+            text = (Path(root) / "gradle-wrapper.properties").read_text(errors="replace")
+            found |= set(re.findall(r"gradle-(\d+\.\d+(?:\.\d+)?(?:-[\w.-]+?)?)-(?:bin|all)\.zip", text))
+        depth = len(Path(root).relative_to(workspace).parts)
+        dirs[:] = [] if depth >= max_depth else [d for d in dirs if d not in skip]
+    return found
+
+
+def command_output(cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=HOME).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def collect_package_caches(workspace):
+    uv_dir = command_output(["uv", "cache", "dir"])
+    pnpm_path = command_output(["pnpm", "store", "path"])
+    store_roots = {Path(pnpm_path).parent} if pnpm_path else set()
+    store_roots |= {workspace / ".pnpm-store"}
+    layouts = {root: [p for p in root.glob("v*") if p.is_dir() and re.fullmatch(r"v\d+", p.name)]
+               for root in store_roots if root.is_dir()}
+    gradle_dirs = [p for p in (GRADLE_HOME / "caches").glob("*") if p.is_dir() and gradle_version(p.name)]
+    gradle_dirs += [p for p in (GRADLE_HOME / "wrapper/dists").glob("gradle-*") if p.is_dir()]
+    tool_paths = [NPM_CACHE, YARN_V1_CACHE] + ([Path(uv_dir)] if uv_dir else [])
+    sizes = sizes_of(tool_paths + gradle_dirs + [p for ps in layouts.values() for p in ps])
+
+    def size(p):
+        return sizes.get(str(p), 0)
+
+    caches = [("npm cache", size(NPM_CACHE), "npm cache clean --force; installs re-download", "command",
+               ("npm", "cache", "clean", "--force"))]
+    caches += [("Yarn v1 cache", size(YARN_V1_CACHE), "Yarn 1 download cache; installs re-download", "path",
+                str(YARN_V1_CACHE))] if YARN_V1_CACHE.is_dir() else []
+    caches += [("uv cache", size(uv_dir), "uv cache prune; frees only unused entries", "command",
+                ("uv", "cache", "prune"))] if uv_dir else []
+    return {
+        "caches": caches,
+        "gradle_dirs": [(p, size(p)) for p in gradle_dirs],
+        "gradle_in_use": gradle_versions_in_use(workspace),
+        "pnpm_stores": [(root, [(p, size(p)) for p in ps]) for root, ps in sorted(layouts.items())],
+    }
 
 
 def scan(categories, workspace, now, stale_days):
@@ -299,6 +502,10 @@ def scan(categories, workspace, now, stale_days):
         items += classify_rust_targets(collect_rust_targets(workspace), now, stale_days)
     if "archive-artifacts" in categories and (workspace / "_archive").is_dir():
         items += classify_archive_artifacts(collect_archive_artifacts(workspace / "_archive"))
+    if "idle-checkouts" in categories and workspace.is_dir():
+        items += classify_idle_checkouts(collect_idle_checkouts(workspace, now, stale_days), now, stale_days)
+    if "package-caches" in categories:
+        items += classify_package_caches(**collect_package_caches(workspace))
     return items
 
 
@@ -309,7 +516,8 @@ def report(items):
         if not group:
             continue
         lines.append(f"== {category} ==")
-        lines += [f"{i.action:<7}{human(i.size):>8}  {i.label}  -- {i.reason}" for i in group]
+        lines += [line for i in group for line in [f"{i.action:<7}{human(i.size):>8}  {i.label}  -- {i.reason}"]
+                  + ([f"{'':17}{path}" for path in i.target] if i.kind == "paths" else [])]
         lines.append("")
     delete = [i for i in items if i.action == "DELETE"]
     review = [i for i in items if i.action == "REVIEW"]
@@ -323,8 +531,20 @@ def delete(item):
         run(["xcrun", "simctl", "delete", item.target])
     elif item.kind == "simctl-runtime":
         run(["xcrun", "simctl", "runtime", "delete", item.target])
+    elif item.kind == "command":
+        subprocess.run(list(item.target), capture_output=True, text=True, check=True, cwd=HOME)
+    elif item.kind == "paths":
+        for path in item.target:
+            shutil.rmtree(path)
     else:
         shutil.rmtree(item.target)
+
+
+def select_items(items, apply, review_labels):
+    unmatched = set(review_labels) - {i.label for i in items if i.action == "REVIEW"}
+    chosen = [i for i in items
+              if (apply and i.action == "DELETE") or (i.action == "REVIEW" and i.label in review_labels)]
+    return chosen, unmatched
 
 
 def free_space():
@@ -334,6 +554,8 @@ def free_space():
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true", help="delete every DELETE item")
+    ap.add_argument("--apply-review", action="append", default=[], metavar="LABEL",
+                    help="also delete the REVIEW item with this label, as printed (repeatable)")
     ap.add_argument("--only", default=",".join(CATEGORIES), help=f"comma list from: {', '.join(CATEGORIES)}")
     ap.add_argument("--days", type=int, default=30, help="idle days before a runtime or build is stale (default 30)")
     ap.add_argument("--workspace", type=Path, default=HOME / "wrksp", help="root holding project checkouts")
@@ -346,12 +568,16 @@ def main():
 
     items = scan(categories, args.workspace.expanduser(), dt.datetime.now(dt.timezone.utc), args.days)
     print(report(items))
-    if not args.apply:
+    chosen, unmatched = select_items(items, args.apply, set(args.apply_review))
+    if unmatched:
+        print(f"no REVIEW item labelled: {', '.join(sorted(unmatched))}", file=sys.stderr)
+        return 2
+    if not chosen:
         return 0
 
     before = free_space()
     failures = []
-    for item in (i for i in items if i.action == "DELETE"):
+    for item in chosen:
         try:
             delete(item)
         except (subprocess.CalledProcessError, OSError) as e:

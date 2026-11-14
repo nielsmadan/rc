@@ -1,6 +1,6 @@
 ---
 name: disk-cleanup
-description: Scan this Mac for obsolete developer leftovers and reclaim disk space — iOS simulators that cannot boot or whose checkout is gone, superseded simulator runtimes, Xcode DerivedData for deleted projects, outdated iOS DeviceSupport, stale Rust target dirs, and regenerable dependencies and build output in archived projects. Use when the user says "disk is full", "free up disk space", "reclaim space", "clean up caches", "clean up leftovers", "obsolete simulators", "DerivedData is huge", or a tool fails for lack of free space. Do NOT use for memory or CPU pressure (see docs/machine-triage.md).
+description: Scan this Mac for obsolete developer leftovers and reclaim disk space — iOS simulators that cannot boot or whose checkout is gone, superseded simulator runtimes, Xcode DerivedData for deleted projects, outdated iOS DeviceSupport, stale Rust target dirs, regenerable dependencies and build output in archived projects and in checkouts idle for a month, and oversized npm, Yarn, uv, pnpm and Gradle caches. Use when the user says "disk is full", "free up disk space", "reclaim space", "clean up caches", "clean up leftovers", "obsolete simulators", "DerivedData is huge", or a tool fails for lack of free space. Do NOT use for memory or CPU pressure (see docs/machine-triage.md).
 ---
 
 # Disk Cleanup
@@ -16,9 +16,10 @@ One script scans every category earlier cleanups covered and sorts each finding 
 python3 .claude/skills/disk-cleanup/scripts/disk_cleanup.py
 ```
 
-It takes about 40s, mostly `du` and the `~/wrksp` walk. Narrow it with
-`--only simulators,runtimes,derived-data,device-support,rust-targets,archive-artifacts`; `--days N` sets the
-staleness threshold (default 30). Also run `df -h ~ | tail -1` to record free space beforehand.
+It takes several minutes, mostly `du` over the idle checkouts' `node_modules`; run it with a
+`timeout 1800`. Narrow it with
+`--only simulators,runtimes,derived-data,device-support,rust-targets,archive-artifacts,idle-checkouts,package-caches`;
+`--days N` sets the staleness threshold (default 30). Also run `df -h ~ | tail -1` to record free space beforehand.
 
 The rules behind each verdict:
 
@@ -29,7 +30,9 @@ The rules behind each verdict:
 | derived-data | `info.plist` missing, or its `WorkspacePath` no longer exists | Xcode's shared `*.noindex` and `SDKExplicitPrecompiledModules`; live projects only reach REVIEW (idle and over 5 GB) |
 | device-support | an older OS folder for a device model that has a newer one | the newest folder per model |
 | rust-targets | `target/` with no `Cargo.toml` beside it | live checkouts only reach REVIEW (idle and over 1 GB) |
-| archive-artifacts | under `~/wrksp/_archive`: `node_modules`, `Pods` beside a `Podfile`, `build` beside a `build.gradle(.kts)`, `.gradle`, `.yarn/cache`, `.next`, `.venv` | anything outside `_archive`; other `build` dirs (PHP `vendor/**/build` holds code, PlatformIO `.pio/build`); `.git` |
+| archive-artifacts | under `~/wrksp/_archive`: `node_modules`, `Pods` beside a `Podfile`, `build` or `.cxx` beside a `build.gradle(.kts)`, `build` beside an `.xcodeproj`/`.xcworkspace`, `build` or `.dart_tool` beside a `pubspec.yaml`, `.build` beside a `Package.swift`, `.gradle`, `.yarn/cache`, `.next`, `.venv` | anything outside `_archive`; other `build` dirs (PHP `vendor/**/build` holds code, PlatformIO `.pio/build`); `.git` |
+| idle-checkouts | never: a git checkout under `~/wrksp` with no git activity and no artifact touched for `--days`, holding over 1 GB of the archive-artifacts dirs, reaches REVIEW as one item | dirs holding git-tracked files (committed `.yarn/cache` or `Pods`); `target/` (rust-targets owns it); `_archive`. A nested repo, submodule or worktree inside an idle checkout is judged as its own checkout, by its own git activity and tracked files |
+| package-caches | npm cache, Yarn 1 cache, `uv cache prune`, `pnpm store prune` per store, each over 1 GB; a pnpm store layout older than the current one; a Gradle version's `caches/<v>` and `wrapper/dists` when no `gradle-wrapper.properties` under `~/wrksp` names it | Yarn Berry's global cache (Plug'n'Play installs run from it); Gradle's shared `modules-2` and `jars-*`; every Gradle version when the scan finds no wrapper at all |
 
 ### Step 2: Sanity-check the DELETE list
 
@@ -47,14 +50,17 @@ python3 .claude/skills/disk-cleanup/scripts/disk_cleanup.py --apply
 
 It prints free space before and after, and lists any failure on stderr with a non-zero exit.
 `--apply` never deletes REVIEW items. List those with sizes and ask; delete only the ones the
-user names, with `rm -rf` on the printed path.
+user names, by passing each printed label to `--apply-review LABEL` (repeatable, works with or
+without `--apply`; add `--only` with the item's category to skip the other scans). An idle
+checkout's item deletes all of its listed dirs; the next install or build there restores them.
 
 ### Step 4: Report
 
 Give free space before and after, and a per-category count and size of what was deleted.
 Then give the REVIEW list as a question. Runtime deletes finish in the background (`simctl
 runtime list` shows `Deleting`), sometimes not until a reboot, so report their size as still
-pending.
+pending. The `uv cache prune` and `pnpm store prune` items list the whole cache's size but free
+only its unused part, so report the free-space change rather than the DELETE total.
 
 ## Examples
 
