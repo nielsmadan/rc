@@ -482,6 +482,8 @@ end
 -- once and leaves manual resizes / title changes alone. Bulk passes ignore
 -- this (always re-home) but refresh it. Cleared on windowDestroyed.
 local placedWindows = {}
+local thirdsLayout = require("thirds_layout")
+local thirdSlots = { [topThird] = 1, [middleThird] = 2, [bottomThird] = 3 }
 local fullscreenPlacer = require("fullscreen_placement").new(resolvePlacement, function(id)
   placedWindows[id] = true
 end)
@@ -589,6 +591,21 @@ function homeAllManagedWindows()
     end
   end
 
+  local items = {}
+  for _, win in ipairs(orderedWindows) do
+    local screen, placement = resolvePlacement(win)
+    if screen and placement then
+      local sf = screen:frame()
+      local app = win:application()
+      items[#items + 1] = {
+        win = win, screenId = screen:id(), screenFrame = sf,
+        frame = placement(sf),
+        third = not (app and FULLSCREEN_TO_PLACE[app:name()]) and thirdSlots[placement] or nil,
+      }
+    end
+  end
+  local frames = thirdsLayout.frames(items)
+
   -- Phase 1 — place everything, then raise in a second pass. The two loops
   -- can't be merged: interleaving setFrame with raise scrambles the
   -- resulting stack (measured), while a tight run of bare raises lands in
@@ -596,23 +613,20 @@ function homeAllManagedWindows()
   local deferred, raiseOrder = {}, {}
   local correctness = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
-  for _, win in ipairs(orderedWindows) do
-    local screen, placement = resolvePlacement(win)
-    if screen and placement then
-      local frame = placement(screen:frame())
-      local id = win:id()
-      local app = win:application()
-      if app and FULLSCREEN_TO_PLACE[app:name()] then
-        if id then placedWindows[id] = nil end
-        fullscreenPlacer.start(win, false)
-      elseif app and FOCUS_TO_PLACE[app:name()] then
-        if id then placedWindows[id] = true end
-        deferred[#deferred + 1] = { win = win, frame = frame }
-      else
-        if id then placedWindows[id] = true end
-        setFrameUnstuck(win, frame)
-        raiseOrder[#raiseOrder + 1] = win
-      end
+  for i, item in ipairs(items) do
+    local win, frame = item.win, frames[i]
+    local id = win:id()
+    local app = win:application()
+    if app and FULLSCREEN_TO_PLACE[app:name()] then
+      if id then placedWindows[id] = nil end
+      fullscreenPlacer.start(win, false)
+    elseif app and FOCUS_TO_PLACE[app:name()] then
+      if id then placedWindows[id] = true end
+      deferred[#deferred + 1] = { win = win, frame = frame }
+    else
+      if id then placedWindows[id] = true end
+      setFrameUnstuck(win, frame)
+      raiseOrder[#raiseOrder + 1] = win
     end
   end
   hs.window.setFrameCorrectness = correctness
