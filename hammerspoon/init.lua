@@ -511,28 +511,7 @@ local function placeViaFocus(items, prev)
   step(1)
 end
 
--- Re-home every managed window in two phases:
---   1. Native apps — placed, then raised, in two loops. setFrameCorrectness
---      off + 0 duration = a single immediate AX set: no retry jitter, no
---      slide. raise() is kAXRaiseAction on its own — it brings a window
---      forward *without* activating its app, so focus normally stays put
---      and there's nothing to put back. The one exception is a non-managed
---      window holding focus, which raise() can't get past; see the comment
---      at the raise call. Windows are raised in orderedWindows order so the
---      last one ends up on top — but only approximately: each AXRaise is
---      handled on its target app's own run loop, so a burst of them doesn't
---      always settle in call order. Sequencing the raises on timers would
---      make it exact, at the cost of a visibly slower pass.
---   2. FOCUS_TO_PLACE apps — only honor setFrame on the focused window, so
---      these go through placeViaFocus (sequenced, async, focus restored at
---      the end). Usually 0-1 windows.
-function homeAllManagedWindows()
-  -- Read this FIRST, before any AX call: setFrame on an iTerm2 window can
-  -- make that window key all by itself (measured — focus moved from `notes`
-  -- to the first window the placement loop touched), so a focused window
-  -- read any later is already the wrong one.
-  local prev = hs.window.focusedWindow()
-
+local function managedPlacementItems(extraWindow)
   -- Build a name → true set for O(1) exact matching. We can't use
   -- hs.application.get(name) here: it only takes one arg (the second,
   -- "exact", is silently dropped) and dispatches a substring search,
@@ -554,6 +533,11 @@ function homeAllManagedWindows()
         end
       end
     end
+  end
+
+  if extraWindow and not managedIds[extraWindow:id()] then
+    allManaged[#allManaged + 1] = extraWindow
+    managedIds[extraWindow:id()] = true
   end
 
   local orderedWindows = {}
@@ -604,6 +588,32 @@ function homeAllManagedWindows()
       }
     end
   end
+  return items, managedIds
+end
+
+-- Re-home every managed window in two phases:
+--   1. Native apps — placed, then raised, in two loops. setFrameCorrectness
+--      off + 0 duration = a single immediate AX set: no retry jitter, no
+--      slide. raise() is kAXRaiseAction on its own — it brings a window
+--      forward *without* activating its app, so focus normally stays put
+--      and there's nothing to put back. The one exception is a non-managed
+--      window holding focus, which raise() can't get past; see the comment
+--      at the raise call. Windows are raised in orderedWindows order so the
+--      last one ends up on top — but only approximately: each AXRaise is
+--      handled on its target app's own run loop, so a burst of them doesn't
+--      always settle in call order. Sequencing the raises on timers would
+--      make it exact, at the cost of a visibly slower pass.
+--   2. FOCUS_TO_PLACE apps — only honor setFrame on the focused window, so
+--      these go through placeViaFocus (sequenced, async, focus restored at
+--      the end). Usually 0-1 windows.
+function homeAllManagedWindows()
+  -- Read this FIRST, before any AX call: setFrame on an iTerm2 window can
+  -- make that window key all by itself (measured — focus moved from `notes`
+  -- to the first window the placement loop touched), so a focused window
+  -- read any later is already the wrong one.
+  local prev = hs.window.focusedWindow()
+
+  local items, managedIds = managedPlacementItems()
   local frames = thirdsLayout.frames(items)
 
   -- Phase 1 — place everything, then raise in a second pass. The two loops
@@ -697,21 +707,41 @@ local function placeWindow(win)
   if not id or placedWindows[id] then return end
   local screen, placement = resolvePlacement(win)
   if not (screen and placement) then return end
-  local frame = placement(screen:frame())
   local app = win:application()
   if app and FULLSCREEN_TO_PLACE[app:name()] then
     fullscreenPlacer.start(win, true)
     return
   end
-  placedWindows[id] = true
-  if app and FOCUS_TO_PLACE[app:name()] then
-    placeViaFocus({ { win = win, frame = frame } }, hs.window.focusedWindow())
-    return
+  local prev = hs.window.focusedWindow()
+  local items = { { win = win, frame = placement(screen:frame()) } }
+  if thirdSlots[placement] then
+    items = {}
+    for _, item in ipairs(managedPlacementItems(win)) do
+      if item.third and item.screenId == screen:id() then
+        items[#items + 1] = item
+      end
+    end
   end
+  local frames = thirdsLayout.frames(items)
+  -- Mark the whole group before resizing can emit another title event.
+  for _, item in ipairs(items) do placedWindows[item.win:id()] = true end
+  local deferred = {}
   local correctness = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
-  setFrameUnstuck(win, frame)
+  for i, item in ipairs(items) do
+    local itemApp = item.win:application()
+    if itemApp and FOCUS_TO_PLACE[itemApp:name()] then
+      deferred[#deferred + 1] = { win = item.win, frame = frames[i] }
+    else
+      setFrameUnstuck(item.win, frames[i])
+    end
+  end
   hs.window.setFrameCorrectness = correctness
+  if #deferred > 0 then
+    placeViaFocus(deferred, prev)
+  elseif thirdSlots[placement] and prev and prev:isStandard() then
+    prev:focus()
+  end
   -- Deliberately no raise() here. A window that just appeared is already in
   -- front, and this path also fires on the first title change of every
   -- existing window (so: for all of them right after a reload) — raising
