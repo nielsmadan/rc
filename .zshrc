@@ -286,7 +286,7 @@ if [ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/google-clou
 
 # increase resources for reliable watchman
 ulimit -n 65536
-ulimit -u 2048
+ulimit -S -u "$(ulimit -Hu)"
 
 # docker context use mac-mini
 
