@@ -1,0 +1,48 @@
+#!/usr/sbin/nft -f
+# No new connections from the host or its containers to the home network.
+# LAN_IFS, ROUTER4, ROUTER_LL and ROUTER_IID come from the machine's own file, which bin/llm-install writes.
+include "/etc/llm/egress-local.nft"
+
+define TS_PORT = 41641
+
+table inet llm_egress {}
+delete table inet llm_egress
+
+table inet llm_egress {
+	chain lan_out {
+		# DNS and DHCP to the router only; its changing global prefix is matched by interface ID
+		ip daddr $ROUTER4 meta l4proto { tcp, udp } th dport 53 accept
+		ip6 daddr & ::ffff:ffff:ffff:ffff == $ROUTER_IID meta l4proto { tcp, udp } th dport 53 accept
+		ip daddr { $ROUTER4, 255.255.255.255 } udp dport 67 accept
+		ip6 daddr ff02::1:2 udp dport 547 accept
+		ip daddr $ROUTER4 icmp type echo-request accept
+		# mDNS so <host>.local keeps answering
+		ip6 daddr ff02::fb udp dport 5353 accept
+		# tailscaled's own direct-path packets to LAN peers
+		udp sport $TS_PORT accept
+		log prefix "llm-egress-drop " level info limit rate 10/minute burst 20 packets
+		reject with icmpx admin-prohibited
+	}
+
+	chain classify {
+		ct state established,related accept
+		meta l4proto ipv6-icmp icmpv6 type { nd-router-solicit, nd-neighbor-solicit, nd-neighbor-advert, mld-listener-report, mld2-listener-report } accept
+		oifname != $LAN_IFS accept
+		ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 255.255.255.255 } goto lan_out
+		ip6 daddr { fe80::/10, fc00::/7, ff00::/8 } goto lan_out
+		# on-link IPv6 (whatever the current prefix): the next hop is the destination, not the router
+		meta nfproto ipv6 rt ip6 nexthop != $ROUTER_LL goto lan_out
+	}
+
+	chain output {
+		type filter hook output priority filter; policy accept;
+		jump classify
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy accept;
+		# published container ports answer on Tailscale and localhost only, never from the LAN
+		iifname $LAN_IFS ct state new ct status dnat drop
+		jump classify
+	}
+}

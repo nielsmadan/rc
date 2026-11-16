@@ -1,0 +1,233 @@
+#!/bin/bash
+set -uo pipefail
+
+RC_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$RC_DIR/llm"
+PROFILE_FILE="${RC_PROFILE_FILE:-/etc/rc-profile}"
+ETC="${LLM_ETC_DIR:-/etc/llm}"
+SRV="${LLM_SRV_DIR:-/srv/llm}"
+UNIT_DIR="${LLM_UNIT_DIR:-/etc/systemd/system}"
+OLD_EGRESS_NFT="${LLM_OLD_EGRESS_NFT:-/etc/gx10-egress.nft}"
+SERVICE_USER=vllm
+ENV_FILE="$ETC/llm.env"
+LOCAL_NFT="$ETC/egress-local.nft"
+
+CHECK=0
+NEW_PROFILE=""
+PENDING=0
+UNITS_CHANGED=0
+EGRESS_CHANGED=0
+RESTART=0
+PULL=0
+
+usage() {
+  cat <<'EOF'
+usage: llm-install [--check] [--profile llm]
+
+Sets up a Linux machine with an NVIDIA GPU as the fleet's LLM host: vLLM behind
+an nginx allowlist, published on its Tailscale address and localhost only, and
+an nftables egress block that keeps the host and its containers off the home
+network. Run it as root from /opt/rc (any clone works for a test run); every
+step is skipped when it is already in place, so re-running after a pull applies
+only what changed.
+
+  --profile llm   record the machine profile in /etc/rc-profile (first run)
+  --check         print what would change without changing anything; exits 1
+                  when something is pending
+
+It writes /etc/llm/egress-local.nft (LAN interfaces and router addresses) from
+the current routes on the first run and never rewrites it, creates the vllm
+user and /etc/llm/llm.env with a new API key, installs llm/ into /etc/llm,
+/srv/llm and /etc/systemd/system, sets ipv6.ignore-auto-dns on the connected
+LAN connections, retires the old gx10-egress unit, and (re)starts
+llm-egress.service and llm.service as needed. Prerequisites: Docker with the
+NVIDIA runtime, NetworkManager, nftables, and Tailscale logged in.
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check) CHECK=1 ;;
+    --profile) NEW_PROFILE="${2:-}"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+die() {
+  echo "llm-install: $*" >&2
+  exit 1
+}
+
+# Prints the step; true when it should run (false under --check).
+pending() {
+  PENDING=$((PENDING + 1))
+  printf '+ %s\n' "$*"
+  [ "$CHECK" = 0 ]
+}
+
+# Installs $1 as $2 with mode $3 when they differ; true when $2 changed or would.
+put() {
+  cmp -s "$1" "$2" && return 1
+  if pending "install -m $3 $1 $2"; then
+    install -m "$3" "$1" "$2" || die "could not install $2"
+  fi
+  return 0
+}
+
+detect_network() {
+  local router4 router_ll ifs
+  router4="$(ip -4 route show default | awk '$1 == "default" && $2 == "via" { print $3; exit }')"
+  router_ll="$(ip -6 route show default | awk '$1 == "default" && $2 == "via" && $3 ~ /^fe80::/ { print $3; exit }')"
+  ifs="$(nmcli -t -f DEVICE,TYPE,STATE device |
+    awk -F: '($2 == "ethernet" || $2 == "wifi") && $3 != "unmanaged" { printf "%s\"%s\"", sep, $1; sep = ", " }')"
+  [ -n "$router4" ] && [ -n "$router_ll" ] && [ -n "$ifs" ] || return 1
+  printf '# Written by llm-install from the routes at install time; edit by hand when the router or the interfaces change.\n'
+  printf 'define LAN_IFS = { %s }\n' "$ifs"
+  printf 'define ROUTER4 = %s\n' "$router4"
+  printf 'define ROUTER_LL = %s\n' "$router_ll"
+  printf 'define ROUTER_IID = ::%s\n' "${router_ll#fe80::}"
+}
+
+unit_running() {
+  systemctl is-enabled --quiet "$1" && systemctl is-active --quiet "$1"
+}
+
+compose() {
+  ( set -a; . "$ENV_FILE"; set +a; cd "$SRV" && docker compose "$@" )
+}
+
+[ "$(id -u)" = 0 ] || [ -n "${LLM_INSTALL_ROOTLESS:-}" ] || die "run as root"
+
+PROFILE="$(cat "$PROFILE_FILE" 2>/dev/null || true)"
+if [ -n "$NEW_PROFILE" ]; then
+  [ "$NEW_PROFILE" = llm ] || die "unknown profile $NEW_PROFILE (llm-install sets up llm only)"
+  [ -z "$PROFILE" ] || [ "$PROFILE" = llm ] || die "$PROFILE_FILE names $PROFILE; not changing it"
+  if [ "$PROFILE" != llm ] && pending "write llm to $PROFILE_FILE"; then
+    printf 'llm\n' > "$PROFILE_FILE" || die "could not write $PROFILE_FILE"
+  fi
+elif [ "$PROFILE" != llm ]; then
+  die "no llm profile in $PROFILE_FILE; pass --profile llm on the first run"
+fi
+
+for cmd in docker nft nmcli tailscale ip systemctl openssl; do
+  command -v "$cmd" >/dev/null 2>&1 || die "$cmd is not installed"
+done
+docker compose version >/dev/null 2>&1 || die "docker compose is not installed"
+TS_IP="$(tailscale ip -4 2>/dev/null | head -n 1)"
+[ -n "$TS_IP" ] || die "Tailscale has no IPv4 address; log in with tailscale up first"
+
+if [ ! -d "$ETC" ] && pending "install -d -m 0700 $ETC"; then
+  install -d -m 0700 "$ETC" || die "could not create $ETC"
+fi
+
+if [ ! -f "$LOCAL_NFT" ]; then
+  network="$(detect_network)" || die "could not find the router and LAN interfaces; write $LOCAL_NFT by hand (see docs/llm.md)"
+  if pending "write $LOCAL_NFT:"; then
+    printf '%s\n' "$network" > "$LOCAL_NFT" || die "could not write $LOCAL_NFT"
+  fi
+  printf '%s\n' "$network" | sed 's/^/    /'
+fi
+
+if ! id "$SERVICE_USER" >/dev/null 2>&1 && pending "useradd --system $SERVICE_USER"; then
+  useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$SERVICE_USER" ||
+    die "could not create the $SERVICE_USER user"
+fi
+if [ ! -d "$SRV" ] && pending "install -d -m 0755 $SRV"; then
+  install -d -m 0755 "$SRV" || die "could not create $SRV"
+fi
+for dir in "$SRV/hf" "$SRV/cache"; do
+  if [ ! -d "$dir" ] && pending "install -d -o $SERVICE_USER -m 0700 $dir"; then
+    install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0700 "$dir" || die "could not create $dir"
+  fi
+done
+
+if [ ! -f "$ENV_FILE" ]; then
+  RESTART=1
+  if pending "write $ENV_FILE with TS_IP=$TS_IP, the $SERVICE_USER IDs and a new VLLM_API_KEY"; then
+    ( umask 077
+      printf 'TS_IP=%s\nVLLM_UID=%s\nVLLM_GID=%s\nVLLM_API_KEY=%s\n' \
+        "$TS_IP" "$(id -u "$SERVICE_USER")" "$(id -g "$SERVICE_USER")" "$(openssl rand -hex 32)" > "$ENV_FILE"
+    ) || die "could not write $ENV_FILE"
+  fi
+else
+  old_ip="$(sed -n 's/^TS_IP=//p' "$ENV_FILE")"
+  if [ "$old_ip" != "$TS_IP" ]; then
+    RESTART=1
+    if pending "set TS_IP=$TS_IP in $ENV_FILE (was ${old_ip:-unset})"; then
+      ( umask 077
+        awk -v ip="$TS_IP" '/^TS_IP=/ { $0 = "TS_IP=" ip } { print }' "$ENV_FILE" > "$ENV_FILE.new" &&
+          mv "$ENV_FILE.new" "$ENV_FILE"
+      ) || die "could not update $ENV_FILE"
+    fi
+  fi
+fi
+
+if [ -f "$LOCAL_NFT" ]; then
+  nft -c -f "$SRC/egress.nft" || die "llm/egress.nft does not load with $LOCAL_NFT"
+fi
+put "$SRC/egress.nft" "$ETC/egress.nft" 0644 && EGRESS_CHANGED=1
+put "$SRC/llm-egress.service" "$UNIT_DIR/llm-egress.service" 0644 && { UNITS_CHANGED=1; EGRESS_CHANGED=1; }
+put "$SRC/llm.service" "$UNIT_DIR/llm.service" 0644 && { UNITS_CHANGED=1; RESTART=1; }
+put "$SRC/compose.yaml" "$SRV/compose.yaml" 0644 && { RESTART=1; PULL=1; }
+put "$SRC/nginx.conf" "$SRV/nginx.conf" 0644 && RESTART=1
+
+if [ "$UNITS_CHANGED" = 1 ] && pending "systemctl daemon-reload"; then
+  systemctl daemon-reload || die "daemon-reload failed"
+fi
+
+if ! unit_running llm-egress.service; then
+  if pending "systemctl enable --now llm-egress.service"; then
+    systemctl enable --now llm-egress.service || die "llm-egress.service did not start; see journalctl -u llm-egress"
+  fi
+elif [ "$EGRESS_CHANGED" = 1 ] && pending "systemctl reload llm-egress.service"; then
+  systemctl reload llm-egress.service || die "llm-egress.service did not reload; see journalctl -u llm-egress"
+fi
+
+# The block this replaced; llm_egress is loaded by now, so there is no gap.
+if [ -f "$UNIT_DIR/gx10-egress.service" ] &&
+  pending "systemctl disable --now gx10-egress.service; rm $UNIT_DIR/gx10-egress.service $OLD_EGRESS_NFT"; then
+  systemctl disable --now gx10-egress.service || die "could not stop gx10-egress.service"
+  rm -f "$UNIT_DIR/gx10-egress.service" "$OLD_EGRESS_NFT"
+  systemctl daemon-reload || die "daemon-reload failed"
+fi
+
+# The router keeps advertising its DNS address from the previous IPv6 prefix, and resolved gets stuck on it.
+dns_changed=0
+while IFS=: read -r dev type state con; do
+  case "$type" in ethernet|wifi) ;; *) continue ;; esac
+  [ "$state" = connected ] || continue
+  [ "$(nmcli -g ipv6.ignore-auto-dns connection show "$con")" = yes ] && continue
+  dns_changed=1
+  if pending "nmcli connection modify '$con' ipv6.ignore-auto-dns yes; nmcli device reapply $dev"; then
+    nmcli connection modify "$con" ipv6.ignore-auto-dns yes && nmcli device reapply "$dev" ||
+      die "could not set ipv6.ignore-auto-dns on $con"
+  fi
+done < <(nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device)
+if [ "$dns_changed" = 1 ] && pending "systemctl restart systemd-resolved"; then
+  systemctl restart systemd-resolved || die "systemd-resolved did not restart"
+fi
+
+if [ "$CHECK" = 0 ]; then
+  compose config --quiet || die "$SRV/compose.yaml is invalid"
+fi
+if [ "$PULL" = 1 ] && pending "docker compose pull"; then
+  compose pull --quiet || die "docker compose pull failed"
+fi
+
+if ! unit_running llm.service; then
+  if pending "systemctl enable --now llm.service"; then
+    systemctl enable --now llm.service || die "llm.service did not start; see journalctl -u llm"
+  fi
+elif [ "$RESTART" = 1 ] && pending "systemctl restart llm.service"; then
+  systemctl restart llm.service || die "llm.service did not restart; see journalctl -u llm"
+fi
+
+if [ "$PENDING" = 0 ]; then
+  echo "llm-install: nothing to do"
+elif [ "$CHECK" = 1 ]; then
+  exit 1
+else
+  echo "llm-install: done; the API answers once vLLM has loaded the model (journalctl -u llm -f)"
+fi

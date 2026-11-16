@@ -52,6 +52,10 @@ case "$MACHINE_PROFILE" in
     PROFILE_SKIPS=(homebrew brewfile syncthing mise secrets hammerspoon finicky librewolf wezterm obsidian-vimrc vimrc gvimrc vim githooks zsh-plugins hidutil)
     COLIMA_CONFIG=colima/colima.studio.yaml
     ;;
+  llm)
+    echo "install.sh: the llm profile has no dotfiles; its setup is bin/llm-install (docs/llm.md)" >&2
+    exit 2
+    ;;
   "") ;;
   *) echo "warn: unknown machine profile '$MACHINE_PROFILE' in /etc/rc-profile" ;;
 esac
