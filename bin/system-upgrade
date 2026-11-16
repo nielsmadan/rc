@@ -60,12 +60,17 @@ step() {
   return "$status"
 }
 
-# Prints the age in seconds of the newest Time Machine backup, from its
-# YYYY-MM-DD-HHMMSS name.
+# Reads destination snapshots, since `tmutil latestbackup` needs Full Disk Access.
+latest_backup() {
+  tmutil destinationinfo 2>/dev/null | sed -n 's/^Mount Point *: //p' |
+    while IFS= read -r mount; do diskutil apfs listSnapshots "$mount" 2>/dev/null; done |
+    sed -n 's/.*com\.apple\.TimeMachine\.\([0-9]\{4\}-[0-9-]*\)\.backup.*/\1/p' |
+    sort | tail -n 1
+}
+
 backup_age() {
-  local latest stamp taken
-  latest="$(tmutil latestbackup 2>/dev/null)" || return 1
-  stamp="$(basename "$latest" .backup)"
+  local stamp="$1" taken
+  [ -n "$stamp" ] || return 1
   taken="$(date -j -f '%Y-%m-%d-%H%M%S' "$stamp" +%s 2>/dev/null)" || return 1
   echo $(( $(date +%s) - taken ))
 }
@@ -101,9 +106,10 @@ fi
 log "system-upgrade: start"
 
 if [ "$CHECK" = 0 ]; then
-  age="$(backup_age)" || age=""
+  latest="$(latest_backup)"
+  age="$(backup_age "$latest")" || age=""
   if [ -z "$age" ] || [ "$age" -gt "$MAX_BACKUP_AGE" ]; then
-    log "skip: no Time Machine backup in the last $((MAX_BACKUP_AGE / 3600))h (latest: $(tmutil latestbackup 2>&1))"
+    log "skip: no Time Machine backup in the last $((MAX_BACKUP_AGE / 3600))h (latest: ${latest:-none found})"
     finish "skipped: no recent backup"
     exit 1
   fi

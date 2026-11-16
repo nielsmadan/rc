@@ -8,8 +8,9 @@ import unittest
 
 SCRIPT = Path(__file__).with_name("system-upgrade")
 
-# Logs every call; `brew list` answers from STUB_INSTALLED and STUB_PINNED, and
-# any call containing STUB_FAIL exits 1.
+# Logs every call; `brew list` answers from STUB_INSTALLED and STUB_PINNED,
+# tmutil and diskutil report one destination whose newest snapshot is
+# STUB_BACKUP (none when empty), and any call containing STUB_FAIL exits 1.
 STUB = """#!/bin/sh
 name="$(basename "$0")"
 echo "$name $*" >> "$STUB_LOG"
@@ -19,8 +20,12 @@ if [ "$name" = brew ] && [ "$1" = list ]; then
   case " $STUB_INSTALLED " in *" $3 "*) exit 0 ;; esac
   exit 1
 fi
-if [ "$name" = tmutil ]; then
-  echo "/Volumes/.timemachine/X/$STUB_BACKUP.backup/$STUB_BACKUP.backup"
+if [ "$name" = tmutil ] && [ -n "$STUB_BACKUP" ]; then
+  printf 'Name          : Elements\nMount Point   : /Volumes/Elements 1\n'
+fi
+if [ "$name" = diskutil ] && [ "$3" = "/Volumes/Elements 1" ]; then
+  echo "|   Name:        com.apple.TimeMachine.$STUB_BACKUP.backup"
+  echo "    Name:        com.apple.TimeMachine.2020-01-01-000000.backup"
 fi
 exit 0
 """
@@ -40,7 +45,7 @@ class SystemUpgradeTests(unittest.TestCase):
         self.log = root / "log"
         stubs = root / "stubs"
         stubs.mkdir()
-        for name in ("brew", "mise", "tmutil"):
+        for name in ("brew", "mise", "tmutil", "diskutil"):
             (stubs / name).write_text(STUB)
             (stubs / name).chmod(0o755)
         self.env = {
@@ -61,7 +66,7 @@ class SystemUpgradeTests(unittest.TestCase):
             env=self.env, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL,
         )
         calls = self.log.read_text().splitlines() if self.log.exists() else []
-        changes = [c for c in calls if not c.startswith(("brew list", "tmutil"))]
+        changes = [c for c in calls if not c.startswith(("brew list", "tmutil", "diskutil"))]
         return result, changes
 
     def test_upgrades_brew_then_the_system_mise_tools_and_records_success(self):
@@ -84,6 +89,14 @@ class SystemUpgradeTests(unittest.TestCase):
         self.assertEqual(changes, [])
         self.assertIn("skipped: no recent backup", self.state.joinpath("last-run").read_text())
         self.assertFalse(self.state.joinpath("last-success").exists())
+
+    def test_skips_without_a_mounted_backup_destination(self):
+        self.env["STUB_BACKUP"] = ""
+        result, changes = self.run_script()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(changes, [])
+        self.assertIn("latest: none found", self.read_log())
+        self.assertIn("skipped: no recent backup", self.state.joinpath("last-run").read_text())
 
     def test_a_failed_mise_upgrade_still_reshims_and_is_recorded(self):
         self.state.joinpath("last-success").write_text("earlier ok\n")
