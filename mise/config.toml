@@ -34,6 +34,7 @@ railway = "latest"
 "pipx:llm" = "latest"
 "github:nolabs-ai/nono" = "latest"
 "github:agavra/tuicr" = "latest"
+"github:pranshuparmar/witr" = "latest"
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]

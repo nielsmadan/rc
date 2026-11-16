@@ -51,6 +51,7 @@ typeset -A _zcompgen=(
   rustup   'rustup completions zsh'
   cargo    'rustup completions zsh cargo'
   prat     'prat completion zsh'
+  witr     'witr completion zsh'
 )
 for _t in "${(@k)_zcompgen}"; do
   [[ -e $_zcompcache/_$_t ]] && continue
