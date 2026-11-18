@@ -303,9 +303,15 @@ bindkey '^[f' forward-word   # ESC+f
 
 fpath+=("$HOME/.zsh/pure")
 autoload -U promptinit; promptinit
-zstyle :prompt:pure:user color yellow
-zstyle :prompt:pure:host color yellow
 prompt pure
+# Newer Pure builds user@host into PROMPT, older versions into prompt_pure_state.
+if (( UID )); then
+  pure_ident='%F{$prompt_pure_colors[user]}%n%f%F{$prompt_pure_colors[host]}@%m%f'
+  pure_badge='%B%K{magenta}%F{black} %n@%m %f%k%b'
+  PROMPT=${PROMPT/"$pure_ident"/$pure_badge}
+  [[ -n $prompt_pure_state[username] ]] && prompt_pure_state[username]=$pure_badge
+  unset pure_ident pure_badge
+fi
 
 ## [Completion]
 ## Completion scripts setup. Remove the following line to uninstall
