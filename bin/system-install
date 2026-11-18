@@ -22,6 +22,10 @@ UPGRADE_STATE_DIR="${STUDIO_UPGRADE_STATE:-/usr/local/var/studio-upgrade}"
 UPGRADE_HELPER=/usr/local/libexec/studio-upgrade
 UPGRADE_LABEL=com.nielsmadan.studio-upgrade
 UPGRADE_PLIST="/Library/LaunchDaemons/$UPGRADE_LABEL.plist"
+PF_HELPER=/usr/local/libexec/studio-pf
+PF_RULES=/etc/pf.anchors/com.nielsmadan.studio-isolation
+PF_LABEL=com.nielsmadan.studio-pf
+PF_PLIST="/Library/LaunchDaemons/$PF_LABEL.plist"
 # Admin's CARGO_HOME holds the rustup proxies every user runs (see mise/studio.toml).
 # mise never needs sudo, since admin owns SYSTEM_MISE_DIR.
 MISE_SYSTEM_ENV=(MISE_CARGO_HOME="$SYSTEM_MISE_DIR/cargo" MISE_SYSTEM_PACKAGES_SUDO=false)
@@ -55,7 +59,9 @@ the terminal's pane ID from ssh clients (for Juggler on the MacBook), installs /
 Brewfile, gives this admin /usr/local/share/mise, and runs `mise install --system`
 and `mise reshim --system` without sudo. Last it installs root-owned copies of
 bin/system-upgrade and the LaunchDaemon that runs it weekly as this admin, gives
-this admin its state directory, and loads the daemon.
+this admin its state directory, and loads the daemon. Then it installs the pf rules
+that block the Studio's new connections to the home network, with bin/studio-pf and
+the LaunchDaemon that loads them at boot and every five minutes.
 EOF
 }
 
@@ -236,14 +242,28 @@ install_upgrade_daemon() {
   sudo_install "$plist" "$UPGRADE_PLIST" 644
   local changed="$INSTALLED"
   rm -f "$plist"
-  if [ "$CHECK" = 0 ] && sudo launchctl print "system/$UPGRADE_LABEL" >/dev/null 2>&1; then
+  load_daemon "$UPGRADE_LABEL" "$UPGRADE_PLIST" "$changed"
+}
+
+# Reloading the daemon reruns the helper, which loads changed rules.
+install_pf_daemon() {
+  INSTALLED=0
+  sudo_install "$DEPLOYED_RC/bin/studio-pf" "$PF_HELPER" 755
+  sudo_install "$DEPLOYED_RC/studio/pf-isolation.conf" "$PF_RULES" 644
+  sudo_install "$DEPLOYED_RC/studio/$PF_LABEL.plist" "$PF_PLIST" 644
+  load_daemon "$PF_LABEL" "$PF_PLIST" "$INSTALLED"
+}
+
+load_daemon() {
+  local label="$1" plist="$2" changed="$3"
+  if [ "$CHECK" = 0 ] && sudo launchctl print "system/$label" >/dev/null 2>&1; then
     if [ "$changed" = 0 ]; then
-      printf 'skip %s (loaded)\n' "$UPGRADE_LABEL"
+      printf 'skip %s (loaded)\n' "$label"
       return
     fi
-    run sudo launchctl bootout "system/$UPGRADE_LABEL"
+    run sudo launchctl bootout "system/$label"
   fi
-  run sudo launchctl bootstrap system "$UPGRADE_PLIST"
+  run sudo launchctl bootstrap system "$plist"
 }
 
 if ! command -v brew >/dev/null 2>&1 && [ -x /opt/homebrew/bin/brew ]; then
@@ -330,6 +350,8 @@ if [ "$UPGRADE" = 1 ]; then
 fi
 require "the upgrade daemon"
 install_upgrade_daemon
+require "the pf rules"
+install_pf_daemon
 
 if [ "${#FAILURES[@]}" -gt 0 ]; then
   printf '\nFailed steps:\n' >&2

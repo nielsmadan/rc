@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+
+ANCHOR=com.apple/900.studio-isolation
+RULES="${STUDIO_PF_RULES:-/etc/pf.anchors/com.nielsmadan.studio-isolation}"
+PFCTL="${STUDIO_PFCTL:-/sbin/pfctl}"
+
+# Reloaded on every run, since a reload of /etc/pf.conf can drop the anchor.
+"$PFCTL" -q -a "$ANCHOR" -f "$RULES"
+"$PFCTL" -s info 2>/dev/null | grep -q '^Status: Enabled' || "$PFCTL" -q -E

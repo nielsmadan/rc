@@ -148,6 +148,23 @@ class SystemInstallTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_check_installs_and_loads_the_pf_rules_and_their_daemon(self):
+        result, _ = self.run_script("--check", "--profile", "studio")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            f"+ sudo install -o root -g wheel -m 755 {self.opt}/rc/bin/studio-pf /usr/local/libexec/studio-pf",
+            result.stdout,
+        )
+        self.assertIn(
+            f"+ sudo install -o root -g wheel -m 644 {self.opt}/rc/studio/pf-isolation.conf "
+            "/etc/pf.anchors/com.nielsmadan.studio-isolation",
+            result.stdout,
+        )
+        self.assertIn(
+            "+ sudo launchctl bootstrap system /Library/LaunchDaemons/com.nielsmadan.studio-pf.plist",
+            result.stdout,
+        )
+
     def test_check_upgrade_runs_system_upgrade_after_the_mise_install(self):
         result, _ = self.run_script("--check", "--upgrade", "--profile", "studio")
         self.assertEqual(result.returncode, 0, result.stderr)
