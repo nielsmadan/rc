@@ -39,6 +39,7 @@ _zcompcache=~/.zsh/completions
 typeset -A _zcompgen=(
   just     'just --completions zsh'
   gh       'gh completion -s zsh'
+  cf       'cf complete zsh'
   glab     'glab completion -s zsh'
   kubectl  'kubectl completion zsh'
   pnpm     'pnpm completion zsh'

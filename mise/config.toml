@@ -35,6 +35,7 @@ railway = "latest"
 "github:nolabs-ai/nono" = "latest"
 "github:agavra/tuicr" = "latest"
 "github:pranshuparmar/witr" = "latest"
+"npm:cf" = "1.0.0-rc.1" # mise latest resolves 0.15.0; use latest after it includes the 1.0 release
 
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
