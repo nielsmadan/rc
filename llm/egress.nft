@@ -30,6 +30,8 @@ table inet llm_egress {
 		oifname != $LAN_IFS accept
 		ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 255.255.255.255 } goto lan_out
 		ip6 daddr { fe80::/10, fc00::/7, ff00::/8 } goto lan_out
+		# tailnet addresses belong on tailscale0; with tailscaled down they would leave by the LAN default route
+		ip daddr 100.64.0.0/10 goto lan_out
 		# on-link IPv6 (whatever the current prefix): the next hop is the destination, not the router
 		meta nfproto ipv6 rt ip6 nexthop != $ROUTER_LL goto lan_out
 	}

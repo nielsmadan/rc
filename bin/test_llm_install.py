@@ -7,6 +7,7 @@ import unittest
 
 SCRIPT = Path(__file__).with_name("llm-install")
 RC_LLM = Path(__file__).resolve().parent.parent / "llm"
+FIRST_RUN = ("--profile", "llm", "--host", "gx10")
 
 STUBS = {
     # Units are enabled and active once `enable --now` ran, until `disable --now`.
@@ -79,7 +80,7 @@ class LlmInstallTests(unittest.TestCase):
         self.state = root / "state"
         self.state.mkdir()
         self.log = root / "log"
-        stubs = root / "stubs"
+        stubs = self.stubs = root / "stubs"
         stubs.mkdir()
         for name, body in STUBS.items():
             (stubs / name).write_text(body)
@@ -108,7 +109,7 @@ class LlmInstallTests(unittest.TestCase):
         return result, calls
 
     def test_check_on_a_new_machine_lists_the_steps_and_writes_nothing(self):
-        result, calls = self.run_script("--check", "--profile", "llm")
+        result, calls = self.run_script("--check", *FIRST_RUN)
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn(f"+ write llm to {self.profile}", result.stdout)
         self.assertIn('    define LAN_IFS = { "wlP9s9", "enP7s7" }', result.stdout)
@@ -118,7 +119,7 @@ class LlmInstallTests(unittest.TestCase):
         self.assertEqual([c for c in calls if c.startswith(("systemctl enable", "useradd", "nmcli connection"))], [])
 
     def test_first_run_writes_the_network_file_from_the_routes(self):
-        result, _ = self.run_script("--profile", "llm")
+        result, _ = self.run_script(*FIRST_RUN)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             (self.etc / "egress-local.nft").read_text().splitlines()[1:],
@@ -130,9 +131,10 @@ class LlmInstallTests(unittest.TestCase):
             ],
         )
         self.assertEqual(self.profile.read_text(), "llm\n")
+        self.assertEqual((self.etc / "host").read_text(), "gx10\n")
 
     def test_first_run_creates_a_private_env_file_with_a_key(self):
-        self.run_script("--profile", "llm")
+        self.run_script(*FIRST_RUN)
         env_file = self.etc / "llm.env"
         self.assertEqual(env_file.stat().st_mode & 0o777, 0o600)
         lines = env_file.read_text().splitlines()
@@ -140,13 +142,14 @@ class LlmInstallTests(unittest.TestCase):
         self.assertRegex(lines[3], r"^VLLM_API_KEY=[0-9a-f]{64}$")
 
     def test_first_run_installs_the_files_and_starts_both_units(self):
-        _, calls = self.run_script("--profile", "llm")
+        _, calls = self.run_script(*FIRST_RUN)
         for src, dest in [
             ("egress.nft", self.etc / "egress.nft"),
             ("llm-egress.service", self.units / "llm-egress.service"),
             ("llm.service", self.units / "llm.service"),
             ("compose.yaml", self.srv / "compose.yaml"),
             ("nginx.conf", self.srv / "nginx.conf"),
+            ("hosts/gx10/engine.yaml", self.srv / "engine.yaml"),
         ]:
             self.assertEqual(dest.read_bytes(), (RC_LLM / src).read_bytes(), src)
         self.assertIn("docker compose pull --quiet", calls)
@@ -154,7 +157,7 @@ class LlmInstallTests(unittest.TestCase):
                         calls.index("systemctl enable --now llm.service"))
 
     def test_first_run_stops_taking_dns_servers_from_router_advertisements(self):
-        _, calls = self.run_script("--profile", "llm")
+        _, calls = self.run_script(*FIRST_RUN)
         self.assertIn("nmcli connection modify internetz ipv6.ignore-auto-dns yes", calls)
         self.assertIn("nmcli device reapply wlP9s9", calls)
         self.assertIn("systemctl restart systemd-resolved", calls)
@@ -162,13 +165,13 @@ class LlmInstallTests(unittest.TestCase):
     def test_old_gx10_egress_unit_is_retired_after_the_new_block_loads(self):
         (self.units / "gx10-egress.service").write_text("[Unit]\n")
         (self.state / "unit-gx10-egress.service").touch()
-        _, calls = self.run_script("--profile", "llm")
+        _, calls = self.run_script(*FIRST_RUN)
         self.assertLess(calls.index("systemctl enable --now llm-egress.service"),
                         calls.index("systemctl disable --now gx10-egress.service"))
         self.assertFalse((self.units / "gx10-egress.service").exists())
 
     def test_second_run_has_nothing_to_do(self):
-        self.run_script("--profile", "llm")
+        self.run_script(*FIRST_RUN)
         result, calls = self.run_script()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "llm-install: nothing to do\n")
@@ -177,18 +180,18 @@ class LlmInstallTests(unittest.TestCase):
     def test_an_existing_network_file_is_kept(self):
         self.etc.mkdir(mode=0o700)
         (self.etc / "egress-local.nft").write_text("define LAN_IFS = { \"eth9\" }\n")
-        self.run_script("--profile", "llm")
+        self.run_script(*FIRST_RUN)
         self.assertEqual((self.etc / "egress-local.nft").read_text(), "define LAN_IFS = { \"eth9\" }\n")
 
     def test_changed_nginx_conf_restarts_the_service_without_a_pull(self):
-        self.run_script("--profile", "llm")
+        self.run_script(*FIRST_RUN)
         (self.srv / "nginx.conf").write_text("old\n")
         _, calls = self.run_script()
         self.assertIn("systemctl restart llm.service", calls)
         self.assertNotIn("docker compose pull --quiet", calls)
 
     def test_new_tailscale_address_updates_the_env_file_and_keeps_the_key(self):
-        self.run_script("--profile", "llm")
+        self.run_script(*FIRST_RUN)
         key = (self.etc / "llm.env").read_text().splitlines()[3]
         self.env["STUB_TS_IP"] = "100.64.0.8"
         _, calls = self.run_script()
@@ -197,9 +200,46 @@ class LlmInstallTests(unittest.TestCase):
         self.assertEqual(lines[3], key)
         self.assertIn("systemctl restart llm.service", calls)
 
+    def test_first_run_without_a_host_names_the_hosts_and_writes_nothing(self):
+        result, calls = self.run_script("--profile", "llm")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("pass --host NAME on the first run (hosts: gx10", result.stderr)
+        self.assertFalse(self.profile.exists())
+        self.assertEqual(calls, [])
+
+    def test_unknown_host_is_refused(self):
+        result, calls = self.run_script("--profile", "llm", "--host", "gx10/../gx10")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("no llm/hosts/gx10/../gx10/engine.yaml", result.stderr)
+        self.assertEqual(calls, [])
+
+    def test_recorded_host_is_used_on_later_runs(self):
+        self.run_script(*FIRST_RUN)
+        (self.srv / "engine.yaml").write_text("old\n")
+        _, calls = self.run_script()
+        self.assertEqual((self.srv / "engine.yaml").read_bytes(),
+                         (RC_LLM / "hosts/gx10/engine.yaml").read_bytes())
+        self.assertIn("docker compose pull --quiet", calls)
+        self.assertIn("systemctl restart llm.service", calls)
+
+    def test_without_networkmanager_the_dns_step_is_skipped(self):
+        (self.stubs / "nmcli").unlink()
+        self.etc.mkdir(mode=0o700)
+        (self.etc / "egress-local.nft").write_text('define LAN_IFS = { "eth0" }\n')
+        result, calls = self.run_script(*FIRST_RUN)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("systemctl restart systemd-resolved", calls)
+        self.assertIn("systemctl enable --now llm.service", calls)
+
+    def test_without_networkmanager_or_a_network_file_asks_for_one(self):
+        (self.stubs / "nmcli").unlink()
+        result, _ = self.run_script(*FIRST_RUN)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("write " + str(self.etc / "egress-local.nft") + " by hand", result.stderr)
+
     def test_another_profile_is_refused(self):
         self.profile.write_text("studio\n")
-        result, calls = self.run_script("--profile", "llm")
+        result, calls = self.run_script(*FIRST_RUN)
         self.assertEqual(result.returncode, 1)
         self.assertIn("names studio", result.stderr)
         self.assertEqual(calls, [])

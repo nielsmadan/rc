@@ -11,9 +11,11 @@ OLD_EGRESS_NFT="${LLM_OLD_EGRESS_NFT:-/etc/gx10-egress.nft}"
 SERVICE_USER=vllm
 ENV_FILE="$ETC/llm.env"
 LOCAL_NFT="$ETC/egress-local.nft"
+HOST_FILE="$ETC/host"
 
 CHECK=0
 NEW_PROFILE=""
+NEW_HOST=""
 PENDING=0
 UNITS_CHANGED=0
 EGRESS_CHANGED=0
@@ -22,7 +24,7 @@ PULL=0
 
 usage() {
   cat <<'EOF'
-usage: llm-install [--check] [--profile llm]
+usage: llm-install [--check] [--profile llm] [--host NAME]
 
 Sets up a Linux machine with an NVIDIA GPU as the fleet's LLM host: vLLM behind
 an nginx allowlist, published on its Tailscale address and localhost only, and
@@ -32,16 +34,19 @@ step is skipped when it is already in place, so re-running after a pull applies
 only what changed.
 
   --profile llm   record the machine profile in /etc/rc-profile (first run)
+  --host NAME     record which llm/hosts/NAME/engine.yaml this machine serves,
+                  in /etc/llm/host (first run)
   --check         print what would change without changing anything; exits 1
                   when something is pending
 
 It writes /etc/llm/egress-local.nft (LAN interfaces and router addresses) from
 the current routes on the first run and never rewrites it, creates the vllm
-user and /etc/llm/llm.env with a new API key, installs llm/ into /etc/llm,
-/srv/llm and /etc/systemd/system, sets ipv6.ignore-auto-dns on the connected
-LAN connections, retires the old gx10-egress unit, and (re)starts
-llm-egress.service and llm.service as needed. Prerequisites: Docker with the
-NVIDIA runtime, NetworkManager, nftables, and Tailscale logged in.
+user and /etc/llm/llm.env with a new API key, installs llm/ and the host's
+engine.yaml into /etc/llm, /srv/llm and /etc/systemd/system, sets
+ipv6.ignore-auto-dns on the connected LAN connections when NetworkManager runs,
+retires the old gx10-egress unit, and (re)starts llm-egress.service and
+llm.service as needed. Prerequisites: Docker with the NVIDIA runtime,
+nftables, and Tailscale logged in.
 EOF
 }
 
@@ -49,6 +54,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --check) CHECK=1 ;;
     --profile) NEW_PROFILE="${2:-}"; shift ;;
+    --host) NEW_HOST="${2:-}"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
@@ -80,6 +86,7 @@ detect_network() {
   local router4 router_ll ifs
   router4="$(ip -4 route show default | awk '$1 == "default" && $2 == "via" { print $3; exit }')"
   router_ll="$(ip -6 route show default | awk '$1 == "default" && $2 == "via" && $3 ~ /^fe80::/ { print $3; exit }')"
+  command -v nmcli >/dev/null 2>&1 || return 1
   ifs="$(nmcli -t -f DEVICE,TYPE,STATE device |
     awk -F: '($2 == "ethernet" || $2 == "wifi") && $3 != "unmanaged" { printf "%s\"%s\"", sep, $1; sep = ", " }')"
   [ -n "$router4" ] && [ -n "$router_ll" ] && [ -n "$ifs" ] || return 1
@@ -100,6 +107,18 @@ compose() {
 
 [ "$(id -u)" = 0 ] || [ -n "${LLM_INSTALL_ROOTLESS:-}" ] || die "run as root"
 
+HOSTS="$(cd "$SRC/hosts" && echo *)"
+HOST="$(cat "$HOST_FILE" 2>/dev/null || true)"
+if [ -n "$NEW_HOST" ]; then
+  [[ "$NEW_HOST" =~ ^[a-z0-9-]+$ ]] && [ -f "$SRC/hosts/$NEW_HOST/engine.yaml" ] ||
+    die "no llm/hosts/$NEW_HOST/engine.yaml (hosts: $HOSTS)"
+  [ -z "$HOST" ] || [ "$HOST" = "$NEW_HOST" ] || die "$HOST_FILE names $HOST; not changing it"
+elif [ -z "$HOST" ]; then
+  die "no host in $HOST_FILE; pass --host NAME on the first run (hosts: $HOSTS)"
+elif [ ! -f "$SRC/hosts/$HOST/engine.yaml" ]; then
+  die "$HOST_FILE names $HOST, but llm/hosts/$HOST/engine.yaml does not exist"
+fi
+
 PROFILE="$(cat "$PROFILE_FILE" 2>/dev/null || true)"
 if [ -n "$NEW_PROFILE" ]; then
   [ "$NEW_PROFILE" = llm ] || die "unknown profile $NEW_PROFILE (llm-install sets up llm only)"
@@ -111,7 +130,7 @@ elif [ "$PROFILE" != llm ]; then
   die "no llm profile in $PROFILE_FILE; pass --profile llm on the first run"
 fi
 
-for cmd in docker nft nmcli tailscale ip systemctl openssl; do
+for cmd in docker nft tailscale ip systemctl openssl; do
   command -v "$cmd" >/dev/null 2>&1 || die "$cmd is not installed"
 done
 docker compose version >/dev/null 2>&1 || die "docker compose is not installed"
@@ -120,6 +139,10 @@ TS_IP="$(tailscale ip -4 2>/dev/null | head -n 1)"
 
 if [ ! -d "$ETC" ] && pending "install -d -m 0700 $ETC"; then
   install -d -m 0700 "$ETC" || die "could not create $ETC"
+fi
+
+if [ -n "$NEW_HOST" ] && [ "$HOST" != "$NEW_HOST" ] && pending "write $NEW_HOST to $HOST_FILE"; then
+  printf '%s\n' "$NEW_HOST" > "$HOST_FILE" || die "could not write $HOST_FILE"
 fi
 
 if [ ! -f "$LOCAL_NFT" ]; then
@@ -171,6 +194,7 @@ put "$SRC/egress.nft" "$ETC/egress.nft" 0644 && EGRESS_CHANGED=1
 put "$SRC/llm-egress.service" "$UNIT_DIR/llm-egress.service" 0644 && { UNITS_CHANGED=1; EGRESS_CHANGED=1; }
 put "$SRC/llm.service" "$UNIT_DIR/llm.service" 0644 && { UNITS_CHANGED=1; RESTART=1; }
 put "$SRC/compose.yaml" "$SRV/compose.yaml" 0644 && { RESTART=1; PULL=1; }
+put "$SRC/hosts/${NEW_HOST:-$HOST}/engine.yaml" "$SRV/engine.yaml" 0644 && { RESTART=1; PULL=1; }
 put "$SRC/nginx.conf" "$SRV/nginx.conf" 0644 && RESTART=1
 
 if [ "$UNITS_CHANGED" = 1 ] && pending "systemctl daemon-reload"; then
@@ -195,7 +219,7 @@ fi
 
 # The router keeps advertising its DNS address from the previous IPv6 prefix, and resolved gets stuck on it.
 dns_changed=0
-while IFS=: read -r dev type state con; do
+command -v nmcli >/dev/null 2>&1 && while IFS=: read -r dev type state con; do
   case "$type" in ethernet|wifi) ;; *) continue ;; esac
   [ "$state" = connected ] || continue
   [ "$(nmcli -g ipv6.ignore-auto-dns connection show "$con")" = yes ] && continue
@@ -210,7 +234,7 @@ if [ "$dns_changed" = 1 ] && pending "systemctl restart systemd-resolved"; then
 fi
 
 if [ "$CHECK" = 0 ]; then
-  compose config --quiet || die "$SRV/compose.yaml is invalid"
+  compose config --quiet || die "$SRV/compose.yaml with engine.yaml is invalid"
 fi
 if [ "$PULL" = 1 ] && pending "docker compose pull"; then
   compose pull --quiet || die "docker compose pull failed"
