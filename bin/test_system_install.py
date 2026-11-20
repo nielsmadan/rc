@@ -73,11 +73,6 @@ class SystemInstallTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         for name in ("tools", "bin"):
             self.assertIn(f"+ sudo install -d -o deploy -g staff -m 755 {self.opt}/{name}", result.stdout)
-        self.assertIn(
-            f"+ sudo ln -sfn {self.opt}/rc/studio/claude-updates.json "
-            "/Library/Application\\ Support/ClaudeCode/managed-settings.d/50-studio-updates.json",
-            result.stdout,
-        )
         self.assertIn(f"+ sudo ln -sfn {self.opt}/rc/studio/codex-requirements.toml /etc/codex/requirements.toml",
                       result.stdout)
         self.assertIn(

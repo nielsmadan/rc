@@ -10,7 +10,6 @@ SHARED_USER="${STUDIO_SHARED_USER:-nielsmadan}"
 DEPLOYED_REPOS=(rc ac)
 # studio-deploy <tool> installs into tools/ and links the commands in bin/.
 DEPLOY_DIRS=(rc ac tools bin)
-CLAUDE_MANAGED_DIR="/Library/Application Support/ClaudeCode/managed-settings.d"
 CODEX_REQUIREMENTS=/etc/codex/requirements.toml
 DROID_MANAGED_SETTINGS="/Library/Application Support/Factory/settings.json"
 SUDOERS_FILE=/etc/sudoers.d/studio-deploy
@@ -317,7 +316,6 @@ fi
 ensure_admin_zshrc
 sudo_link "$DEPLOYED_RC/mise/config.toml" /etc/mise/config.toml
 sudo_link "$DEPLOYED_RC/mise/$PROFILE.toml" "/etc/mise/conf.d/$PROFILE.toml"
-sudo_link "$DEPLOYED_RC/studio/claude-updates.json" "$CLAUDE_MANAGED_DIR/50-studio-updates.json"
 sudo_link "$DEPLOYED_RC/studio/codex-requirements.toml" "$CODEX_REQUIREMENTS"
 sudo_link "$DEPLOYED_RC/studio/droid-settings.json" "$DROID_MANAGED_SETTINGS"
 ensure_system_mise_dir
