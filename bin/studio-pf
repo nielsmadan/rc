@@ -4,7 +4,12 @@ set -euo pipefail
 ANCHOR=com.apple/900.studio-isolation
 RULES="${STUDIO_PF_RULES:-/etc/pf.anchors/com.nielsmadan.studio-isolation}"
 PFCTL="${STUDIO_PFCTL:-/sbin/pfctl}"
+# pfctl prints this notice and a blank line on every -f, even with -q.
+NOTICE='^$|^(pfctl: Use of -f option, could result in flushing of rules|present in the main ruleset added by the system at startup\.|See /etc/pf\.conf for further details\.)$'
 
 # Reloaded on every run, since a reload of /etc/pf.conf can drop the anchor.
-"$PFCTL" -q -a "$ANCHOR" -f "$RULES"
+status=0
+output=$("$PFCTL" -q -a "$ANCHOR" -f "$RULES" 2>&1) || status=$?
+if [[ -n $output ]]; then grep -Ev "$NOTICE" <<<"$output" >&2 || (( $? == 1 )) || exit 2; fi
+if (( status != 0 )); then exit "$status"; fi
 "$PFCTL" -s info 2>/dev/null | grep -q '^Status: Enabled' || "$PFCTL" -q -E
