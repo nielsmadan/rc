@@ -1,6 +1,6 @@
 # LLM host (`llm` profile)
 
-A Linux machine with an NVIDIA GPU that serves an OpenAI-compatible API to the fleet over Tailscale. Hosts live in `llm/hosts/<name>/`: `gx10` is the ASUS Ascent GX10 (DGX OS); a second host is planned (the XMG's WSL2 node). The machine's setup history, measurements and open steps live in the notes vault (`work/localllm/gx10-setup.md`); this file is how the repo side works.
+A Linux machine with an NVIDIA GPU that serves an OpenAI-compatible API to the fleet over Tailscale. Hosts live in `llm/hosts/<name>/`; today the only one is `gx10`, the ASUS Ascent GX10 (DGX OS). The machine's setup history, measurements and open steps live in the notes vault (`work/localllm/gx10-setup.md`); this file is how the repo side works.
 
 ## What runs
 
