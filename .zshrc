@@ -92,6 +92,17 @@ fi
 # git: `g` is the one oh-my-zsh git alias worth keeping; the rest of the git
 # shortcuts (ca, co, ci, po, d, ...) live in ~/.gitconfig.
 alias g='git'
+github() {
+  local url
+  url=$(git remote get-url "${1:-origin}") || return
+  url=${url%.git}
+  case $url in
+    git@*:*) url="https://${${url#git@}/://}" ;;
+    ssh://*) url="https://${${url#ssh://}#*@}" ;;
+    http*://*@*) url="https://${url#*@}" ;;
+  esac
+  open "$url"
+}
 
 # up N directories: `..` is built into zsh's cd, these add deeper hops
 # (replaces oh-my-zsh's lost `...`/`....`/`.....` aliases).
