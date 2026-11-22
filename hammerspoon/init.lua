@@ -36,6 +36,7 @@ require("hs.ipc")
 --   a / s   = left / right half (horizontal = side-by-side cols)
 --   z / x   = left / right two-thirds (horizontal = side-by-side cols)
 --   h       = home (re-run placement pass)
+--   i       = arrange iTerm2 on its current displays, ladder beside Juggler on main and tile on the sides
 --   j       = ladder all iTerm2 windows on the focused screen, most tabs widest, every title bar visible
 --   v       = join the clipboard's wrapped lines into one line, then paste
 
@@ -45,7 +46,7 @@ require("hs.ipc")
 -- iTerm2's AppleScript window id). "Stuck" = asked to shrink, didn't move at
 -- all, and is still well over the request, so a window that merely hits its
 -- real minimum on the way down doesn't trigger it.
-local UNSTICK_APP = "iTerm2"
+local ITERM_APP = "iTerm2"
 local UNSTICK_SLOP = 40   -- two text rows; char-grid snapping stays under this
 
 local function stuckDims(before, want, got)
@@ -71,7 +72,7 @@ local function setFrameUnstuck(win, frame)
   local before = win:frame()
   win:setFrame(frame, 0)
   local app, id = win:application(), win:id()
-  if not (app and id and app:name() == UNSTICK_APP) then return end
+  if not (app and id and app:name() == ITERM_APP) then return end
   local got = win:frame()
   local stuck = stuckDims(before, frame, got)
   if not (stuck.rows or stuck.columns) then return end
@@ -130,23 +131,22 @@ end
 
 -- Hyper+j gathers every iTerm2 window onto the focused window's screen and
 -- lays them out as a staircase, ordered by tab count: the window with the
--- most tabs bottom-left at full width, each one after it a title bar
--- higher and LADDER_STEP_X further right, the fewest-tabs window flush with
--- the top. Ties keep their current front-to-back order. The windows are
--- stacked in ladder order and then the window you were in is focused, so
--- every window below it keeps a LADDER_STEP_X-wide strip of title bar
--- uncovered.
-local LADDER_APP = "iTerm2"
+-- most tabs bottom-left at full width, the fewest flush with the top.
+-- Steps move up and right, shrinking if space is tight. Ties keep their
+-- current front-to-back order. The focused window is brought back to the
+-- front after stacking.
 local LADDER_STEP_Y = 32   -- iTerm2 title bar height (its tab bar starts 31px down, measured)
 local LADDER_STEP_X = 120  -- wider than the traffic lights (~70px), so the strip has room to click
 
 -- Rank 1 = frontmost (bottom-left), rank n = backmost (top-right).
 local function ladderFrame(sf, n, rank)
+  local stepX = math.min(LADDER_STEP_X, sf.w / n)
+  local stepY = math.min(LADDER_STEP_Y, sf.h / n)
   return {
-    x = sf.x + (rank - 1) * LADDER_STEP_X,
-    y = sf.y + (n - rank) * LADDER_STEP_Y,
-    w = sf.w - (rank - 1) * LADDER_STEP_X,
-    h = sf.h - (n - rank) * LADDER_STEP_Y,
+    x = sf.x + (rank - 1) * stepX,
+    y = sf.y + (n - rank) * stepY,
+    w = sf.w - (rank - 1) * stepX,
+    h = sf.h - (n - rank) * stepY,
   }
 end
 
@@ -179,25 +179,36 @@ local function byTabCount(wins, counts)
   return sorted
 end
 
-local function ladderWindows()
-  local focused = hs.window.focusedWindow()
-  local screen = focused and focused:screen() or hs.screen.mainScreen()
-  local wins = hs.fnutils.filter(hs.window.orderedWindows(), function(win)
+local function orderedItermWindows()
+  return hs.fnutils.filter(hs.window.orderedWindows(), function(win)
     local app = win:application()
-    return win:isStandard() and app ~= nil and app:name() == LADDER_APP
+    return win:isStandard() and app ~= nil and app:name() == ITERM_APP
   end)
-  if #wins == 0 then return end
-  wins = byTabCount(wins, itermTabCounts())
+end
 
-  local sf = screen:frame()
-  local prev = hs.window.setFrameCorrectness
-  hs.window.setFrameCorrectness = false
+local function setLadderFrames(wins, sf)
   for rank, win in ipairs(wins) do
     setFrameUnstuck(win, ladderFrame(sf, #wins, rank))
   end
+end
+
+local function raiseBackToFront(wins)
+  for i = #wins, 1, -1 do wins[i]:raise() end
+end
+
+local function ladderWindows()
+  local focused = hs.window.focusedWindow()
+  local screen = focused and focused:screen() or hs.screen.mainScreen()
+  local wins = orderedItermWindows()
+  if #wins == 0 then return end
+  wins = byTabCount(wins, itermTabCounts())
+
+  local prev = hs.window.setFrameCorrectness
+  hs.window.setFrameCorrectness = false
+  setLadderFrames(wins, screen:frame())
   hs.window.setFrameCorrectness = prev
 
-  for i = #wins, 1, -1 do wins[i]:raise() end
+  raiseBackToFront(wins)
   local stayIn = hs.fnutils.find(wins, function(win)
     return focused ~= nil and win:id() == focused:id()
   end)
@@ -424,6 +435,14 @@ end
 -- re-home.
 local FOCUS_TO_PLACE = { Neovide = true }
 
+local function appPlacementCandidates(appName)
+  local entry = APP_PLACEMENTS[appName]
+  if type(entry) == "function" then
+    return { { screen = MAIN_SCREEN_NAME, placement = entry } }
+  end
+  return entry or {}
+end
+
 -- Build the ordered candidate list {screen=name, placement=fn} for a
 -- window from its first matching WINDOW_RULE, else its APP_PLACEMENTS
 -- entry. Each config form normalizes to a list: a window_rule supplies
@@ -438,12 +457,7 @@ local function candidatesFor(win)
     end
   end
   local app = win:application()
-  local entry = app and APP_PLACEMENTS[app:name()]
-  if not entry then return {} end
-  if type(entry) == "function" then
-    return { { screen = MAIN_SCREEN_NAME, placement = entry } }
-  end
-  return entry  -- already a candidate list
+  return app and appPlacementCandidates(app:name()) or {}
 end
 
 -- Resolve which (screen, placement) to use for a given window: the first
@@ -451,8 +465,8 @@ end
 -- screen omitted/"" resolves to the primary screen (always connected), so
 -- a trailing { placement = fill } acts as a catch-all fallback. Returns
 -- nil if no candidate's screen is connected.
-local function resolvePlacement(win)
-  for _, c in ipairs(candidatesFor(win)) do
+local function resolveCandidates(candidates)
+  for _, c in ipairs(candidates) do
     local screen
     if c.screen and c.screen ~= "" then
       screen = findScreen(c.screen)        -- nil if monitor absent → try next
@@ -463,6 +477,73 @@ local function resolvePlacement(win)
   end
   return nil, nil
 end
+
+local function resolvePlacement(win)
+  return resolveCandidates(candidatesFor(win))
+end
+
+local function mainLadderArea(screenId, sf)
+  local dockScreen, placeDock = resolveCandidates(appPlacementCandidates("Juggler"))
+  if not dockScreen or dockScreen:id() ~= screenId then return sf end
+  local dock = placeDock(sf)
+  if dock.x == sf.x and dock.w > 0 and dock.w < sf.w then
+    return rightOf(dock.w)(sf)
+  end
+  return sf
+end
+
+local sideRows = {
+  { fill },
+  { topHalf, bottomHalf },
+  { topThird, middleThird, bottomThird },
+}
+
+local function arrangeItermWindows()
+  local focused = hs.window.focusedWindow()
+  local main = findScreen(MAIN_SCREEN_NAME) or hs.screen.primaryScreen()
+  if not main then return end
+  local mainId = main:id()
+  local groups = {}
+  for _, win in ipairs(orderedItermWindows()) do
+    local screen = not win:isFullScreen() and win:screen()
+    if screen then
+      local id = screen:id()
+      local group = groups[id]
+      if not group then
+        group = { frame = screen:frame(), wins = {} }
+        groups[id] = group
+      end
+      table.insert(group.wins, win)
+    end
+  end
+  if not next(groups) then return end
+
+  local mainGroup = groups[mainId]
+  if mainGroup then
+    mainGroup.frame = mainLadderArea(mainId, mainGroup.frame)
+    mainGroup.wins = byTabCount(mainGroup.wins, itermTabCounts())
+  end
+
+  local prev = hs.window.setFrameCorrectness
+  hs.window.setFrameCorrectness = false
+  for id, group in pairs(groups) do
+    if id == mainId then
+      setLadderFrames(group.wins, group.frame)
+    else
+      local rows = sideRows[math.min(#group.wins, 3)]
+      for rank, win in ipairs(group.wins) do
+        local placement = rows[(rank - 1) % #rows + 1]
+        setFrameUnstuck(win, placement(group.frame))
+      end
+    end
+  end
+  hs.window.setFrameCorrectness = prev
+
+  for _, group in pairs(groups) do raiseBackToFront(group.wins) end
+  if focused and focused:isStandard() then focused:focus() end
+end
+
+bindHyper("i", arrangeItermWindows)
 
 -- Union of APP_PLACEMENTS keys and WINDOW_RULES app names. Both the
 -- window filter (event subscription) and homeAllManagedWindows (initial /
