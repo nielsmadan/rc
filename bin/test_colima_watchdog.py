@@ -9,13 +9,20 @@ SCRIPT = Path(__file__).with_name("colima-watchdog")
 COLIMA = """#!/bin/sh
 d="$WD_TEST_DIR"
 case "$1" in
-  list) printf '{"name":"default","status":"%s"}\\n' "$(sh "$d/next" "$d/status.seq")" ;;
+  list)
+    status="$(sh "$d/next" "$d/status.seq")"
+    [ -n "$status" ] || exit 1
+    printf '{"name":"default","status":"%s"}\\n' "$status" ;;
   stop) echo "stop $*" >> "$d/calls"; echo Stopped > "$d/status.seq" ;;
   start)
-    echo "start $*" >> "$d/calls"; echo Running > "$d/status.seq"
+    echo "start $*" >> "$d/calls"
     echo "${COLIMA_SAVE_CONFIG-unset}" > "$d/save_config"
+    code=0
+    [ ! -f "$d/start_exit" ] || code="$(sh "$d/next" "$d/start_exit")"
+    [ "$code" = 0 ] || exit "$code"
+    echo Running > "$d/status.seq"
     [ -f "$d/start_heals" ] && echo ok > "$d/docker.seq"
-    exit "$(cat "$d/start_exit" 2>/dev/null || echo 0)" ;;
+    exit 0 ;;
 esac
 """
 
@@ -59,6 +66,9 @@ class ColimaWatchdogTests(unittest.TestCase):
             path.write_text(body)
             path.chmod(0o755)
         (self.dir / "next").write_text(NEXT)
+        self.config = self.dir / ".colima" / "default" / "colima.yaml"
+        self.config.parent.mkdir(parents=True)
+        self.config.write_text("mounts:\n  - location: ~/wrksp\n")
         self.env = {
             "PATH": f"{stubs}:/usr/bin:/bin",
             "HOME": str(self.dir),
@@ -92,6 +102,27 @@ class ColimaWatchdogTests(unittest.TestCase):
     def test_stopped_vm_is_started_at_login(self):
         self.assertEqual(self.run_watchdog("Stopped", ["fail"], ticks=1), ["start start --profile default"])
 
+    def test_login_starts_colima_when_list_gives_no_status(self):
+        self.assertEqual(self.run_watchdog("", ["fail"], ticks=1), ["start start --profile default"])
+
+    def test_login_waits_for_profile_config_before_starting(self):
+        self.config.unlink()
+        self.assertEqual(self.run_watchdog("", ["fail"], ticks=3), [])
+        self.assertIn(f"Colima config unavailable at {self.config}", (self.dir / "watchdog.log").read_text())
+
+    def test_failed_login_start_retries_until_docker_answers(self):
+        self.env["COLIMA_WATCHDOG_COOLDOWN"] = "0"
+        (self.dir / "start_exit").write_text("1\n0\n")
+        (self.dir / "start_heals").touch()
+        calls = self.run_watchdog("Stopped", ["fail"], ticks=5)
+        self.assertEqual(calls, ["start start --profile default", "notify", "start start --profile default"])
+        self.assertIn("docker is answering (colima Running)", (self.dir / "watchdog.log").read_text())
+
+    def test_failed_login_start_waits_for_cooldown(self):
+        (self.dir / "start_exit").write_text("1\n0\n")
+        calls = self.run_watchdog("Stopped", ["fail"], ticks=5)
+        self.assertEqual(calls, ["start start --profile default", "notify"])
+
     def test_start_leaves_the_linked_config_unwritten(self):
         self.run_watchdog("Stopped", ["fail"], ticks=1)
         self.assertEqual((self.dir / "save_config").read_text(), "0\n")
@@ -115,7 +146,7 @@ class ColimaWatchdogTests(unittest.TestCase):
     def test_repair_that_does_not_help_waits_for_cooldown(self):
         calls = self.run_watchdog("Running", ["fail"], ticks=12)
         self.assertEqual(calls.count(self.force_stop), 1)
-        self.assertIn("last repair under 3600s ago", (self.dir / "watchdog.log").read_text())
+        self.assertIn("last start or repair under 3600s ago", (self.dir / "watchdog.log").read_text())
 
     def test_repair_repeats_once_cooldown_has_passed(self):
         self.env["COLIMA_WATCHDOG_COOLDOWN"] = "0"

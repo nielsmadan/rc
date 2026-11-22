@@ -12,11 +12,12 @@
 # when the VZ VM has died (a logout kills it), so `colima list` cannot be
 # trusted to notice.
 #
-#   - At start (login): a Stopped VM is started.
+#   - At login: start Colima when Docker is down and the VM is Stopped or
+#     unknown. Retry at most once per COOLDOWN until Docker answers.
 #   - Every interval after that: if Colima says Running (or Broken) but docker
 #     has not answered THRESHOLD checks in a row, the VM is repaired with
 #     `limactl stop --force` + `colima start`, at most once per COOLDOWN.
-#   - A VM that says Stopped after start is left alone, so `colima stop` sticks.
+#   - Once Docker has answered, `colima stop` sticks.
 #   - Nothing is done while another colima start/stop/restart is running.
 #
 # It never holds Colima in the foreground, so a manual `colima start` is fine.
@@ -33,8 +34,10 @@ THRESHOLD="${COLIMA_WATCHDOG_THRESHOLD:-3}"
 COOLDOWN="${COLIMA_WATCHDOG_COOLDOWN:-600}"
 TICKS="${COLIMA_WATCHDOG_TICKS:-0}"
 LOG="${COLIMA_WATCHDOG_LOG:-$HOME/Library/Logs/colima-watchdog.log}"
-SOCKET="${COLIMA_HOME:-$HOME/.colima}/$PROFILE/docker.sock"
-export LIMA_HOME="${COLIMA_HOME:-$HOME/.colima}/_lima"
+COLIMA_DIR="${COLIMA_HOME:-$HOME/.colima}"
+CONFIG="$COLIMA_DIR/$PROFILE/colima.yaml"
+SOCKET="$COLIMA_DIR/$PROFILE/docker.sock"
+export LIMA_HOME="$COLIMA_DIR/_lima"
 # colima.yaml links to rc's copy (deploy-owned on the Studio), which a start must not rewrite.
 export COLIMA_SAVE_CONFIG=0
 if [ "$PROFILE" = default ]; then INSTANCE=colima; else INSTANCE="colima-$PROFILE"; fi
@@ -96,11 +99,15 @@ repair_vm() {
 
 # Prints the action for one check: ok, wait, start, repair, defer or unknown.
 decide() {
-  status="$1" healthy="$2" fails="$3" busy="$4" first="$5" cooled="$6"
+  status="$1" healthy="$2" fails="$3" busy="$4" startup_pending="$5" cooled="$6"
   if [ "$healthy" = 1 ]; then echo ok; return; fi
   if [ "$busy" = 1 ]; then echo wait; return; fi
+  if [ "$startup_pending" = 1 ] && { [ "$status" = Stopped ] || [ -z "$status" ]; }; then
+    if [ "$cooled" = 1 ]; then echo start; else echo defer; fi
+    return
+  fi
   case "$status" in
-    Stopped) if [ "$first" = 1 ]; then echo start; else echo wait; fi ;;
+    Stopped) echo wait ;;
     "") echo unknown ;;
     *)
       if [ "$fails" -lt "$THRESHOLD" ]; then echo wait
@@ -124,33 +131,43 @@ run() {
   fi
   log "watchdog started (profile $PROFILE, every ${INTERVAL}s)"
 
-  fails=0 last_repair=0 first=1 tick=0 last_note=""
+  fails=0 last_attempt=0 startup_pending=1 tick=0 last_note=""
   while :; do
     tick=$((tick + 1))
     status="$(colima_status)"
     if docker_healthy; then healthy=1; else healthy=0; fi
     if colima_busy; then busy=1; else busy=0; fi
-    if [ $(( $(date +%s) - last_repair )) -ge "$COOLDOWN" ]; then cooled=1; else cooled=0; fi
+    if [ $(( $(date +%s) - last_attempt )) -ge "$COOLDOWN" ]; then cooled=1; else cooled=0; fi
     if [ "$healthy" = 0 ] && [ "$busy" = 0 ] && [ "$status" != Stopped ] && [ -n "$status" ]; then
       fails=$((fails + 1))
     else
       fails=0
     fi
 
-    action="$(decide "$status" "$healthy" "$fails" "$busy" "$first" "$cooled")"
+    action="$(decide "$status" "$healthy" "$fails" "$busy" "$startup_pending" "$cooled")"
     note="$action/${status:-unknown}"
     case "$action" in
       ok|wait) ;;
-      start) log "VM is Stopped at start; starting it"; start_vm ;;
-      repair) repair_vm "$status"; last_repair="$(date +%s)"; fails=0 ;;
-      defer) [ "$note" = "$last_note" ] || log "docker still down, last repair under ${COOLDOWN}s ago; waiting" ;;
+      start|repair)
+        if [ -r "$CONFIG" ] && [ -s "$CONFIG" ]; then
+          case "$action" in
+            start) log "starting Colima for this login (status ${status:-unknown})"; start_vm ;;
+            repair) repair_vm "$status"; fails=0 ;;
+          esac
+          last_attempt="$(date +%s)"
+        elif [ "$note" != "$last_note" ]; then
+          log "Colima config unavailable at $CONFIG"
+        fi ;;
+      defer) [ "$note" = "$last_note" ] || log "docker still down, last start or repair under ${COOLDOWN}s ago; waiting" ;;
       unknown) [ "$note" = "$last_note" ] || log "colima list gave no status for profile $PROFILE" ;;
     esac
-    if [ "$action" = ok ] && [ "$last_note" != "$note" ] && [ -n "$last_note" ]; then
-      log "docker is answering (colima $status)"
+    if [ "$action" = ok ]; then
+      startup_pending=0
+      if [ "$last_note" != "$note" ] && [ -n "$last_note" ]; then
+        log "docker is answering (colima ${status:-unknown})"
+      fi
     fi
     last_note="$note"
-    [ "$busy" = 1 ] || first=0
 
     [ "$TICKS" -gt 0 ] && [ "$tick" -ge "$TICKS" ] && exit 0
     sleep "$INTERVAL"
