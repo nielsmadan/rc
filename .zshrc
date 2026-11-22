@@ -386,3 +386,17 @@ autoload -U +X bashcompinit && bashcompinit
 # and carries no username, so this file stays portable across machines.
 [[ -x "$HOME/.local/share/mise/shims/vault" ]] && \
   complete -o nospace -C "$HOME/.local/share/mise/shims/vault" vault
+
+# iTerm2 can start the saved login shell before consulting the pane profile.
+if [[ $ZSH_EVAL_CONTEXT == file && -o login && -t 0 && -z ${ZSH_EXECUTION_STRING+x} &&
+      $TERM_PROGRAM == iTerm.app && -n $ITERM_SESSION_ID && -z $SSH_CONNECTION && -z $TMUX &&
+      -z $RC_ITERM_STARTUP_CHECKED && -x ~/.local/bin/iterm-agent-resume &&
+      -f ~/.local/state/iterm-agent-resume/signing-key &&
+      -S ~/Library/'Application Support'/iTerm2/private/socket ]]; then
+  export RC_ITERM_STARTUP_CHECKED=1
+  _iterm_resume_python=(~/Library/'Application Support'/iTerm2/uv/venvs/*/bin/python(Nom))
+  if (( $#_iterm_resume_python )) && [[ -x $_iterm_resume_python[1] ]]; then
+    "$_iterm_resume_python[1]" ~/.local/bin/iterm-agent-resume --shell-startup
+  fi
+  unset _iterm_resume_python
+fi

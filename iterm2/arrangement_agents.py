@@ -15,6 +15,7 @@ from uuid import UUID
 
 RESUME_VAR = "user.rcAgentResume"
 DISABLED_VAR = "user.rcAgentDisabled"
+RESUME_ATTEMPTED_VAR = "user.rcAgentResumeAttempted"
 RECIPES = {
     "claude": "claude",
     "claude-raw": "claude",

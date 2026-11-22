@@ -12,6 +12,7 @@ from unittest.mock import patch
 import arrangement_agents as agents
 
 PANE = "1A0478C7-1362-4522-B935-588B9A313416"
+PANE_TTY = "/dev/ttys001"
 IDENTITY = "0e238fc7-96dc-4b26-9d7f-7a233e79a4f0"
 GENERATION = "99808f74-2f51-484c-99ab-c819c2302b34"
 STARTED = "Sun Nov 1 00:00:00 2026"
@@ -255,6 +256,8 @@ class Session:
         self.settings.update(profile.values)
 
     async def async_get_variable(self, name):
+        if name == "session.tty":
+            return PANE_TTY
         return self.variables.get(name)
 
     async def async_set_variable(self, name, value):
@@ -296,7 +299,17 @@ class SaveTests(unittest.IsolatedAsyncioTestCase):
         self.connection = types.SimpleNamespace(transactions=0)
         self.session = Session()
         self.window = Window(self.session, self.connection)
-        self.app = types.SimpleNamespace(windows=[self.window])
+        self.app = types.SimpleNamespace(
+            windows=[self.window],
+            get_session_by_id=lambda session_id: (
+                self.session if self.session.session_id == session_id else None
+            ),
+        )
+
+        async def get_app(_):
+            return self.app
+
+        fake.async_get_app = get_app
         self.scheduled = []
         self.directory = tempfile.TemporaryDirectory()
         self.service = self.bridge.ArrangementAgents(
@@ -350,6 +363,54 @@ class SaveTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             agents.command_record(self.window.saved["Command"]), self.saved_record
         )
+
+    async def prepare_resume(self, tty=PANE_TTY):
+        return await self.bridge.prepare_resume(
+            self.connection, self.session.session_id, tty, self.service.key
+        )
+
+    async def test_startup_claims_the_saved_profile_record_once(self):
+        latest = agents.sign_record(record(cwd="/tmp/latest"), self.service.key)
+        self.session.settings = {
+            "Command": agents.resume_command(latest, "/python", "/helper"),
+            "Custom Command": "Yes",
+        }
+        restored = await self.prepare_resume()
+        self.assertEqual(restored, latest)
+        self.assertEqual(self.session.settings, latest["original"])
+        self.assertEqual(json.loads(self.session.variables[agents.RESUME_VAR]), latest)
+        self.assertIsNone(await self.prepare_resume())
+
+    async def test_startup_can_claim_a_profile_already_repaired_by_the_saver(self):
+        self.session.session_id = "69E5D95F-18AD-410B-90A9-7BAE6C9FC21B"
+        self.session.variables = {}
+        self.session.settings = {
+            "Command": agents.resume_command(self.saved_record, "/python", "/helper"),
+            "Custom Command": "Yes",
+        }
+        await self.service.reconcile()
+        restored = await self.prepare_resume()
+        expected = agents.sign_record(
+            {**self.saved_record, "pane": self.session.session_id}, self.service.key
+        )
+        self.assertEqual(restored, expected)
+        self.assertEqual(self.session.settings, expected["original"])
+
+    async def test_startup_without_a_binding_or_with_capture_disabled_leaves_a_shell(self):
+        for variables in ({}, {**self.session.variables, agents.DISABLED_VAR: "1"}):
+            with self.subTest(disabled=bool(variables)):
+                self.session.variables = variables
+                self.assertIsNone(await self.prepare_resume())
+                self.assertEqual(self.session.settings, record()["original"])
+
+    async def test_startup_rejects_a_live_record_from_a_different_pane(self):
+        self.session.session_id = "69E5D95F-18AD-410B-90A9-7BAE6C9FC21B"
+        with self.assertRaisesRegex(ValueError, "belongs to a different pane"):
+            await self.prepare_resume()
+
+    async def test_startup_rejects_a_different_terminal(self):
+        with self.assertRaisesRegex(ValueError, "different terminal"):
+            await self.prepare_resume(tty="/dev/ttys002")
 
     async def test_missing_presence_keeps_binding_and_repairs_interrupted_save(self):
         self.session.settings = {

@@ -249,26 +249,25 @@ class ArrangementAgents:
             await asyncio.sleep(2)
 
 
-async def prepare_resume(connection, record, session_id, key):
-    agents.verify_record(record, key)
+async def prepare_resume(connection, session_id, tty, key):
     app = await iterm2.async_get_app(connection)
     session = app.get_session_by_id(session_id)
     if not session:
         raise ValueError("restored pane no longer exists")
-    current = agents.sign_record({**record, "pane": agents.pane_id(session_id)}, key)
     async with iterm2.Transaction(connection):
-        embedded = agents.command_record(
-            (await session.async_get_profile()).command or ""
-        )
-        if embedded:
-            agents.verify_record(embedded, key)
-            if embedded != record:
-                raise ValueError("pane resume record changed")
-            await set_startup(session, record["original"])
-        else:
-            live = agents.object_value(
+        if await session.async_get_variable("session.tty") != tty:
+            raise ValueError("resume requested from a different terminal")
+        if await session.async_get_variable(
+            agents.RESUME_ATTEMPTED_VAR
+        ) or await session.async_get_variable(agents.DISABLED_VAR):
+            return None
+        record, _ = await repair_session(session, key)
+        if not record:
+            record = agents.object_value(
                 await session.async_get_variable(agents.RESUME_VAR)
             )
-            if live != current:
-                raise ValueError("pane no longer owns this resume record")
-        await session.async_set_variable(agents.RESUME_VAR, json.dumps(current))
+            if not record:
+                return None
+            agents.verify_record(record, key, session.session_id)
+        await session.async_set_variable(agents.RESUME_ATTEMPTED_VAR, "1")
+        return record
