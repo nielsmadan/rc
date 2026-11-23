@@ -13,6 +13,7 @@ local main = screen(2, "Main", { x = 0, y = 24, w = 1800, h = 1200 })
 local right = screen(3, "Right", { x = 1800, y = 50, w = 1000, h = 1200 })
 local screens = { right, main, left }
 local windows, tabCounts, focused = {}, {}, nil
+local raised = {}
 local arrange
 
 local function watcher() return { start = function(self) return self end } end
@@ -53,12 +54,30 @@ local fakeHs = {
 }
 
 local function config(h)
+  local rightOfJuggler = h.rightOf(360)
+  local function mainLadder(rank)
+    local place = h.ladder(3, rank)
+    return function(sf) return place(rightOfJuggler(sf)) end
+  end
   return {
     main_screen = "Main",
     app_placements = { Juggler = {
       { screen = "Missing", placement = h.leftDock(480) },
       { screen = "Main", placement = h.leftDock(360) },
     } },
+    window_rules = {
+      { app = "iTerm2", titlePattern = "^Left top", screen = "Left", placement = h.topThird },
+      { app = "iTerm2", titlePattern = "^Left bottom", placements = {
+        { screen = "Missing", placement = h.bottomThird },
+        { screen = "Left", placement = h.bottomThird },
+      } },
+      { app = "iTerm2", titlePattern = "^Right top", placements = {
+        { screen = "Right", placement = h.topThird },
+        { screen = "Left", placement = h.topThird },
+      } },
+      { app = "iTerm2", titlePattern = "^Main front", screen = "Main", placement = mainLadder(1) },
+      { app = "iTerm2", titlePattern = "^Main back", screen = "Main", placement = mainLadder(3) },
+    },
   }
 end
 
@@ -78,6 +97,7 @@ local function window(id, display, options)
   local app = { name = function() return options.app or "iTerm2" end }
   local win = { rect = { x = 10, y = 50, w = 480, h = 640 } }
   function win:id() return id end
+  function win:title() return options.title end
   function win:screen() return display end
   function win:frame() return self.rect end
   function win:application() return app end
@@ -88,7 +108,10 @@ local function window(id, display, options)
     self.rect = frame
     focused = self
   end
-  function win:raise() focused = self end
+  function win:raise()
+    raised[#raised + 1] = self
+    focused = self
+  end
   function win:focus() focused = self end
   return win
 end
@@ -138,4 +161,45 @@ frame(windows[1], 1800, 338, 1000, 912)
 frame(windows[10], 2700, 50, 100, 1200)
 print("PASS edges of a crowded ladder fit its display")
 
-return "3 iTerm2 arrangement tests passed"
+screens = { right, main, left }
+local away = window(13, left, { title = "Right top" })
+local top = window(14, left, { title = "Left top" })
+local bottom = window(15, left, { title = "Left bottom" })
+local bottomTwin = window(16, left, { title = "Left bottom twin" })
+local guest = window(17, left)
+windows, raised, focused = { away, bottom, bottomTwin, guest, top }, {}, away
+arrange()
+frame(top, -1200, -30, 1200, 600)
+frame(away, -1200, 570, 1200, 600)
+frame(bottom, -1200, 1170, 1200, 600)
+frame(bottomTwin, -1200, 1170, 1200, 600)
+frame(guest, -1200, -30, 1200, 600)
+for i, win in ipairs({ guest, bottomTwin, bottom, away, top }) do assert(raised[i] == win) end
+assert(focused == away)
+print("PASS home rows get priority, visitors fill gaps, and overflow stacks behind occupied rows")
+
+windows, focused = { bottom, away }, bottom
+arrange()
+frame(away, -1200, -30, 1200, 900)
+frame(bottom, -1200, 870, 1200, 900)
+print("PASS two side windows preserve a returning window's bottom placement")
+
+local front = window(18, main, { title = "Main front" })
+local back = window(19, main, { title = "Main back" })
+local mainVisitor = window(20, main, { title = "Left top" })
+windows, focused = { back, small, front, mainVisitor }, back
+tabCounts = { { 18, 1 }, { 19, 10 }, { 20, 6 }, { 6, 4 } }
+arrange()
+frame(front, 360, 120, 1440, 1104)
+frame(mainVisitor, 480, 88, 1320, 1136)
+frame(back, 600, 56, 1200, 1168)
+frame(small, 720, 24, 1080, 1200)
+print("PASS home ladder ranks get priority and visitors fill gaps by tab count")
+
+windows = { back, mainVisitor }
+arrange()
+frame(mainVisitor, 360, 56, 1440, 1168)
+frame(back, 480, 24, 1320, 1200)
+print("PASS a home ladder step stays behind a visitor when the ladder shrinks")
+
+return "7 iTerm2 arrangement tests passed"

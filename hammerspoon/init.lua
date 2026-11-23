@@ -186,16 +186,6 @@ local function orderedItermWindows()
   end)
 end
 
-local function setLadderFrames(wins, sf)
-  for rank, win in ipairs(wins) do
-    setFrameUnstuck(win, ladderFrame(sf, #wins, rank))
-  end
-end
-
-local function raiseBackToFront(wins)
-  for i = #wins, 1, -1 do wins[i]:raise() end
-end
-
 local function ladderWindows()
   local focused = hs.window.focusedWindow()
   local screen = focused and focused:screen() or hs.screen.mainScreen()
@@ -203,12 +193,15 @@ local function ladderWindows()
   if #wins == 0 then return end
   wins = byTabCount(wins, itermTabCounts())
 
+  local sf = screen:frame()
   local prev = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
-  setLadderFrames(wins, screen:frame())
+  for rank, win in ipairs(wins) do
+    setFrameUnstuck(win, ladderFrame(sf, #wins, rank))
+  end
   hs.window.setFrameCorrectness = prev
 
-  raiseBackToFront(wins)
+  for i = #wins, 1, -1 do wins[i]:raise() end
   local stayIn = hs.fnutils.find(wins, function(win)
     return focused ~= nil and win:id() == focused:id()
   end)
@@ -368,7 +361,7 @@ end
 -- One step of the Hyper+j staircase, for homing a fixed set of windows into
 -- a ladder: rank 1 of n is bottom-left at full width, rank n flush with the top.
 local function ladder(n, rank)
-  return function(sf) return ladderFrame(sf, n, rank) end
+  return function(sf) return ladderFrame(sf, n, rank), rank end
 end
 
 -- Load ~/.hammerspoon/local.lua for per-machine MAIN_SCREEN_NAME,
@@ -497,6 +490,78 @@ local sideRows = {
   { topHalf, bottomHalf },
   { topThird, middleThird, bottomThird },
 }
+local thirdSlots = { [topThird] = 1, [middleThird] = 2, [bottomThird] = 3 }
+local halfSlots = { [topHalf] = 1, [bottomHalf] = 3 }
+
+local function homeItermSlot(win, screenId, sf, onMain)
+  local home, placement = resolvePlacement(win)
+  if not home or home:id() ~= screenId then return nil end
+  if not onMain then return thirdSlots[placement] or halfSlots[placement] end
+
+  local _, rank = placement(sf)
+  if type(rank) == "number" and rank >= 1 and rank % 1 == 0 then return rank end
+end
+
+local function assignItermSlots(wins, slotCount, preferred)
+  local slots, waiting, overflow = {}, {}, {}
+  for _, win in ipairs(wins) do
+    local slot = preferred[win]
+    if slot and not slots[slot] then
+      slots[slot] = win
+    else
+      waiting[#waiting + 1] = win
+    end
+  end
+
+  local nextSlot = 1
+  for _, win in ipairs(waiting) do
+    while slots[nextSlot] do nextSlot = nextSlot + 1 end
+    if nextSlot <= slotCount then
+      slots[nextSlot] = win
+    else
+      overflow[#overflow + 1] = win
+    end
+  end
+  return slots, overflow
+end
+
+local function itermDisplayLayout(group, screenId, onMain)
+  local wins, sf = group.wins, group.frame
+  local preferred, slotCount = {}, onMain and #wins or #sideRows
+  for _, win in ipairs(wins) do
+    local slot = homeItermSlot(win, screenId, sf, onMain)
+    if slot then
+      preferred[win] = slot
+      slotCount = math.max(slotCount, slot)
+    end
+  end
+  if onMain then
+    wins = byTabCount(wins, itermTabCounts())
+    sf = mainLadderArea(screenId, sf)
+  end
+
+  local slots, overflow = assignItermSlots(wins, slotCount, preferred)
+  local occupied = {}
+  for slot in pairs(slots) do occupied[#occupied + 1] = slot end
+  table.sort(occupied)
+
+  local items, rows = {}, sideRows[math.min(#wins, #sideRows)]
+  for rank, slot in ipairs(occupied) do
+    local frame = onMain and ladderFrame(sf, #wins, rank) or rows[rank](sf)
+    items[#items + 1] = { win = slots[slot], frame = frame }
+  end
+
+  local nextRow = 1
+  for _, win in ipairs(overflow) do
+    local row = preferred[win]
+    if not row then
+      row = nextRow
+      nextRow = row % #rows + 1
+    end
+    items[#items + 1] = { win = win, frame = rows[row](sf) }
+  end
+  return items
+end
 
 local function arrangeItermWindows()
   local focused = hs.window.focusedWindow()
@@ -516,30 +581,22 @@ local function arrangeItermWindows()
       table.insert(group.wins, win)
     end
   end
-  if not next(groups) then return end
-
-  local mainGroup = groups[mainId]
-  if mainGroup then
-    mainGroup.frame = mainLadderArea(mainId, mainGroup.frame)
-    mainGroup.wins = byTabCount(mainGroup.wins, itermTabCounts())
+  local items = {}
+  for id, group in pairs(groups) do
+    for _, item in ipairs(itermDisplayLayout(group, id, id == mainId)) do
+      items[#items + 1] = item
+    end
   end
+  if #items == 0 then return end
 
   local prev = hs.window.setFrameCorrectness
   hs.window.setFrameCorrectness = false
-  for id, group in pairs(groups) do
-    if id == mainId then
-      setLadderFrames(group.wins, group.frame)
-    else
-      local rows = sideRows[math.min(#group.wins, 3)]
-      for rank, win in ipairs(group.wins) do
-        local placement = rows[(rank - 1) % #rows + 1]
-        setFrameUnstuck(win, placement(group.frame))
-      end
-    end
+  for _, item in ipairs(items) do
+    setFrameUnstuck(item.win, item.frame)
   end
   hs.window.setFrameCorrectness = prev
 
-  for _, group in pairs(groups) do raiseBackToFront(group.wins) end
+  for i = #items, 1, -1 do items[i].win:raise() end
   if focused and focused:isStandard() then focused:focus() end
 end
 
@@ -564,7 +621,6 @@ end
 -- this (always re-home) but refresh it. Cleared on windowDestroyed.
 local placedWindows = {}
 local thirdsLayout = require("thirds_layout")
-local thirdSlots = { [topThird] = 1, [middleThird] = 2, [bottomThird] = 3 }
 local fullscreenPlacer = require("fullscreen_placement").new(resolvePlacement, function(id)
   placedWindows[id] = true
 end)
