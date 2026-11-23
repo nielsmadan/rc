@@ -1,6 +1,6 @@
 services:
   engine:
-    image: vllm/vllm-openai:v0.33.0@sha256:d825baf9ce4b1b6bfc5ecc7b79880c7e6748c65a72d697ce3d47607aafa84c6e
+    image: vllm/vllm-openai:v0.34.0@sha256:20fdb089454afbb324efa4110a2c025ff7b27cc1a086e07aa580b18df8ad1ce1
     user: "${VLLM_UID:?}:${VLLM_GID:?}"
     gpus: all
     shm_size: 16gb
@@ -19,25 +19,25 @@ services:
     volumes:
       - /srv/llm/hf:/hf
       - /srv/llm/cache:/cache
-    # NVIDIA's DGX Spark "agent ready" recipe (dgx-spark-playbooks nvidia/vllm), minus --trust-remote-code, plus text-only
+    # The single-GB10 command from vllm-project/vllm#59958, plus long context, prefix caching and tool calls.
+    # disk_offload reads the PLE table from the mmapped checkpoint; --load-format=fastsafetensors makes it fail.
     command:
-      - nvidia/Qwen3.6-35B-A3B-NVFP4
-      - --revision=1355db6a052410cfd62085d94b58866fd0f2c3c5
-      - --served-model-name=qwen3.6-35b-a3b
+      - nvidia/Qwen3.8-Flash-Next-NVFP4
+      - --revision=fc694b54fb0174e0913e6adf86691ef85a4ead47
+      - --served-model-name=qwen3.8-flash-next
       - --host=0.0.0.0
       - --port=8000
+      - '--engram-config={"disk_offload": true}'
       - --kv-cache-dtype=fp8
-      - --attention-backend=flashinfer
-      - --moe-backend=marlin
-      - --gpu-memory-utilization=0.4
+      - --gpu-memory-utilization=0.8
       - --max-model-len=262144
       - --max-num-seqs=4
       - --max-num-batched-tokens=8192
       - --enable-chunked-prefill
       - --async-scheduling
       - --enable-prefix-caching
-      - '--speculative-config={"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"}'
-      - --load-format=fastsafetensors
+      - '--speculative-config={"method":"mtp","num_speculative_tokens":3}'
+      - '--compilation-config={"max_cudagraph_capture_size": 32}'
       - --reasoning-parser=qwen3
       - --tool-call-parser=qwen3_xml
       - --enable-auto-tool-choice
