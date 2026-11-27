@@ -129,15 +129,23 @@ if not tomllib.load(open(os.path.join(root, "pyproject.toml"), "rb"))["project"]
 if not os.path.exists(os.path.join(root, "uv.lock")):
     sys.exit(f"studio-tool: {dist} has dependencies but its sdist has no uv.lock")
 packages = {p["name"]: p for p in tomllib.load(open(os.path.join(root, "uv.lock"), "rb"))["package"]}
-seen, todo = set(), [dist]
+# An extra on a dependency adds what the lock lists under that package's optional-dependencies.
+seen, visited, todo = set(), set(), [(dist, ())]
 while todo:
-    name = todo.pop()
-    for dep in packages[name].get("dependencies", []):
-        if "marker" in dep or "extra" in dep:
-            sys.exit(f"studio-tool: uv.lock gives {dep['name']} a marker or extra; teach studio-tool to read it")
-        if dep["name"] not in seen:
+    name, extras = todo.pop()
+    package = packages[name]
+    optional = package.get("optional-dependencies", {})
+    for extra in extras:
+        if extra not in optional:
+            sys.exit(f"studio-tool: uv.lock lists no extra {extra!r} for {name}")
+    for dep in package.get("dependencies", []) + [d for extra in extras for d in optional[extra]]:
+        if "marker" in dep:
+            sys.exit(f"studio-tool: uv.lock gives {dep['name']} a marker; teach studio-tool to read it")
+        key = (dep["name"], tuple(sorted(dep.get("extra", []))))
+        if key not in visited:
+            visited.add(key)
             seen.add(dep["name"])
-            todo.append(dep["name"])
+            todo.append(key)
 for name in sorted(seen):
     p = packages[name]
     hashes = [w["hash"] for w in p.get("wheels", [])] + ([p["sdist"]["hash"]] if "sdist" in p else [])

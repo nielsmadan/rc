@@ -123,12 +123,13 @@ class StudioToolTests(unittest.TestCase):
         archive = tarball({"codex-package.json": json.dumps(package).encode(), "bin/codex": b"#!/bin/sh\n"})
         self.release("openai/codex", f"rust-v{version}", {"codex-package-aarch64-apple-darwin.tar.gz": archive})
 
-    def publish_wheel(self, repo, dist, version, command, lock_dependencies=None):
+    def publish_wheel(self, repo, dist, version, command, lock_dependencies=None, lock_packages=""):
         files = {f"{dist}-{version}/pyproject.toml":
                  f'[project]\nname = "{dist}"\ndependencies = [{"\"x\"" if lock_dependencies else ""}]\n'.encode()}
         if lock_dependencies is not None:
             lock = f'version = 1\n\n[[package]]\nname = "{dist}"\nversion = "{version}"\n'
             lock += f'source = {{ editable = "." }}\ndependencies = [{", ".join(lock_dependencies)}]\n'
+            lock += lock_packages
             files[f"{dist}-{version}/uv.lock"] = lock.encode()
         self.release(repo, f"v{version}", {
             f"{dist}-{version}-py3-none-any.whl": python_wheel(dist, version, command),
@@ -309,6 +310,26 @@ class StudioToolTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         run = subprocess.run([str(self.opt / "bin/rl")], capture_output=True, text=True)
         self.assertEqual(run.stdout, "rl 0.4.0\n")
+
+    def test_follows_an_extra_to_the_packages_it_adds(self):
+        self.publish_wheel("nielsmadan/ringleader", "ringleader", "0.4.0", "rl",
+                           lock_dependencies=['{ name = "md", extra = ["linkify"] }'],
+                           lock_packages=(
+                               '\n[[package]]\nname = "md"\nversion = "1.0"\n'
+                               'wheels = [{ hash = "sha256:aa" }]\n'
+                               '[package.optional-dependencies]\nlinkify = [{ name = "linkify-it" }]\n'
+                               '\n[[package]]\nname = "linkify-it"\nversion = "1.0"\n'))
+        result = self.run_tool("install", "ringleader", "0.4.0")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("uv.lock has no hashes for linkify-it", result.stderr)
+
+    def test_refuses_an_extra_the_lock_does_not_list(self):
+        self.publish_wheel("nielsmadan/ringleader", "ringleader", "0.4.0", "rl",
+                           lock_dependencies=['{ name = "md", extra = ["linkify"] }'],
+                           lock_packages='\n[[package]]\nname = "md"\nversion = "1.0"\n')
+        result = self.run_tool("install", "ringleader", "0.4.0")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("lists no extra 'linkify' for md", result.stderr)
 
     def test_refuses_dependencies_without_a_lock(self):
         self.publish_wheel("nielsmadan/pratfall", "pratfall", "1.1.0", "prat")
