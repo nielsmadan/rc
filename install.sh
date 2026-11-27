@@ -296,6 +296,10 @@ if [ -n "$MACHINE_PROFILE" ]; then
   link studio-deploy  bin/studio-deploy ~/.local/bin/studio-deploy
   link package-audit bin/package-audit ~/.local/bin/package-audit
 fi
+# Its counterpart on the MacBook: pushes the Studio clones and runs studio-deploy.
+if [ -z "$MACHINE_PROFILE" ]; then
+  link studio-ship    bin/studio-ship ~/.local/bin/studio-ship
+fi
 # The Studio's rustup toolchains are admin's (mise/studio.toml). CARGO_HOME stays
 # ~/.cargo, since cargo writes its registry and `cargo install` there, and mise puts
 # its bin on PATH, so that bin links the shared rustup proxies.
