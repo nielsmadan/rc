@@ -1,0 +1,36 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+usage: studio-ship <repo>...
+
+Run on the MacBook. For each repo, pushes its Mac Studio clone
+(~/wrksp/<repo>/dev1) through your forwarded SSH agent, then deploys rc and ac
+with studio-deploy; other repos are only pushed. Stops at the first push or
+deploy that fails.
+USAGE
+}
+
+SSH="${STUDIO_SHIP_SSH:-ssh}"
+HOST="${STUDIO_SHIP_HOST:-studio}"
+NAME='^[A-Za-z0-9._-]+$'
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  "") usage >&2; exit 2 ;;
+esac
+for repo in "$@"; do
+  [[ "$repo" =~ $NAME ]] || { echo "studio-ship: invalid repo name '$repo'" >&2; exit 2; }
+done
+
+for repo in "$@"; do
+  echo "studio-ship: pushing $repo"
+  "$SSH" -A "$HOST" "cd ~/wrksp/$repo/dev1 && git push"
+  case "$repo" in
+    rc|ac)
+      echo "studio-ship: deploying $repo"
+      "$SSH" "$HOST" "zsh -lc 'studio-deploy $repo'"
+      ;;
+  esac
+done
