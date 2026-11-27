@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nielsmadan.lock-at-login</string>
+
+    <!-- Display sleep locks the session only with Lock Screen > "Require password after screen saver begins or display is turned off" set to Immediately. caffeinate -u then wakes the display so the lock screen shows without a key press. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>sleep 5; /usr/bin/pmset displaysleepnow; sleep 3; /usr/bin/caffeinate -u -t 2</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

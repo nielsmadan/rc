@@ -357,6 +357,18 @@ else
   load_agent com.nielsmadan.resource-log "$RESOURCE_LOG_PLIST"
 fi
 
+# Locks the session right after automatic login, so a shared screen (the Mini at the
+# projector) shows the lock screen instead of this account's desktop. Not loaded now:
+# loading it locks the screen; it runs at the next login.
+LOCK_AT_LOGIN_PLIST="$HOME/Library/LaunchAgents/com.nielsmadan.lock-at-login.plist"
+AUTOLOGIN_USER="$(defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2>/dev/null || true)"
+if [ "$AUTOLOGIN_USER" = "$(id -un)" ]; then
+  link lock-at-login-agent launchd/com.nielsmadan.lock-at-login.plist "$LOCK_AT_LOGIN_PLIST"
+else
+  seen_key lock-at-login-agent
+  say "skip $LOCK_AT_LOGIN_PLIST (automatic login is not $(id -un))"
+fi
+
 # Colima supervisor, replacing `brew services start colima`; see docs/colima-hardening.md.
 # Both at once would fight, so brew's agent is unloaded first. That stops the VM once,
 # and the watchdog starts it again when it loads.
