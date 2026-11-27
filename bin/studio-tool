@@ -12,6 +12,7 @@ bin/studio-checkout. Installs an exact release of one of these tools under
 /opt/tools/<tool>/<version>, from that tool's own release files only:
   loadout, pratfall  GitHub release wheel, dependencies locked by its uv.lock
   bellhop, callboard the same
+  ringleader         the same
   hooklinesinker     GitHub release binary, checked against SHA256SUMS too
   claude             Anthropic's signed release manifest and binary
   codex              OpenAI's GitHub release package
@@ -40,7 +41,7 @@ GPG="${STUDIO_TOOL_GPG:-/opt/homebrew/bin/gpg}"
 GPGV="${STUDIO_TOOL_GPGV:-/opt/homebrew/bin/gpgv}"
 CODESIGN="${STUDIO_TOOL_CODESIGN:-/usr/bin/codesign}"
 
-TOOL_NAMES="loadout pratfall bellhop callboard hooklinesinker claude codex pi droid opencode"
+TOOL_NAMES="loadout pratfall bellhop callboard ringleader hooklinesinker claude codex pi droid opencode"
 # Anthropic's release signing key and the publishers' Apple team IDs.
 CLAUDE_KEY_FPR=31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE
 CLAUDE_TEAM=Q6L2SF6YDW
@@ -66,6 +67,7 @@ die() { printf 'studio-tool: %s\n' "$*" >&2; exit 1; }
 command_of() {
   case "$1" in
     pratfall) echo prat ;;
+    ringleader) echo rl ;;
     *) echo "$1" ;;
   esac
 }
@@ -166,6 +168,10 @@ install_bellhop() {
 
 install_callboard() {
   install_wheel nielsmadan/callboard callboard "$@"
+}
+
+install_ringleader() {
+  install_wheel nielsmadan/ringleader ringleader "$@"
 }
 
 # The binary is ad-hoc signed, so the checksums are all there is to check.

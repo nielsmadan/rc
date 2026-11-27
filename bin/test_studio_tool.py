@@ -303,6 +303,13 @@ class StudioToolTests(unittest.TestCase):
             run = subprocess.run([str(self.opt / f"bin/{tool}")], capture_output=True, text=True)
             self.assertEqual(run.stdout, f"{tool} {version}\n")
 
+    def test_installs_ringleader_and_links_rl(self):
+        self.publish_wheel("nielsmadan/ringleader", "ringleader", "0.4.0", "rl")
+        result = self.run_tool("install", "ringleader", "0.4.0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        run = subprocess.run([str(self.opt / "bin/rl")], capture_output=True, text=True)
+        self.assertEqual(run.stdout, "rl 0.4.0\n")
+
     def test_refuses_dependencies_without_a_lock(self):
         self.publish_wheel("nielsmadan/pratfall", "pratfall", "1.1.0", "prat")
         sdist = tarball({"pratfall-1.1.0/pyproject.toml": b'[project]\nname = "pratfall"\ndependencies = ["x"]\n'})
@@ -388,7 +395,7 @@ class StudioToolTests(unittest.TestCase):
     def test_status_lists_every_tool(self):
         self.assertEqual(self.run_tool("status").stdout.splitlines(), [
             f"{tool}: not deployed"
-            for tool in ("loadout", "pratfall", "bellhop", "callboard", "hooklinesinker", "claude", "codex", "pi", "droid", "opencode")])
+            for tool in ("loadout", "pratfall", "bellhop", "callboard", "ringleader", "hooklinesinker", "claude", "codex", "pi", "droid", "opencode")])
 
 
 if __name__ == "__main__":
