@@ -239,6 +239,8 @@ loadenv() {
 }
 
 alias flt="flutter"
+alias st="slimetrail"
+alias sts="slimetrail search"
 
 alias rc="cd ~/rc"
 alias srcz="source ~/.zshrc"
